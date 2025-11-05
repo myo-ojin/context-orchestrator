@@ -168,10 +168,16 @@ This document lists the implementation tasks for the Context Orchestrator (exter
 ## Phase 11: Obsidian Integration
 
 ### 11. File Watcher and Parser
-- [ ] 11.1 Implement `ObsidianWatcher` (`src/services/obsidian_watcher.py`) using `watchdog` to detect `.md` changes
+- [x] 11.1 Implement `ObsidianWatcher` (`src/services/obsidian_watcher.py`) using `watchdog` to detect `.md` changes
   - _Requirements: Requirement 1.5_
-- [ ] 11.2 Implement `ObsidianParser` (`src/services/obsidian_parser.py`) to parse conversation notes (`**User:**` / `**Assistant:**`, Wikilinks)
+  - Completed: File system monitoring with watchdog, debouncing, graceful shutdown
+- [x] 11.2 Implement `ObsidianParser` (`src/services/obsidian_parser.py`) to parse conversation notes (`**User:**` / `**Assistant:**`, Wikilinks)
   - _Requirements: Requirements 1.5, 9_
+  - Completed: Conversation extraction, Wikilink parsing, YAML frontmatter support
+- [x] 11.3 Integrate ObsidianWatcher with main.py startup
+  - Completed: Auto-start when obsidian_vault_path is configured
+- [x] 11.4 Add unit tests for ObsidianWatcher and ObsidianParser
+  - Completed: Comprehensive test suites with 20+ test cases each
 
 ---
 

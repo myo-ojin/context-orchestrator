@@ -210,6 +210,40 @@ Runs automatically at 3:00 AM (configurable):
 4. Summary + metadata saved to session repository
 5. Failed jobs auto-retry with exponential backoff
 
+### 7. Obsidian Integration (Requirements 1.5, 9)
+
+**Purpose**: Automatically detect and ingest conversation notes from Obsidian vault, enabling seamless integration with existing knowledge base.
+
+**Components:**
+- `ObsidianWatcher`: File system watcher that monitors `.md` files in the vault
+- `ObsidianParser`: Parses conversation format (`**User:**` / `**Assistant:**`) and Wikilinks
+
+**Flow:**
+1. `ObsidianWatcher` monitors vault directory using watchdog library
+2. When `.md` file is created/modified, check if it contains conversations
+3. `ObsidianParser` extracts:
+   - User/Assistant conversation turns
+   - Wikilinks (`[[filename]]`) for relationship tracking
+   - YAML frontmatter (tags, date, metadata)
+4. Each conversation is ingested through `IngestionService`
+5. Metadata includes file path, Wikilinks, and conversation index
+
+**Features:**
+- **Auto-detection**: Automatically finds conversation notes as they're created
+- **Debouncing**: Prevents duplicate processing of rapid file changes (2s interval)
+- **Graceful handling**: Errors in parsing don't crash the watcher
+- **Vault scanning**: Optional one-time import of existing notes via `scan_existing_notes()`
+- **Recursive monitoring**: Detects changes in subdirectories
+- **Context manager support**: Properly manages lifecycle with `with` statement
+
+**Configuration:**
+```yaml
+# config.yaml
+obsidian_vault_path: C:\Users\username\Documents\ObsidianVault
+```
+
+When `obsidian_vault_path` is set, ObsidianWatcher starts automatically on system startup.
+
 ## Development Commands
 
 ### Running the System

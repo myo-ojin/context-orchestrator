@@ -48,6 +48,7 @@ from src.services.consolidation import ConsolidationService
 from src.services.session_manager import SessionManager
 from src.services.session_log_collector import SessionLogCollector
 from src.services.session_summary import SessionSummaryWorker
+from src.services.obsidian_watcher import ObsidianWatcher
 
 # Import MCP handler
 from src.mcp.protocol_handler import MCPProtocolHandler
@@ -180,7 +181,7 @@ def init_services(
     classifier: SchemaClassifier,
     chunker: Chunker,
     indexer: Indexer
-) -> tuple[IngestionService, SearchService, ConsolidationService, Optional[SessionManager]]:
+) -> tuple[IngestionService, SearchService, ConsolidationService, Optional[SessionManager], Optional[ObsidianWatcher]]:
     """
     Initialize core services
 
@@ -194,7 +195,7 @@ def init_services(
         indexer: Indexer instance
 
     Returns:
-        Tuple of (ingestion_service, search_service, consolidation_service, session_manager)
+        Tuple of (ingestion_service, search_service, consolidation_service, session_manager, obsidian_watcher)
     """
     # Initialize Ingestion Service
     ingestion_service = IngestionService(
@@ -242,7 +243,20 @@ def init_services(
         )
         logger.info(f"Initialized SessionManager with Obsidian vault: {config.obsidian_vault_path}")
 
-    return ingestion_service, search_service, consolidation_service, session_manager
+    # Initialize Obsidian Watcher (optional) - Requirement 1.5
+    obsidian_watcher = None
+    if config.obsidian_vault_path:
+        try:
+            obsidian_watcher = ObsidianWatcher(
+                vault_path=config.obsidian_vault_path,
+                ingestion_service=ingestion_service
+            )
+            logger.info(f"Initialized ObsidianWatcher for vault: {config.obsidian_vault_path}")
+        except ValueError as e:
+            logger.warning(f"Failed to initialize ObsidianWatcher: {e}")
+            obsidian_watcher = None
+
+    return ingestion_service, search_service, consolidation_service, session_manager, obsidian_watcher
 
 
 def check_and_run_consolidation(consolidation_service, data_dir: str) -> None:
@@ -324,7 +338,7 @@ def main(config_path: Optional[str] = None) -> None:
         classifier, chunker, indexer = init_processing(model_router, vector_db, bm25_index)
 
         # Initialize services
-        ingestion_service, search_service, consolidation_service, session_manager = init_services(
+        ingestion_service, search_service, consolidation_service, session_manager, obsidian_watcher = init_services(
             config,
             model_router,
             vector_db,
@@ -374,6 +388,20 @@ def main(config_path: Optional[str] = None) -> None:
                 logger.error(f"Failed to initialize scheduler: {e}")
                 scheduler = None
 
+        # Start Obsidian Watcher (if configured) - Requirement 1.5
+        if obsidian_watcher is not None:
+            try:
+                obsidian_watcher.start()
+                logger.info("Started ObsidianWatcher")
+
+                # Optional: Scan existing notes on startup
+                # Uncomment the line below to enable initial vault scan
+                # obsidian_watcher.scan_existing_notes()
+
+            except Exception as e:
+                logger.error(f"Failed to start ObsidianWatcher: {e}")
+                obsidian_watcher = None
+
         # Initialize MCP Protocol Handler
         handler = MCPProtocolHandler(
             ingestion_service=ingestion_service,
@@ -390,6 +418,12 @@ def main(config_path: Optional[str] = None) -> None:
         try:
             handler.start()
         finally:
+            # Graceful shutdown: stop Obsidian Watcher
+            if obsidian_watcher is not None:
+                logger.info("Shutting down ObsidianWatcher...")
+                obsidian_watcher.stop()
+                logger.info("ObsidianWatcher stopped")
+
             # Graceful shutdown: stop scheduler
             if scheduler is not None:
                 logger.info("Shutting down scheduler...")
