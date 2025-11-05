@@ -87,6 +87,9 @@ python -m src.cli import --input backup.json   # Import memories
 # Session history
 python -m src.cli session-history  # List all sessions
 python -m src.cli session-history --session-id <id>  # Show specific session
+
+# Performance profiling
+python scripts/performance_profiler.py  # Run performance benchmarks
 ```
 
 See [CLAUDE.md](CLAUDE.md) for detailed CLI documentation.
@@ -223,6 +226,29 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture and development guide.
 - **Disk Usage**: ~10MB/year (~100MB/10 years)
 - **Consolidation**: Complete in <5 minutes for 10K memories
 
+### Performance Profiling
+
+Run performance benchmarks to validate system performance:
+
+```bash
+# Run all benchmarks
+python scripts/performance_profiler.py
+
+# Custom run count
+python scripts/performance_profiler.py --runs 200
+
+# Save report to custom location
+python scripts/performance_profiler.py --output ./perf_report.json
+```
+
+The profiler measures:
+- **Search Latency**: P50/P95/P99 latencies with target ≤200ms
+- **Ingestion Throughput**: Conversations per second, target <5s/conversation
+- **Consolidation Time**: Extrapolated time for 10K memories, target <5 minutes
+- **Memory Footprint**: Peak and resident memory usage
+
+Reports are saved as JSON with pass/fail indicators for each target.
+
 ## Documentation
 
 - **Requirements**: `.kiro/specs/dev-knowledge-orchestrator/requirements.md` - Full project requirements
@@ -237,9 +263,12 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture and development guide.
 - ✅ **Phase 11**: Obsidian Integration - **COMPLETE**
 - ✅ **Phase 12**: CLI Interface - **COMPLETE**
 - ✅ **Phase 13**: Testing and Documentation - **COMPLETE**
-- ⏳ **Phase 14**: Integration & Optimization - PLANNED
+- ✅ **Phase 14**: Integration & Optimization - **COMPLETE**
+  - End-to-end validation tests
+  - Performance profiling tool
+  - Enhanced error handling and structured logging
 
-**Current Status**: MVP Ready for Production Testing
+**Current Status**: Production Ready
 
 ## License
 

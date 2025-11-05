@@ -135,3 +135,48 @@ class ConsolidationError(ContextOrchestratorError):
         ConsolidationError: Failed to cluster memories
     """
     pass
+
+
+class ValidationError(ContextOrchestratorError):
+    """
+    Validation error (invalid input data)
+
+    Example:
+        >>> raise ValidationError('conversation', 'Missing required field: assistant')
+        ValidationError: Invalid conversation: Missing required field: assistant
+    """
+    def __init__(self, data_type: str, message: str):
+        super().__init__(f"Invalid {data_type}: {message}")
+
+
+class ObsidianError(ContextOrchestratorError):
+    """
+    Obsidian integration error
+
+    Example:
+        >>> raise ObsidianError('Failed to parse markdown file')
+        ObsidianError: Failed to parse markdown file
+    """
+    pass
+
+
+class ChunkingError(ContextOrchestratorError):
+    """
+    Chunking failed
+
+    Example:
+        >>> raise ChunkingError('Content exceeds maximum token limit')
+        ChunkingError: Content exceeds maximum token limit
+    """
+    pass
+
+
+class EmbeddingError(ContextOrchestratorError):
+    """
+    Embedding generation failed
+
+    Example:
+        >>> raise EmbeddingError('Failed to generate embedding for text')
+        EmbeddingError: Failed to generate embedding for text
+    """
+    pass

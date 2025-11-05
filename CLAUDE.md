@@ -340,11 +340,35 @@ pytest
 # Run unit tests only
 pytest tests/unit/
 
-# Run integration tests
-pytest tests/integration/
+# Run end-to-end tests
+pytest tests/e2e/
+
+# Run specific test file
+pytest tests/e2e/test_full_workflow.py
 
 # Run with coverage
-pytest --cov=src
+pytest --cov=src --cov-report=html
+
+# Run with verbose output
+pytest -v
+```
+
+### Performance Profiling
+```bash
+# Run all performance benchmarks
+python scripts/performance_profiler.py
+
+# Custom number of runs
+python scripts/performance_profiler.py --runs 200
+
+# Save report to custom location
+python scripts/performance_profiler.py --output ./performance_report.json
+
+# Benchmarks include:
+# - Search latency (P50/P95/P99, target ≤200ms)
+# - Ingestion throughput (target <5s/conversation)
+# - Consolidation time (target <5min for 10K memories)
+# - Memory footprint (target ≤1GB resident, ≤3GB peak)
 ```
 
 ## Configuration
@@ -411,11 +435,53 @@ score = (
 )
 ```
 
-### 3. Error Handling
+### 3. Error Handling (Enhanced in Phase 14)
 - **Graceful degradation**: Continue operating on partial failures
 - **Detailed logging**: All errors logged with context
 - **User-friendly messages**: Technical details hidden from users
 - **Fallback chains**: Cloud LLM fails → local LLM fallback
+
+**Error Handling Framework:**
+```python
+from src.utils.error_handler import ErrorHandler, ErrorContext, with_error_handling
+
+# Using ErrorContext for structured error handling
+try:
+    result = risky_operation()
+except Exception as e:
+    context = ErrorContext(
+        operation='search',
+        context={'query': query},
+        user_message='Failed to search memories',
+        suggestions=['Check database connection', 'Verify Ollama is running']
+    )
+    ErrorHandler.handle_error(e, context, reraise=False)
+
+# Using decorator for automatic error handling
+@with_error_handling("ingest_conversation", "Failed to ingest conversation")
+def ingest(conversation):
+    # Implementation
+    pass
+```
+
+**Structured Logging:**
+```python
+from src.utils.logger import setup_structured_logger, get_logger_with_context, log_operation
+
+# JSON-formatted logging
+logger = setup_structured_logger('my_service', 'INFO')
+logger.info('Processing item', extra={'context': {'item_id': '123'}})
+# Output: {"timestamp": "2025-01-15T10:00:00", "level": "INFO", "message": "Processing item", "context": {"item_id": "123"}}
+
+# Logger with automatic context injection
+logger = get_logger_with_context(__name__, {'service': 'ingestion'})
+
+# Operation timing context manager
+with log_operation(logger, 'search'):
+    results = search_memory(query)
+# Logs: Operation 'search' started
+# Logs: Operation 'search' completed in 123.45ms
+```
 
 ### 4. PowerShell CLI Recording
 The system uses a PowerShell wrapper function that:
@@ -451,7 +517,7 @@ The system uses a PowerShell wrapper function that:
 - **Performance**: Sufficient for personal use (10K-100K memories)
 - **Portability**: Single directory backup
 
-## Testing Strategy
+## Testing Strategy (Updated Phase 14)
 
 ### Unit Tests (`tests/unit/`)
 Focus on individual components:
@@ -459,24 +525,55 @@ Focus on individual components:
 - `SchemaClassifier`: Schema detection accuracy
 - `Reranker`: Score calculation logic
 - `BM25Index`: Keyword search correctness
+- **Coverage**: 20+ unit test files with mocked dependencies
 
-### Integration Tests (`tests/integration/`)
-Cover component interactions:
-- Ingestion → Indexing pipeline
-- Search → Reranking pipeline
-- Consolidation → Clustering flow
+### Integration Tests
+Documented in `INTEGRATION_TEST_RESULTS.md`:
+- 7/10 components tested (70% coverage)
+- 100% pass rate for tested components
+- CLI commands (status, doctor, list-recent, export, import)
+- ObsidianParser (conversation extraction, wikilinks, frontmatter)
+- Error handling validation
 
-### End-to-End Tests (`tests/e2e/`)
-Validate full user scenarios:
-- CLI conversation recording → search → retrieval
-- Obsidian note ingestion → search → retrieval
-- Nightly consolidation → clustering → forgetting
+### End-to-End Tests (`tests/e2e/`) - Phase 14
+Comprehensive full-workflow validation in `tests/e2e/test_full_workflow.py`:
+
+**TestEndToEndWorkflow:**
+- Basic ingestion and retrieval loop
+- Multiple conversation retrieval with ranking
+- Consolidation workflow (cluster detection)
+- Search with special characters
+- Long content chunking validation
+- Japanese text handling
+- Code block preservation
+- Search result ranking validation
+
+**TestErrorHandling:**
+- Missing required fields
+- Empty content handling
+- Empty query handling
+
+**TestPerformance:**
+- Search latency measurement (target ≤200ms)
+- Batch ingestion throughput (target <5s/conversation)
+
+### Performance Profiling (`scripts/performance_profiler.py`)
+Automated benchmarking tool that measures:
+- **Search Latency**: P50/P95/P99 with 100+ runs
+- **Ingestion Throughput**: Conversations per second
+- **Consolidation Time**: Extrapolated to 10K memories
+- **Memory Footprint**: Peak and resident memory tracking
+- **JSON Reports**: Pass/fail for each target with detailed metrics
+
+Run with: `python scripts/performance_profiler.py [--runs N] [--output PATH]`
 
 ### Target Metrics
-- **Coverage**: ≥85% statement coverage
+- **Coverage**: ≥85% statement coverage (unit tests)
+- **E2E Coverage**: 15+ test scenarios covering main workflows
 - **Search latency**: ≤200ms (typical ~80ms)
 - **Ingestion speed**: ≤5 seconds per conversation
 - **Memory usage**: ~1GB resident, ~3GB peak
+- **All performance targets**: Validated via profiler
 
 ## Common Development Tasks
 
