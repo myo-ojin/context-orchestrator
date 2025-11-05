@@ -1,0 +1,916 @@
+Claude Codeを「第二の自分」にする、Obsidianを脳として。
+Obsidian
+AIエージェント
+DeepResearch
+ClaudeCode
+コンテキストエンジニアリング
+最終更新日 2025年09月06日
+投稿日 2025年08月26日
+こんばんは。座禅いぬです。
+
+Claude Code、Gemini CLI、CursorにKiroと、いよいよAIエージェントのない生活など考えられなくなってきましたね。最初は何ができるんだろう？と思いながら触っていましたが、自分なりの仕組みができてくるにつれすっかり生活必需品。「我々は道具を形づくり、その後、道具が我々を形づくる。」という有名な言葉がありますが、まさに生活を劇的に変えているなあと思います。
+
+ここしばらく、日々の業務において経営分析や調査業務の効率化が急務となっていました。各種AIツールを連携させることで一定の効率化は実現できていましたが、それでもまだ十分とは言えませんでした。先月半ばにLT会などでも発表しましたがObsidianをコンテキスト倉庫としたより自律的な運用の必要性を痛感していました。
+
+また、そのような中で、GeminiCLIをmarkdownで制御してDeep Researchを再現してみようぜというチャレンジを行ったのですが、このような仕組みを使えばvault内を調査して、RAGよりも柔軟に情報取得してコンテキストを引っ張ってこれる可能性を感じました。
+
+そこで、Claude Codeなどのようなコーディングエージェントを、より汎用的なリサーチや分析業務・経営などに応用できないかと考え、AIエージェントとの「協働」による新しい業務自動化の検証を行っています。
+
+AIエージェントに「仕事をさせる」とはどういうことだろう
+AIエージェントに単純作業を「自動化」させるだけでは、人間の代替に過ぎません。変な話、人間でもできる仕事しかしていないという意味でもあり、新規性はないです。しかし、もし自分自身の思考や判断プロセスをエージェントに移植し、「自分を複製」することができれば、そこには独自の価値が生まれるはずです。なんとかしたいですよね。
+
+その鍵となるのが、「連続性」と「自律性」です。つまり、常に人間の意図や文脈（コンテキスト）を理解し、それに沿って自律的に判断・実行できるエージェントがあれば、今までの自動化の文脈とは違う新しい価値が生まれます。
+
+仮説：厳密なルールが、コンテキストに沿った自律性を生む
+AIエージェントに人間のような柔軟な判断を期待するのはまだ難しいのが現状だと思いますが、それは連続性がないから判断の収束する場所が見えないがゆえのことではないかと思います。今のLLM、もう十分すぎるほど賢いですよね。人間でこんなに賢い人はそうそういないなあと思います。
+
+それを踏まえて、「厳密なルールを課すことで、コンテキストに沿った自律性を実現できるのではないか」という仮説を立てました。
+
+作業のプロセスを「入力 → 状況・制約の参照 → 基準参照 → 意思決定 → 実行 → 責任と検証」と分解し、各段階でエージェントが従うべきルールを定義します。これにより、人間の判断をシミュレートさせようという試みです。これって、最近のエージェントが要件定義や仕様、タスクリストをきっちり定義するとコード生成がうまくいきやすいのと同じことですよね。
+
+検証：ルールベースのAIエージェント運用
+今回は、ユーザー知見の多いClaude Codeエージェントを用いて、以下のルールを定義し、実際の業務で検証を行いました。
+
+1. 厳密なルールセットの定義
+エージェントの挙動を制御するため、CLAUDE.md というファイルに以下のルールを記述しました。
+
+スケジュール管理: 毎朝、その日のタスクを30分単位のスケジュールに分解する。人間は各コマの開始前に計画を承認する。
+進捗管理: タスクが完了したら、スケジュール表のチェックボックスを更新し、実績を記録する。人間の承認なしには次のタスクに進めない。
+自律的なコンテキスト検索: タスク実行に必要な情報は、ObsidianのVault内から自律的に検索・参照する。
+情報提供依頼書: 必要な情報が見つからない場合、人間に「情報提供依頼書」を生成し、追記を求める。
+調査依頼書: 外部情報の調査が必要な場合、Deep Research（ChatGPTなど）にそのまま投入できる形式の「調査依頼書」プロンプトを生成する。
+この仕組みにより、「AIが自律的に作業し、人間は要所で承認と方向修正を行う」という協働体制を目指します。これはポモドーロテクニックと併用して、人間が自分の作業に25分集中し、5分の休憩時にレビューするというサイクルを回すことを想定しています。
+
+というか僕が歯医者なので、普段こんな感じで仕事をしているというだけではあります。
+
+2. 実際に検証
+この仕組みを、仕事やプライベートで使い倒すこととしました。
+
+事例1
+解決したい課題
+マナビDXクエストで、みんながコーディングの勉強を気軽にできる自主イベントを開催したいなあ。なんかええアイディアないかなあ。せや！自分たちの学習を補助してくれるツールを開発するイベントはどやろ？
+ClaudeCodeに依頼
+課題解決のプロセスを相談→タスクをスケジュールに割り振る
+image.png
+ClaudeCodeがvault内を調査し、調査依頼書を生成する
+image.png
+wikilinkでドキュメントがまとめられているので、しゅっと参照できます。
+ChatGPT Deep Researchに調査依頼書をコピペして調査
+image.png
+対話や調査、時には差戻しを繰り返しスライド作成まで終了
+image.png
+受講生コミュニティってないけど、まあいいか。最後の25分仮眠してたからこんなもん。でも内容は（寝ぼけて検印したやつ以外は）全部把握していて、自分の考えからずれるところはこまごま修正している。修正が早い方が、直す量は少なくて済むし、方向性がちゃんと絞れる。重要なメッセージはちゃんと自分の言葉になっている。
+事例2
+解決したい課題
+本業の業務改善課題（仕事の具体的な内容過ぎてスクショ載せられない）
+解決策の立案
+解決案とロードマップの策定。スケジュールに記載してもらってスタート。
+本質的問題の特定
+マークダウン化されているマニュアルや経営分析を、vaultからディープリサーチ的探索をさせる
+解決策の提案
+説得力がない部分は似た事例をオンラインで調査すべく調査依頼書書かせてディープリサーチ
+改善マニュアル案の作成
+vaultから隣接領域のマニュアルを取得、様式をまねて新しいマニュアルを記述
+アプリモックアップの作成
+よく考えたらこれが本業ですよね
+提案スライドの作成
+Marpでも十分わかりやすいスライドが完成
+3. 考察
+成果:
+作業の合間に、関連ドキュメントがObsidian内に自動で蓄積されていく。過去の議事録や分析結果を自律的に参照し、整合性の取れたアウトプットを生成。確認と検印を求めてくる。プロセス上で目を通してないファイルはゼロ。
+特に「調査依頼書」の仕組みは強力でした。エージェントが論点を整理し、調査すべき項目をプロンプトとして生成してくれるため、Deep Researchの精度と効率が劇的に向上しました。これにより、1日に10回以上の質の高いリサーチを実行できるようになりました。
+課題:
+「情報提供依頼書」への記入は、対話形式の方が効率的だと感じました（要改善）。他人にぶん投げて書かせる用に使うかなとか思い悩み中。
+生成されるドキュメントの約7割は、まだだいぶ手直しが必要なゴミドキュメント。しかし、結果的にドキュメント作成の不備に気付く点もあり、思考の叩き台として非常に有用でした。困ったらGPT-5 proちゃんに何とかしてもらう。
+コーディングエージェントの特性や機能をもっと理解しないといけない。コーディング作業はそんなにないため、あまりたくさんコードを書かせていないので、挙動の理解を十分できていない。
+どうでもいいけど、自分の事を「人間」って呼ぶ癖ついたウケる。人間は賢くないにゃあ。
+まとめ：AIエージェントとの「協働」に見えた光
+今回の検証を通じて、Obsidianをコンテキスト倉庫＋ドキュメント共有システムとし、厳密なルールに基づいてAIエージェントを制御することで、高度なリサーチ業務やレポートを半自動化できそうだということが分かりました。
+
+「完全な自由とは、最も厳格な規律を通してのみ達成される」とルソーも言っていますが、AIエージェントは非常に高性能で、自由すぎると逆に使いこなせません。人間が厳密なルール定義と定期的なチェックをするシステムを構築することで初めてその能力を最大限に引き出し、我々の模倣的知的存在として我々の活動を飛躍させることができるように思います。そんな「協働」の未来が、すぐそこまで来ていると感じています。
+
+次回は具体的なCLAUDE.mdやAGENTS.mdの内容、そしていくつかのエージェントの挙動の比較などをまとめてみようと思います。
+
+2025/8/29 追記
+たくさんの方にみていただいてリアクションをいただいております。いつもありがとうございます。また、同内容をCDLEひろしまで発表しましたが、議論も盛り上がり、非常に示唆に富む質問を頂けました。より多くの方に自分が良いと思っているものを体験していただきたいので、現段階でのCLAUDE.mdを公開いたします。
+
+Claude Codeのルール制御に関しては、作業フォルダごとにルールファイルを設定できるところが面白いところだと思います。ぜひ、実験できるフォルダを作成いただき（もちろん、Obsidianのvaultが理想です！）、コピペなどでCLAUDE.mdを作成してClaude Codeを動かしてみてください。
+
+CLAUDE.md
+
+# Work Guidelines
+
+## 30-Minute Autonomous Task Execution (HITL Method)
+
+### Basic Cycle
+1. **Schedule Check** (At start)
+   - Read markdown format schedule
+   - Create 30-minute work plan
+   
+2. **Task Execution** (25 minutes)
+   - Execute tasks based on schedule
+   - Work in chunks that humans can verify in 1-5 minutes
+   
+3. **Report Creation** (5 minutes)
+   - Document completed tasks, ongoing tasks, and issues
+   - Specify plans for next 30 minutes
+
+### Performance Recording Method
+Record directly in each time slot within the schedule file:
+- **Completed:** Content completed and results
+- **Issues:** Problems encountered or pending decisions
+- **Changes:** Modifications from original plan
+
+### Schedule Performance Recording Format
+```markdown
+**Performance:**
+- (Work content and results)
+- Reference files:
+  - [[File name]]
+
+Comments (Human): (Human provides modification instructions or supplementary information)
+
+- [ ] Human verification
+```
+
+### Feedback Processing
+1. Receive modification instructions from humans via comments
+2. Create and present modification plan
+3. Incorporate into next cycle's plan after approval
+
+### Checkpoint Management (Important)
+- **If human verification is not `- [x]`, do not proceed to the next task**
+- After completing work for each time slot, wait for human verification
+- If no verification, pause work and request confirmation
+- **Do not edit text before the parts that humans have verified**
+- **AI must never edit the lines `- [ ] Human verification` or `- [x] Human verification`**
+- **There are no exceptions to this rule**
+
+### Verification Check Rules at Work Start (Mandatory)
+**Before starting work on a new time slot, always execute the following:**
+
+1. **Check Previous Time Slot in Schedule File**
+   - Load schedule file
+   - Check checkbox state of immediately preceding time slot
+   - Verify if it shows `- [x] Human verification`
+
+2. **Response When Verification Not Complete**
+   - If `- [ ] Human verification`, stop work
+   - Clearly state "Waiting for verification of previous time slot"
+   - Do not start next task until verification is complete
+
+3. **Start Work After Verification Complete**
+   - Start work after confirming `- [x] Human verification`
+   - Update TodoList status and proceed with work
+
+**Apply this rule without exception to prevent missing verifications**
+
+### Time Slot Transition Protocol (Added 2025-08-26)
+**Mandatory verbal confirmation at every time slot start:**
+
+1. **Explicit Verification Check**
+   - Must state: "Checking previous time slot verification status"
+   - Must report: "Verification status: [Complete/Incomplete]"
+   - Must document check in TodoList as first item
+
+2. **TodoList Structure for Time Slots**
+   ```markdown
+   Required first Todo item for any time slot:
+   - [ ] Previous time slot verification confirmed
+   - [ ] (Only after verification) Begin main task
+   
+   Required final Todo item for any time slot:
+   - [ ] Schedule performance recording completed
+   ```
+
+3. **Verification Failure Protocol**
+   - Immediately stop all work
+   - Report: "Previous slot unverified, work stopped"
+   - Wait for human verification before any further action
+
+## Error Management and Prevention (Added 2025-08-26)
+
+### Mandatory Error Analysis and Reporting
+When any rule violation or error occurs:
+
+1. **Immediate Stop and Analysis**
+   - Stop all work immediately upon error detection
+   - Identify which specific rule was violated
+   - Analyze the direct cause of the violation
+
+2. **Root Cause Analysis Report (Required)**
+   ```markdown
+   ## Error Report
+   - **Violated Rule**: [Specific rule that was broken]
+   - **What Happened**: [Factual description of the error]
+   - **Direct Cause**: [Immediate reason for violation]
+   - **Root Cause**: [Underlying systemic reason]
+   - **Prevention Measure**: [Specific action to prevent recurrence]
+   ```
+
+3. **Error Log Documentation (Mandatory)**
+   - **File Location**: `/claude/error_log.md`
+   - **Update Timing**: Immediately after error detection
+   - **Format**: Date, Error Type, Rule Violated, Root Cause, Prevention, Status
+   - **Review Cycle**: Weekly pattern analysis, Monthly improvement review
+
+4. **Prevention Implementation Requirements**
+   - **Prevention measures MUST be implemented as either:**
+     - Rule updates in CLAUDE.md (for behavioral changes)
+     - Template modifications (for process improvements)
+     - Schedule format changes (for workflow issues)
+   - **Not acceptable:** Verbal promises, mental notes, or informal commitments
+   - **Documentation required:** Show exact rule/template changes made
+   - Update error_log.md with resolution status and implementation details
+
+5. **Pattern Recognition**
+   - If same error occurs twice: Propose CLAUDE.md rule update
+   - Track error patterns to identify systemic issues
+   - Prioritize prevention over speed
+   - Use error_log.md for pattern analysis
+
+### Zero Tolerance for Repeated Violations
+- Same error twice = Mandatory rule revision proposal
+- Three violations of any rule = Full work stop for rule review
+- Prevention measures must be actionable and specific
+- All patterns must be documented in error_log.md
+
+## Schedule Management
+
+### File Placement
+- Schedules are placed in `/claude/schedules/YYYY-MM-DD.md` format
+- Example: `/claude/schedules/2024-01-15.md` (Based on Japan time)
+
+### Schedule Format
+- Activity hours: 05:00-22:00
+- Place `- [ ]` checkbox at the beginning of each time slot
+- Only one single task per time slot
+- **Place today's tasks section at the top of file** (maximum 3)
+- **Task breakdown and time allocation section** for human confirmation of work plan
+- Example:
+  ```markdown
+  # YYYY-MM-DD Schedule
+  
+  ## Today's Tasks
+  ### Task 1
+  - **Content:** [Enter here]
+  
+  ### Task 2
+  - **Content:** [Enter here]
+  
+  ### Task 3
+  - **Content:** [Enter here]
+  
+  ## Task Breakdown and Time Allocation (For Human Confirmation)
+  <!--
+  At the start of work, break down the above tasks and record below:
+  - Work processes for each task
+  - Estimated time required
+  - Schedule allocation proposal
+  -->
+  
+  Is this plan acceptable? If approved, I will begin execution sequentially from 09:00.
+  
+  **Once work processes are finalized, AI agent should transfer the schedule to the schedule below**
+  
+  - [ ] Human verification
+  
+  ---
+  
+  ## 14:00-14:30
+  - [ ] **Scheduled:**
+  - Create business flow diagram for self-pay treatment
+  
+  **Performance:**
+  - (To be filled after work)
+  
+  - [ ] Human verification
+  ```
+
+### Task Execution Behavior
+1. **When task completed**: I update checkbox to `- [x]`
+2. **Performance recording**: Record completed content in performance section
+3. **Next task transition**: Move to next time slot after 30 minutes or completion
+
+### Standard Process for Task Execution (Deep Research Type)
+
+#### Phase 1: Investigation Planning (5 minutes)
+1. **Task Understanding**: What to create, what is the purpose
+2. **Hypothesis Formation**: What information seems necessary
+3. **Investigation Strategy**: Identify related documents from entire vault
+
+#### Phase 2: Comprehensive Investigation (10 minutes)
+1. **Identify Related Files**: Keyword search with Glob/Grep
+2. **Analyze Existing Materials**: Examples of similar work, related business information
+3. **Structure/Format Investigation**: In what format are they made
+4. **Identify Missing Information**: Clarify what is lacking
+
+#### Phase 3: Judgment/Request (5 minutes)
+- **If information sufficient**: Proceed to Phase 4
+- **If information insufficient**:
+  1. Create list of missing documents
+  2. Submit creation request
+  3. Pause task and move to next time slot
+
+#### Phase 4: Creation Execution (8 minutes)
+1. **Structure Decision**: Design structure based on investigation results
+2. **Content Creation**: Specific creation based on reference information
+3. **Quality Check**: Verification against investigated standards
+
+#### Phase 5: Recording (2 minutes)
+1. **Performance Recording**: Referenced files, created content, issues
+2. **Checkbox Update**: Change to `- [x]`
+
+### Deep Research Investigation Parallel Work Rules
+- After creating Deep Research investigation request, execute other tasks in parallel while waiting for results (about 30 minutes)
+- Complete up to request creation in the time slot where investigation was requested, then proceed to next work
+- Resume and complete original task as soon as investigation results arrive
+- Design work order considering investigation wait time when planning schedule
+
+### Planning Policy for Tasks Including External Investigation
+- Place tasks requiring web search/Deep Research requests in early time slots
+- Execute tasks that can be completed with internal materials in parallel after investigation requests
+- Conduct investigation result integration work in subsequent time slots
+- Place dependent tasks after investigation completion
+
+### Creating Deep Research Investigation Request for Web Search
+
+#### Creation Timing
+- When internet search becomes necessary
+- When external information investigation is needed
+
+#### File Placement
+- **Investigation Request**: Create in `/claude/` directory
+  - File name: `{Investigation Theme}_Investigation_Request.md` (Written in Japanese)
+
+#### Deep Research Investigation Request Format
+```markdown
+---
+tags:
+  - ClaudeCode
+  - Investigation Request
+  - DeepResearch
+  - [Related tags]
+date: YYYY-MM-DD
+updated: YYYY-MM-DD
+title: {Investigation Theme} Investigation Request
+---
+
+# Deep Research Investigation Request for {Investigation Theme}
+
+## Investigation Purpose
+{Clearly state why this investigation is necessary and what you want to achieve}
+
+## Investigation Background
+{Current situation, known information, challenges, etc.}
+
+## Investigation Items (Structured)
+
+### 1. Basic Information Collection
+- [ ] {Specific investigation item 1}
+- [ ] {Specific investigation item 2}
+- [ ] {Specific investigation item 3}
+
+### 2. Detailed Analysis
+- [ ] {Analysis perspective 1}
+- [ ] {Analysis perspective 2}
+- [ ] {Analysis perspective 3}
+
+### 3. Comparison/Evaluation
+- [ ] {Comparison item 1}
+- [ ] {Comparison item 2}
+- [ ] {Evaluation criteria}
+
+### 4. Practical Information
+- [ ] {Implementation method/procedure}
+- [ ] {Precautions/risks}
+- [ ] {Success cases/failure cases}
+
+## Expected Deliverables
+1. **Investigation Summary** (1-2 pages)
+   - Key findings
+   - Important insights
+   - Recommendations
+
+2. **Detailed Report**
+   - Detailed results for each investigation item
+   - Data/statistical information
+   - Reference materials list
+
+3. **Actionable Proposals**
+   - Specific action plan
+   - Priorities
+   - Timeline
+
+## Important Perspectives in Investigation
+- Prioritize reliable information sources
+- Emphasize latest information ({current year} data)
+- Consider practical applicability
+- Analysis from multiple perspectives
+
+## Investigation Results Entry Section
+```
+(Paste ChatGPT Deep Research results here)
+
+
+
+
+```
+
+## Next Execution Schedule
+Will continue {original task name} as soon as investigation results are provided.
+```
+
+#### Notes for Creating Investigation Request
+- Create assuming it will be copied and pasted to OpenAI ChatGPT Deep Research
+- Organize investigation items hierarchically and structurally
+- Set specific and measurable investigation items
+- Clearly define expected deliverables
+
+## Pending Task Management System (Added 2025-08-26)
+
+### Purpose
+Maximize productivity by managing tasks awaiting human input without blocking other work.
+
+### Pending Task Workflow
+
+#### 1. Task Suspension Process
+```markdown
+When Information Needed:
+1. Create information provision request (情報提供依頼)
+2. Immediately add to /claude/pending_tasks.md
+3. Mark current task as "Pending" in schedule
+4. Switch to next available task
+```
+
+#### 2. Pending List Entry Format
+```markdown
+### [Task Name]
+- **Status**: 🟡 Awaiting Information
+- **Request Document**: [[Request file link]]
+- **Request Date**: YYYY-MM-DD HH:MM
+- **Blocked Reason**: [Specific information needed]
+- **Required for Resume**: [Checklist of needed items]
+- **Next Action**: [What to do once unblocked]
+- **Priority**: High/Medium/Low
+```
+
+#### 3. Task Resume Protocol
+```markdown
+Check Cycle (Every 30 minutes):
+1. Review pending_tasks.md
+2. Check if any request documents have responses
+3. If information provided → Resume task
+4. If still waiting → Continue other tasks
+```
+
+#### 4. Human Interaction Flow
+- Human sees information provision request
+- Human adds ✓ check when reviewing request
+- Human provides information in request document
+- Claude detects update and resumes task
+
+#### 5. Benefits
+- Zero idle time waiting for information
+- Parallel processing of multiple tasks
+- Clear visibility of blocked tasks
+- Systematic tracking of dependencies
+
+### Integration with Schedule
+- Schedule shows: "Task moved to pending (see [[pending_tasks]])"
+- Continue with next task immediately
+- No time slot remains empty
+
+### Deep Research Investigation Result Integration Workflow
+
+#### Basic Flow
+1. **Create Investigation Request**: Create `/claude/{Investigation Theme}_Investigation_Request.md`
+2. **Execute Deep Research**: Conduct investigation with ChatGPT Deep Research
+3. **Save PDF**: Download investigation results as PDF, save to `/claude/research/`
+4. **Extract Text**: Extract text from PDF with `pdftotext` command
+5. **Summary Integration**: Record structured summary in "Investigation Results Entry Section" of investigation request
+6. **Wikilink Reference**: Reference detailed report with Wikilink notation `[[PDF filename]]`
+
+#### Technical Implementation
+```bash
+# Extract text from PDF (requires poppler-utils)
+pdftotext "/claude/research/Investigation_Report.pdf" -
+```
+
+#### File Placement Rules
+- **Investigation Request**: `/claude/{Investigation Theme}_Investigation_Request.md`
+- **Investigation Result PDF**: `/claude/research/{Investigation Theme}_Investigation_Report.pdf`
+- **Summary Integration**: Add structured summary to "Investigation Results Entry Section" in investigation request
+- **Detailed Reference**: Wikilink reference with `[[PDF filename]]`
+
+#### Summary Format
+```markdown
+### Investigation Results Summary (Conducted on YYYY-MM-DD)
+
+#### 1. [Main Category 1]
+- [Key point 1]
+- [Key point 2]
+
+#### 2. [Main Category 2]
+- [Key point 1]
+- [Key point 2]
+
+### Detailed Report
+Complete version included in [[Investigation_Report.pdf]]
+```
+
+#### Effects
+- Quick understanding through investigation result summary
+- Immediate access to details by clicking PDF
+- Unified information management within Obsidian vault
+- Efficient contextualization of large amounts of text
+
+### Creating Request When Documents are Insufficient
+
+#### File Placement Location
+- **Request**: Create in `/claude/` directory
+  - File name: `{Task name}_情報提供依頼.md` (Information Provision Request)
+- **Created items**: Create in `/claude/` directory
+  - File name: `{Created item name}.md` (Written in Japanese)
+  - Example: Business flow diagram, feature list, specifications, etc.
+- Link from schedule file using Wikilink notation (`[[File name]]`)
+
+#### Request Format
+```markdown
+---
+tags:
+  - ClaudeCode
+  - 情報提供依頼
+  - [Related tags]
+date: YYYY-MM-DD
+updated: YYYY-MM-DD
+title: {Task name} 情報提供依頼
+---
+
+# {Task name} 情報提供依頼
+
+## Task Overview
+- **Task Name**: {Task name}
+- **Scheduled Time**: YYYY-MM-DD HH:MM-HH:MM
+- **Status**: Temporarily paused due to insufficient information
+
+## Investigation Results
+### Discovered Existing Materials
+(List related materials found during investigation)
+
+### Missing Documents
+(Create sections for each necessary information below)
+
+#### 1. {Missing Information Title}
+**Required Information**:
+- [ ] {Required item 1}
+- [ ] {Required item 2}
+
+**Entry Section**:
+```
+(Please enter information here)
+
+
+
+
+```
+
+## Next Execution Schedule
+Will execute {Task name} as soon as above document information is provided.
+```
+
+#### Notes for Creating Requests
+- Specifically describe required information
+- Secure sufficient blank space for human entry
+- Clarify required items with checkboxes
+- YAML frontmatter is mandatory (tags, date, updated, title)
+
+#### Standard Format for Created Items
+- Save to `/claude/` directory
+- YAML frontmatter is mandatory (minimum: tags, date, updated, title)
+- Always include `ClaudeCode` in tags
+- Add tags according to type of created item (e.g., business flow diagram, feature list, specifications)
+
+#### File Reference Rules
+- **Markdown files (.md)**: Use Wikilink notation `[[File name]]`
+- **Other files (.csv, .xlsx, etc.)**: Use absolute or relative path
+- Examples:
+  - .md file → `[[Management Analysis Data]]`
+  - .csv file → `/research/dental-clinic-analysis/management_analysis.csv`
+
+## Claude Generated Document Management
+
+### Project-Based Directory Management
+
+#### Directory Structure
+```
+/claude/
+├── schedules/                           # Schedule files
+├── outputs/                            # Claude generated documents
+│   ├── YYYY-MM-DD_ProjectName_Theme/   # Project folder
+│   │   ├── Investigation_Request.md
+│   │   ├── Basic_Concept.md
+│   │   └── Proposal.md
+│   └── [Other projects]/
+└── research/                           # Overall common research materials (all PDFs)
+    └── Investigation_Report.pdf
+```
+
+#### Naming Rules
+- **Folder name**: `YYYY-MM-DD_ProjectName_SpecificTheme`
+- **Example**: `2025-08-24_ManabiDXQuest_AppDevelopmentEvent`
+- **Benefits**: Date order sorting, theme-based management within same project, improved searchability
+
+#### File Placement Rules
+- **Investigation Request**: `/claude/outputs/{Project folder}/Investigation_Request.md`
+- **Plans/Concepts**: `/claude/outputs/{Project folder}/`
+- **Investigation Result PDF**: `/claude/research/` (Overall common)
+- **Related Documents**: Managed within same project folder
+
+### Human Comment/Clean Copy Workflow
+
+#### Comment Notation
+```html
+<!-- Comments, modification instructions, additional requests -->
+```
+**Minimal typing for efficiency**
+
+#### Workflow
+1. **First Version Creation**: Claude creates basic version
+2. **Add Comments**: Human enters comments using HTML comment notation
+3. **Create Clean Copy**: Claude creates organized version reflecting comments
+4. **File Organization**: Version management as needed (`_v1.md`, `_final.md`, etc.)
+
+#### Effects
+- Minimize human input effort (simple HTML comments)
+- Utilize Claude's writing ability and speed
+- Efficiently reflect human insights and judgments
+- Comments hidden in Obsidian
+
+### Work Start Method
+1. User instructs "Start today's work"
+2. Automatically load today's schedule file
+3. **Task Breakdown and Time Allocation Dialogue** (Added 2025-08-27)
+   - For each task in "Today's Tasks" section:
+     - Break down into concrete subtasks
+     - Estimate realistic time (in 30-minute units)
+     - Consider dependencies and waiting times (Deep Research, human input)
+   - Present complete breakdown to human
+   - Engage in dialogue to refine:
+     - "This won't finish in 30 minutes" → Adjust allocation
+     - "Add this subtask" → Include additional work
+     - "This needs investigation first" → Plan Deep Research timing
+   - Only proceed after explicit approval
+4. **Check for incomplete work**:
+   - If there is incomplete work in time slots before current time
+   - Execute from oldest incomplete work in order
+   - Shift all subsequent schedules backward
+   - Present rescheduling proposal and obtain human approval
+5. **Record approved plan in "Task Breakdown and Time Allocation" section**
+6. **Transfer to time slots only after approval**
+7. After approval, start work (from incomplete work if any, otherwise from current time)
+
+### When Schedule File Not Found
+- Report error and assist with schedule creation
+
+## Task Breakdown Best Practices (Added 2025-08-27)
+
+### Effective Task Decomposition
+1. **Granularity**: Break tasks into 30-minute executable units
+2. **Dependencies**: Identify what must be done before/after
+3. **Waiting periods**: Account for Deep Research, human input
+4. **Buffer time**: Include time for unexpected issues
+
+### Time Estimation Guidelines
+- **Investigation tasks**: Usually 2-4 slots (1-2 hours)
+- **Document creation**: Minimum 2 slots for quality
+- **Complex implementations**: Start with 4+ slots
+- **Always overestimate rather than underestimate**
+
+### Dialogue Examples
+```
+AI: "Task 1 breakdown: Investigation (30min) → Analysis (30min) → Document (60min). Total: 4 slots."
+Human: "Investigation will need web search, add Deep Research request slot"
+AI: "Updated: Deep Research request (30min) → Other task (30min, waiting) → Analysis (30min) → Document (60min)"
+```
+
+## Things to Always Do Before Writing Code or Changing Files
+
+1. **No Code Writing Without Discussion**
+   - Always have sufficient discussion about implementation approach before writing code
+   - Confirm and clarify requirements
+   - Consider design options and clarify trade-offs
+
+2. **Document Creation**
+   - Create design documents before implementation
+   - Record decisions and reasons
+   - Document the overall implementation picture
+
+3. **Implementation Approach**
+   - Proceed with implementation based on documentation
+   - Confirm impact scope of changes beforehand
+   - Create phased implementation plan
+
+## Basic Principles
+
+- **Think before acting**: Secure sufficient consideration time before starting implementation
+- **Ensure transparency**: Clarify decision-making process
+- **Phased approach**: Divide large changes into small steps
+
+### Procedure for Rule Changes
+- Always obtain human pre-approval for rule additions/changes to CLAUDE.md
+- Propose changes clearly and wait for approval
+- Update rules only after approval
+
+## Mandatory Rules for Fact-Based Document Creation
+
+### Basic Principle
+**All documents must be created 100% based on facts; speculation, assumptions, and generalizations are strictly prohibited.**
+
+### Work Suspension Conditions (Absolute Compliance)
+**If there is even one unclear point, immediately stop work and follow the Information Gap Analysis process.**
+- List unclear points concisely and ask for confirmation before creating detailed request
+- Only create information provision request after human approval
+- Clearly note "Temporarily paused due to insufficient information" in schedule
+- **File naming**: Use `{Task name}_情報提供依頼.md` (Information Provision Request)
+
+### Prohibited Expressions
+- "Generally," "Usually," "Typically"
+- "Expected," "Considered," "Presumed"
+- "Approximately XX yen," "Around XX yen," "About XX0,000 yen"
+- Unfounded estimates or industry generalizations
+
+### Required Information
+- Specify source (file name, line number) for all numbers and systems
+- Record reference date and confirmation time for information
+- Clearly mark unavoidable assumptions with [Assumption] tag
+
+### Quality Assurance
+- Conduct 100% fact check before document submission
+- Mandatorily attach quality assurance statement at end of document
+- Clearly state unconfirmed items
+
+## Document Creation Absolute Prerequisites (Added 2025-08-26)
+
+### Mandatory Information Sufficiency Check
+1. **All document creation tasks must start with "Information Sufficiency Check" as the first Todo item**
+2. **Information insufficiency discovery and request document creation are also considered "task completion"**
+3. **Prioritize appropriate work suspension over incomplete deliverable creation**
+
+### Required Work Flow for All Document Creation
+```markdown
+Step 1: Information Sufficiency Check (Mandatory)
+- [ ] All necessary numerical values are confirmed
+- [ ] Zero items require speculation
+- [ ] Can be written without using "generally"
+
+Step 2: Action Based on Check Results
+- If ALL checkboxes are "Yes" → Proceed with document creation
+- If ANY checkbox is "No" → Follow Step 3
+
+Step 3: Information Gap Analysis and Confirmation (Added 2025-08-26)
+- List unclear points concisely (bullet points, maximum 10 items)
+- Ask human: "Should I create detailed information provision request for these items?"
+- Wait for confirmation before proceeding with request creation
+```
+
+### Work Interruption Triggers
+Immediately stop if about to write:
+- "Approximately," "About," "Around"
+- "Expected," "Assumed," "Considered"
+- "Generally," "Usually," "In many cases"
+- Specific numerical values (if unconfirmed)
+
+## Important: Time Zone Reference
+**All work is conducted based on Japan Time (JST/UTC+9).**
+- Schedule file dates use Japan time dates
+- All time notations are in Japan time
+- If system displays UTC time, add 9 hours to convert to Japan time
+- Example: UTC 15:00 = JST 00:00 (next day)
+
+**Details: [[Fact-Based Document Creation Rules]]**
+
+## Improvement Guidelines for Large-Scale Requirements Definition Projects
+
+### Quality Management for Multiple Document Creation
+**Reflecting insights from Labor Management App Requirements Definition (2025-08-20)**
+
+#### Ensuring Cross-Document Consistency
+```yaml
+Basic Principles:
+  - Always reference preceding documents (attendance management, employee management, payroll calculation)
+  - Maintain consistency of terms and definitions
+  - Ensure consistency of data items and screen elements
+  - Align technology stack and architecture
+
+Specific Methods:
+  - Conduct investigation of related documents before creating each document
+  - Reference and update common glossary
+  - Centralized management of data dictionary
+  - Unified API specifications
+```
+
+#### Phased Design Approach
+```yaml
+Design Process:
+  Phase 1: Foundation Design (Authentication, DB, API)
+  Phase 2: Core Function Design (Main Business Functions)
+  Phase 3: Integration Design (Inter-system, External Integration)
+  Phase 4: Advanced Function Design (AI, Analysis, Optimization)
+  Phase 5: Operations Design (Maintenance, Monitoring, Security)
+
+Deliverables for Each Phase:
+  - Requirements Definition (Functional Specifications)
+  - Design Document (Technical Specifications)
+  - Implementation Plan (Development Plan)
+  - Quality Assurance Plan (Testing, Audit)
+```
+
+#### Ensuring Implementation Feasibility
+```yaml
+Reality Check Items:
+  Technical Aspects:
+    - Maturity and stability of selected technologies
+    - Development team skill level
+    - Compatibility with existing systems
+    - Performance and scalability
+
+Economic Aspects:
+    - Validity of development budget
+    - Realism of ROI and payback period
+    - Continuity of operating costs
+    - Possibility of phased investment
+
+Organizational Aspects:
+    - Stakeholder consensus building
+    - Change management and training plan
+    - Feasibility of operational structure
+    - Risk management structure
+```
+
+#### Strengthened Response to Legal Requirements
+```yaml
+Compliance Design:
+  Identification of Applicable Regulations:
+    - Investigation of industry-specific regulations
+    - Personal information protection related laws
+    - Labor related regulations
+    - Security related standards
+
+Reflection in Design:
+    - Clarification of data protection requirements
+    - Detailed design of access control
+    - Definition of audit log requirements
+    - Incident response procedures
+
+Continuous Response:
+    - Legal amendment monitoring
+    - Regular compliance audits
+    - Education and training programs
+    - Cooperation with external experts
+```
+
+### Quality Improvement Checklist
+
+#### Document Quality Check
+```yaml
+Content:
+  - [ ] Comprehensiveness of business requirements (no omissions)
+  - [ ] Feasibility of technical requirements
+  - [ ] Compliance with legal requirements
+  - [ ] Consistency with existing systems
+
+Structure:
+  - [ ] Logical structure of chapters and table of contents
+  - [ ] Appropriateness of figures and samples
+  - [ ] Clarity of reference relationships
+  - [ ] Consistency of terminology and notation
+
+Practicality:
+  - [ ] Understandability for development team
+  - [ ] Ease of reference during implementation
+  - [ ] Support for future maintenance and expansion
+  - [ ] Explanatory power for stakeholders
+```
+
+#### Project Management Check
+```yaml
+Schedule:
+  - [ ] Validity of duration for each phase
+  - [ ] Appropriate management of dependencies
+  - [ ] Securing time for risk response
+  - [ ] Incorporation of quality assurance activities
+
+Resources:
+  - [ ] Identification and securing of required skills
+  - [ ] Realistic estimation of workload
+  - [ ] Plan for utilizing external resources
+  - [ ] Knowledge transfer and documentation
+
+Quality:
+  - [ ] Setting quality gates at each stage
+  - [ ] Review and approval process
+  - [ ] Testing and verification plan
+  - [ ] Mechanism for continuous improvement
+```
+

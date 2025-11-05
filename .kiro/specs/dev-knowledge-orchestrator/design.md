@@ -1,0 +1,1618 @@
+# Design Document - Context Orchestrator（外部脳システム）
+
+## Overview
+
+Context Orchestratorは、開発者個人の実務経験と知識を外部化し、人間の脳の記憶システムを模倣した「第二の脳」を構築するシステムである。MCPサーバとして動作し、任意のLLMクライアント（Claude CLI、Codex CLI、Cursor、Kiroなど）から統一的にアクセス可能にする。
+
+### 設計の基本方針
+
+1. **シンプルさ優先**: 複雑な抽象化を避け、直感的に理解できるコード構造
+2. **段階的実装**: MVPで最小限の機能を実装し、Phase 2で拡張
+3. **実装しやすさ**: Claude Codeが理解しやすいように、明確なモジュール分割と具体的な実装例
+4. **プライバシー重視**: 機密情報はローカルLLMで処理
+5. **コスト最適化**: 軽量タスクはローカル、重量タスクはCLI経由でクラウドLLM
+
+## Architecture
+
+### システム全体構成
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     LLM Clients (MCP Clients)               │
+│  Claude CLI │ Codex CLI │ Cursor │ Kiro │ VS Code Extension │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ stdio (JSON-RPC)
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│              Context Orchestrator (MCP Server)              │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  MCP Protocol Handler (stdio JSON-RPC)              │   │
+│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  Core Services                                       │   │
+│  │  • Ingestion Service (会話記録)                      │   │
+│  │  • Search Service (ハイブリッド検索)                 │   │
+│  │  • Consolidation Service (記憶統合)                  │   │
+│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  Model Router (ハイブリッドモデル選択)               │   │
+│  │  • Local LLM (軽量タスク)                            │   │
+│  │  • CLI-based Cloud LLM (重量タスク)                  │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│                    Storage Layer                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │  Chroma DB   │  │  BM25 Index  │  │  Config File │     │
+│  │  (SQLite)    │  │  (Pickle)    │  │  (YAML)      │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│                    External Systems                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │  Ollama      │  │  Obsidian    │  │  PowerShell  │     │
+│  │  (Local LLM) │  │  (Vault)     │  │  (Wrapper)   │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+
+
+## Components and Interfaces
+
+### 1. MCP Protocol Handler
+
+**責任**: stdio経由でJSON-RPCメッセージを受信し、適切なサービスにルーティングする。
+
+**インターフェース**:
+```python
+class MCPProtocolHandler:
+    """MCP Protocol Handler for stdio JSON-RPC communication"""
+    
+    def __init__(self, ingestion_service, search_service, consolidation_service):
+        self.ingestion_service = ingestion_service
+        self.search_service = search_service
+        self.consolidation_service = consolidation_service
+    
+    def start(self):
+        """Start listening on stdin for JSON-RPC messages"""
+        pass
+    
+    def handle_request(self, request: dict) -> dict:
+        """
+        Handle incoming JSON-RPC request
+        
+        Args:
+            request: JSON-RPC request dict with 'method' and 'params'
+        
+        Returns:
+            JSON-RPC response dict with 'result' or 'error'
+        """
+        pass
+    
+    def _route_to_service(self, method: str, params: dict) -> any:
+        """Route request to appropriate service based on method name"""
+        pass
+```
+
+**提供するMCPツール**:
+- `ingest_conversation`: 会話を記録
+- `search_memory`: 記憶を検索
+- `get_memory`: 特定の記憶を取得
+- `list_recent_memories`: 最近の記憶を一覧表示
+- `consolidate_memories`: 記憶の統合を手動実行
+
+### 2. Ingestion Service
+
+**責任**: 会話を受信し、スキーマ正規化、チャンク化、索引化を実行する。
+
+**インターフェース**:
+```python
+class IngestionService:
+    """Service for ingesting and processing conversations"""
+    
+    def __init__(self, schema_classifier, chunker, indexer, model_router):
+        self.schema_classifier = schema_classifier
+        self.chunker = chunker
+        self.indexer = indexer
+        self.model_router = model_router
+    
+    def ingest_conversation(self, conversation: dict) -> str:
+        """
+        Ingest a conversation and process it into memories
+        
+        Args:
+            conversation: {
+                'user': str,
+                'assistant': str,
+                'timestamp': str (ISO 8601),
+                'source': str ('cli', 'obsidian', 'kiro'),
+                'refs': list[str]
+            }
+        
+        Returns:
+            memory_id: str (unique identifier for the memory)
+        """
+        pass
+    
+    def _classify_schema(self, conversation: dict) -> str:
+        """Classify conversation into Incident/Snippet/Decision/Process"""
+        pass
+    
+    def _chunk_content(self, content: str) -> list[dict]:
+        """Split content into 512-token chunks"""
+        pass
+    
+    def _index_chunks(self, chunks: list[dict]) -> None:
+        """Index chunks in vector DB and BM25 index"""
+        pass
+```
+
+
+
+### 3. Search Service
+
+**責任**: ハイブリッド検索（ベクトル + BM25）を実行し、再ランキングして結果を返す。
+
+**インターフェース**:
+```python
+class SearchService:
+    """Service for hybrid search and retrieval"""
+    
+    def __init__(self, vector_db, bm25_index, embedding_model, reranker):
+        self.vector_db = vector_db
+        self.bm25_index = bm25_index
+        self.embedding_model = embedding_model
+        self.reranker = reranker
+    
+    def search(self, query: str, top_k: int = 10) -> list[dict]:
+        """
+        Search memories using hybrid search
+        
+        Args:
+            query: Search query string
+            top_k: Number of results to return (default: 10)
+        
+        Returns:
+            List of memory dicts with scores, sorted by relevance
+        """
+        pass
+    
+    def _generate_query_embedding(self, query: str) -> list[float]:
+        """Generate embedding vector for query using local LLM"""
+        pass
+    
+    def _vector_search(self, query_embedding: list[float], top_k: int = 50) -> list[dict]:
+        """Search vector DB (Chroma) for similar memories"""
+        pass
+    
+    def _bm25_search(self, query: str, top_k: int = 50) -> list[dict]:
+        """Search BM25 index for keyword matches"""
+        pass
+    
+    def _merge_results(self, vector_results: list[dict], bm25_results: list[dict]) -> list[dict]:
+        """Merge and deduplicate results from both searches"""
+        pass
+    
+    def _rerank(self, candidates: list[dict], query: str, top_k: int) -> list[dict]:
+        """Rerank candidates using rule-based scoring"""
+        pass
+```
+
+**再ランキングのスコア計算**:
+```python
+def calculate_rerank_score(memory: dict, query: str) -> float:
+    """
+    Calculate reranking score based on multiple factors
+    
+    Score = (
+        memory.strength * 0.3 +           # 記憶強度
+        recency_score * 0.2 +             # 最近度
+        len(memory.refs) * 0.1 +          # refs信頼性
+        memory.bm25_score * 0.2 +         # キーワードマッチ
+        memory.vector_similarity * 0.2    # ベクトル類似度
+    )
+    """
+    pass
+```
+
+### 4. Consolidation Service
+
+**責任**: 記憶の統合、クラスタリング、忘却を実行する。
+
+**インターフェース**:
+```python
+class ConsolidationService:
+    """Service for memory consolidation and forgetting"""
+    
+    def __init__(self, vector_db, clustering_engine, model_router):
+        self.vector_db = vector_db
+        self.clustering_engine = clustering_engine
+        self.model_router = model_router
+    
+    def consolidate(self) -> dict:
+        """
+        Run full consolidation process
+        
+        Returns:
+            stats: {
+                'clusters_created': int,
+                'memories_compressed': int,
+                'memories_deleted': int
+            }
+        """
+        pass
+    
+    def _migrate_working_memory(self) -> None:
+        """Migrate completed working memory to short-term memory"""
+        pass
+    
+    def _cluster_similar_memories(self) -> list[dict]:
+        """Cluster similar memories (similarity >= 0.9)"""
+        pass
+    
+    def _select_representative_memory(self, cluster: list[dict]) -> dict:
+        """Select most detailed or recent memory as representative"""
+        pass
+    
+    def _forget_old_memories(self) -> None:
+        """Delete or compress memories older than 30 days with low importance"""
+        pass
+```
+
+
+
+### 5. Model Router
+
+**責任**: タスクの複雑度に基づいて、ローカルLLMまたはCLI経由クラウドLLMを選択する。
+
+**インターフェース**:
+```python
+class ModelRouter:
+    """Router for selecting appropriate LLM based on task complexity"""
+    
+    def __init__(self, local_llm_client, cli_llm_client):
+        self.local_llm_client = local_llm_client
+        self.cli_llm_client = cli_llm_client
+    
+    def route(self, task_type: str, **kwargs) -> str:
+        """
+        Route task to appropriate LLM
+        
+        Args:
+            task_type: 'embedding', 'classification', 'short_summary', 
+                      'long_summary', 'reasoning'
+            **kwargs: Task-specific parameters
+        
+        Returns:
+            Result string from LLM
+        """
+        pass
+    
+    def _is_lightweight_task(self, task_type: str) -> bool:
+        """Determine if task should use local LLM"""
+        pass
+```
+
+**タスクの振り分けロジック**:
+```python
+TASK_ROUTING = {
+    'embedding': 'local',           # nomic-embed-text
+    'classification': 'local',      # Qwen2.5-7B
+    'short_summary': 'local',       # Qwen2.5-7B (< 100 tokens)
+    'long_summary': 'cli',          # Claude/GPT via CLI (> 500 tokens)
+    'reasoning': 'cli',             # Claude/GPT via CLI
+    'investigation_request': 'cli'  # Claude/GPT via CLI
+}
+```
+
+### 6. Local LLM Client
+
+**責任**: Ollama経由でローカルLLMを呼び出す。
+
+**インターフェース**:
+```python
+class LocalLLMClient:
+    """Client for local LLM via Ollama"""
+    
+    def __init__(self, ollama_url: str = "http://localhost:11434"):
+        self.ollama_url = ollama_url
+    
+    def generate_embedding(self, text: str, model: str = "nomic-embed-text") -> list[float]:
+        """
+        Generate embedding vector
+        
+        Args:
+            text: Input text
+            model: Embedding model name
+        
+        Returns:
+            Embedding vector (list of floats)
+        """
+        pass
+    
+    def generate(self, prompt: str, model: str = "qwen2.5:7b", max_tokens: int = 100) -> str:
+        """
+        Generate text completion
+        
+        Args:
+            prompt: Input prompt
+            model: Model name
+            max_tokens: Maximum tokens to generate
+        
+        Returns:
+            Generated text
+        """
+        pass
+```
+
+### 7. CLI LLM Client
+
+**責任**: バックグラウンドでCLI（claude/codex）を呼び出し、記録を防止する。
+
+**インターフェース**:
+```python
+class CLILLMClient:
+    """Client for cloud LLM via CLI (claude/codex)"""
+    
+    def __init__(self, cli_command: str = "claude"):
+        self.cli_command = cli_command
+    
+    def generate(self, prompt: str, timeout: int = 30) -> str:
+        """
+        Generate text via CLI
+        
+        Args:
+            prompt: Input prompt
+            timeout: Timeout in seconds
+        
+        Returns:
+            Generated text
+        """
+        pass
+    
+    def _call_cli_background(self, prompt: str, timeout: int) -> str:
+        """
+        Call CLI in background with CONTEXT_ORCHESTRATOR_INTERNAL=1
+        to prevent recording
+        """
+        import os
+        import subprocess
+        
+        env = os.environ.copy()
+        env['CONTEXT_ORCHESTRATOR_INTERNAL'] = '1'  # Prevent recording
+        
+        result = subprocess.run(
+            [self.cli_command, prompt],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=timeout
+        )
+        
+        if result.returncode != 0:
+            raise Exception(f"CLI call failed: {result.stderr}")
+        
+        return result.stdout.strip()
+```
+
+
+
+### 8. Schema Classifier
+
+**責任**: 会話をIncident/Snippet/Decision/Processに分類する。
+
+**インターフェース**:
+```python
+class SchemaClassifier:
+    """Classifier for conversation schemas"""
+    
+    def __init__(self, model_router):
+        self.model_router = model_router
+    
+    def classify(self, conversation: dict) -> str:
+        """
+        Classify conversation into schema type
+        
+        Args:
+            conversation: Conversation dict
+        
+        Returns:
+            Schema type: 'Incident', 'Snippet', 'Decision', or 'Process'
+        """
+        pass
+    
+    def _build_classification_prompt(self, conversation: dict) -> str:
+        """Build prompt for classification"""
+        prompt = f"""
+        Classify the following conversation into one of these categories:
+        - Incident: Bug reports, errors, troubleshooting
+        - Snippet: Code examples, implementations
+        - Decision: Choices, trade-offs, architectural decisions
+        - Process: Thought processes, learning, experimentation
+        
+        Conversation:
+        User: {conversation['user']}
+        Assistant: {conversation['assistant']}
+        
+        Category (one word only):
+        """
+        return prompt
+```
+
+### 9. Chunker
+
+**責任**: テキストを512トークン以下のチャンクに分割する。
+
+**インターフェース**:
+```python
+class Chunker:
+    """Chunker for splitting text into semantic units"""
+
+    # Metadata: each chunk stores `memory_id` and `chunk_index` so downstream indexes
+    # can trace chunks back to the parent memory (Requirement 26 integration).
+    
+    def __init__(self, tokenizer_name: str = "cl100k_base"):
+        import tiktoken
+        self.tokenizer = tiktoken.get_encoding(tokenizer_name)
+        self.max_tokens = 512
+    
+    def chunk(self, text: str, metadata: dict) -> list[dict]:
+        """
+        Split text into chunks
+        
+        Args:
+            text: Input text (Markdown format)
+            metadata: Metadata to attach to each chunk
+        
+        Returns:
+            List of chunk dicts: {
+                'content': str,
+                'tokens': int,
+                'metadata': dict
+            }
+        """
+        pass
+    
+    def _split_by_headings(self, text: str) -> list[str]:
+        """Split Markdown by headings (#, ##, ###)"""
+        pass
+    
+    def _split_by_paragraphs(self, text: str) -> list[str]:
+        """Split by paragraphs (\\n\\n) if heading split exceeds max_tokens"""
+        pass
+    
+    def _preserve_code_blocks(self, text: str) -> list[str]:
+        """Keep code blocks (```...```) intact"""
+        pass
+    
+    def _count_tokens(self, text: str) -> int:
+        """Count tokens using tiktoken"""
+        return len(self.tokenizer.encode(text))
+```
+
+
+
+### 10. Indexer
+
+**責任**: チャンクをChroma DBとBM25索引に登録する。
+
+**インターフェース**:
+```python
+class Indexer:
+    """Indexer for vector DB and BM25 index"""
+    
+    def __init__(self, vector_db, bm25_index, embedding_model):
+        self.vector_db = vector_db
+        self.bm25_index = bm25_index
+        self.embedding_model = embedding_model
+    
+    def index(self, chunks: list[dict]) -> None:
+        """
+        Index chunks in both vector DB and BM25 index
+        
+        Args:
+            chunks: List of chunk dicts with 'content' and 'metadata'
+        """
+        pass
+    
+    def _index_vector_db(self, chunks: list[dict]) -> None:
+        """Index in Chroma DB"""
+        for chunk in chunks:
+            embedding = self.embedding_model.generate_embedding(chunk['content'])
+            self.vector_db.add(
+                id=chunk['id'],
+                embedding=embedding,
+                metadata=chunk['metadata'],
+                document=chunk['content']
+            )
+    
+    def _index_bm25(self, chunks: list[dict]) -> None:
+        """Index in BM25"""
+        for chunk in chunks:
+            self.bm25_index.add_document(
+                doc_id=chunk['id'],
+                text=chunk['content']
+            )
+```
+
+### 11. Vector DB (Chroma)
+
+**責任**: ベクトル検索とメタデータ管理。
+
+**インターフェース**:
+```python
+class ChromaVectorDB:
+    """Wrapper for Chroma vector database"""
+    
+    def __init__(self, persist_directory: str):
+        import chromadb
+        self.client = chromadb.PersistentClient(path=persist_directory)
+        self.collection = self.client.get_or_create_collection(
+            name="memories",
+            metadata={"hnsw:space": "cosine"}
+        )
+    
+    def add(self, id: str, embedding: list[float], metadata: dict, document: str) -> None:
+        """Add a memory to the database"""
+        self.collection.add(
+            ids=[id],
+            embeddings=[embedding],
+            metadatas=[metadata],
+            documents=[document]
+        )
+    
+    def search(self, query_embedding: list[float], top_k: int = 50) -> list[dict]:
+        """Search for similar memories"""
+        results = self.collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k
+        )
+        
+        return [
+            {
+                'id': results['ids'][0][i],
+                'content': results['documents'][0][i],
+                'metadata': results['metadatas'][0][i],
+                'distance': results['distances'][0][i],
+                'similarity': 1 - results['distances'][0][i]  # Convert distance to similarity
+            }
+            for i in range(len(results['ids'][0]))
+        ]
+    
+    def get(self, id: str) -> dict:
+        """Get a specific memory by ID"""
+        result = self.collection.get(ids=[id])
+        if not result['ids']:
+            return None
+        
+        return {
+            'id': result['ids'][0],
+            'content': result['documents'][0],
+            'metadata': result['metadatas'][0]
+        }
+    
+    def delete(self, id: str) -> None:
+        """Delete a memory"""
+        self.collection.delete(ids=[id])
+```
+
+
+
+### 12. BM25 Index
+
+**責任**: キーワードベースの全文検索。
+
+**インターフェース**:
+```python
+class BM25Index:
+    """BM25 index for keyword-based search"""
+    
+    def __init__(self, persist_path: str):
+        self.persist_path = persist_path
+        self.documents = {}  # doc_id -> text
+        self.index = None
+        self._load()
+    
+    def add_document(self, doc_id: str, text: str) -> None:
+        """Add a document to the index"""
+        self.documents[doc_id] = text
+        self._rebuild_index()
+        self._save()
+    
+    def search(self, query: str, top_k: int = 50) -> list[dict]:
+        """
+        Search for documents matching query
+        
+        Returns:
+            List of dicts with 'id' and 'score'
+        """
+        from rank_bm25 import BM25Okapi
+        
+        if not self.index:
+            return []
+        
+        tokenized_query = query.lower().split()
+        scores = self.index.get_scores(tokenized_query)
+        
+        # Get top_k results
+        top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_k]
+        doc_ids = list(self.documents.keys())
+        
+        return [
+            {
+                'id': doc_ids[i],
+                'score': scores[i]
+            }
+            for i in top_indices if scores[i] > 0
+        ]
+    
+    def _rebuild_index(self) -> None:
+        """Rebuild BM25 index from documents"""
+        from rank_bm25 import BM25Okapi
+        
+        tokenized_docs = [doc.lower().split() for doc in self.documents.values()]
+        self.index = BM25Okapi(tokenized_docs)
+    
+    def _save(self) -> None:
+        """Save index to disk"""
+        import pickle
+        with open(self.persist_path, 'wb') as f:
+            pickle.dump({'documents': self.documents, 'index': self.index}, f)
+    
+    def _load(self) -> None:
+        """Load index from disk"""
+        import pickle
+        import os
+        
+        if os.path.exists(self.persist_path):
+            with open(self.persist_path, 'rb') as f:
+                data = pickle.load(f)
+                self.documents = data['documents']
+                self.index = data['index']
+```
+
+## Data Models
+
+### Memory Schema
+
+```python
+from dataclasses import dataclass
+from datetime import datetime
+from typing import List, Optional
+
+@dataclass
+class Memory:
+    """Base memory data model"""
+    id: str                          # Unique identifier (UUID)
+    schema_type: str                 # 'Incident', 'Snippet', 'Decision', 'Process'
+    content: str                     # Original content
+    summary: str                     # 100-token summary
+    refs: List[str]                  # Source URLs, file paths, commit IDs
+    created_at: datetime             # Creation timestamp
+    updated_at: datetime             # Last update timestamp
+    strength: float                  # Memory strength (0.0-1.0)
+    importance: float                # Importance score (0.0-1.0)
+    tags: List[str]                  # Tags for categorization
+    metadata: dict                   # Additional metadata
+    
+    # Hierarchy
+    memory_type: str                 # 'working', 'short_term', 'long_term'
+    cluster_id: Optional[str]        # Cluster ID if part of a cluster
+    is_representative: bool          # True if representative memory in cluster
+
+@dataclass
+class Chunk:
+    """Chunk data model"""
+    id: str                          # Unique identifier
+    memory_id: str                   # Parent memory ID
+    content: str                     # Chunk content
+    tokens: int                      # Token count
+    embedding: List[float]           # Embedding vector
+    metadata: dict                   # Metadata (tags, timestamp, etc.)
+```
+
+
+
+### Configuration Schema
+
+```python
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class Config:
+    """System configuration"""
+    
+    # Paths
+    data_dir: str = "~/.context-orchestrator"
+    obsidian_vault_path: Optional[str] = None
+    
+    # Ollama
+    ollama_url: str = "http://localhost:11434"
+    embedding_model: str = "nomic-embed-text"
+    inference_model: str = "qwen2.5:7b"
+    
+    # CLI LLM
+    cli_command: str = "claude"  # or "codex"
+    
+    # Search
+    search_candidate_count: int = 50
+    search_result_count: int = 10
+    search_timeout_seconds: int = 2
+    
+    # Clustering
+    similarity_threshold: float = 0.9
+    min_cluster_size: int = 2
+    
+    # Forgetting
+    age_threshold_days: int = 30
+    importance_threshold: float = 0.3
+    compression_enabled: bool = True
+    
+    # Working Memory
+    working_memory_retention_hours: int = 8
+    auto_consolidate: bool = True
+    
+    # Consolidation
+    consolidation_schedule: str = "0 3 * * *"  # cron format (3:00 AM daily)
+    consolidation_auto_enabled: bool = True
+```
+
+## Error Handling
+
+### エラー処理の基本方針
+
+1. **グレースフルデグラデーション**: エラーが発生しても、システムは可能な限り動作を継続する
+2. **詳細なログ**: 全てのエラーをログに記録し、トラブルシューティングを容易にする
+3. **ユーザーフレンドリーなメッセージ**: 技術的な詳細は隠し、ユーザーに分かりやすいメッセージを表示
+
+### エラーの種類と対応
+
+```python
+class ContextOrchestratorError(Exception):
+    """Base exception for Context Orchestrator"""
+    pass
+
+class OllamaConnectionError(ContextOrchestratorError):
+    """Ollama is not running or not accessible"""
+    def __init__(self):
+        super().__init__(
+            "Ollama is not running. Please start Ollama: 'ollama serve'"
+        )
+
+class ModelNotFoundError(ContextOrchestratorError):
+    """Required model is not installed"""
+    def __init__(self, model_name: str):
+        super().__init__(
+            f"Model '{model_name}' is not installed. "
+            f"Please install: 'ollama pull {model_name}'"
+        )
+
+class CLICallError(ContextOrchestratorError):
+    """CLI call failed"""
+    def __init__(self, cli_command: str, error_message: str):
+        super().__init__(
+            f"CLI call to '{cli_command}' failed: {error_message}"
+        )
+
+class DatabaseError(ContextOrchestratorError):
+    """Database operation failed"""
+    pass
+```
+
+### エラーハンドリングの実装例
+
+```python
+def safe_call_with_fallback(primary_func, fallback_func, error_type):
+    """
+    Call primary function, fallback to secondary if error occurs
+    
+    Args:
+        primary_func: Primary function to call
+        fallback_func: Fallback function if primary fails
+        error_type: Expected error type
+    
+    Returns:
+        Result from primary or fallback function
+    """
+    try:
+        return primary_func()
+    except error_type as e:
+        logger.warning(f"Primary function failed: {e}. Falling back...")
+        return fallback_func()
+```
+
+
+
+## Testing Strategy
+
+### テストの階層
+
+1. **Unit Tests**: 個別のコンポーネントをテスト
+2. **Integration Tests**: コンポーネント間の連携をテスト
+3. **End-to-End Tests**: システム全体の動作をテスト
+
+### Unit Tests
+
+**対象コンポーネント**:
+- Chunker: トークン数計算、見出し分割、コードブロック保持
+- SchemaClassifier: スキーマ分類の精度
+- Reranker: スコア計算ロジック
+
+**テスト例**:
+```python
+def test_chunker_splits_by_headings():
+    """Test that chunker splits Markdown by headings"""
+    chunker = Chunker()
+    text = """
+    # Heading 1
+    Content 1
+    
+    ## Heading 2
+    Content 2
+    """
+    chunks = chunker.chunk(text, {})
+    assert len(chunks) == 2
+    assert "Heading 1" in chunks[0]['content']
+    assert "Heading 2" in chunks[1]['content']
+
+def test_chunker_preserves_code_blocks():
+    """Test that chunker does not split code blocks"""
+    chunker = Chunker()
+    text = """
+    # Code Example
+    ```python
+    def hello():
+        print("Hello")
+    ```
+    """
+    chunks = chunker.chunk(text, {})
+    assert len(chunks) == 1
+    assert "```python" in chunks[0]['content']
+```
+
+### Integration Tests
+
+**対象フロー**:
+- Ingestion → Indexing: 会話が正しく索引化されるか
+- Search → Reranking: 検索結果が正しくランク付けされるか
+- Consolidation → Clustering: 類似記憶が正しくクラスタ化されるか
+
+**テスト例**:
+```python
+def test_ingestion_to_indexing():
+    """Test full ingestion pipeline"""
+    service = IngestionService(...)
+    
+    conversation = {
+        'user': 'How to fix TypeError?',
+        'assistant': 'Check null values...',
+        'timestamp': '2025-01-15T10:30:00Z',
+        'source': 'cli',
+        'refs': []
+    }
+    
+    memory_id = service.ingest_conversation(conversation)
+    
+    # Verify memory is indexed
+    memory = vector_db.get(memory_id)
+    assert memory is not None
+    assert memory['metadata']['schema_type'] == 'Incident'
+```
+
+### End-to-End Tests
+
+**対象シナリオ**:
+- CLI会話の記録 → 検索 → 結果取得
+- Obsidian会話の取り込み → 検索 → 結果取得
+- 深夜バッチ処理 → 記憶の統合 → クラスタリング
+
+**テスト例**:
+```python
+def test_cli_conversation_recording():
+    """Test CLI conversation recording end-to-end"""
+    # 1. Record conversation via MCP
+    mcp_handler.handle_request({
+        'method': 'ingest_conversation',
+        'params': {
+            'user': 'Test question',
+            'assistant': 'Test answer',
+            'timestamp': '2025-01-15T10:30:00Z',
+            'source': 'cli',
+            'refs': []
+        }
+    })
+    
+    # 2. Search for conversation
+    results = mcp_handler.handle_request({
+        'method': 'search_memory',
+        'params': {
+            'query': 'Test question',
+            'top_k': 10
+        }
+    })
+    
+    # 3. Verify results
+    assert len(results['result']) > 0
+    assert 'Test question' in results['result'][0]['content']
+```
+
+
+
+## Implementation Details
+
+### ディレクトリ構造
+
+```
+context-orchestrator/
+├── src/
+│   ├── __init__.py
+│   ├── main.py                      # Entry point
+│   ├── config.py                    # Configuration management
+│   ├── mcp/
+│   │   ├── __init__.py
+│   │   └── protocol_handler.py      # MCP Protocol Handler
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── ingestion.py             # Ingestion Service
+│   │   ├── search.py                # Search Service
+│   │   └── consolidation.py         # Consolidation Service
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── router.py                # Model Router
+│   │   ├── local_llm.py             # Local LLM Client
+│   │   └── cli_llm.py               # CLI LLM Client
+│   ├── processing/
+│   │   ├── __init__.py
+│   │   ├── classifier.py            # Schema Classifier
+│   │   ├── chunker.py               # Chunker
+│   │   └── indexer.py               # Indexer
+│   ├── storage/
+│   │   ├── __init__.py
+│   │   ├── vector_db.py             # Chroma Vector DB
+│   │   └── bm25_index.py            # BM25 Index
+│   └── utils/
+│       ├── __init__.py
+│       ├── logger.py                # Logging utilities
+│       └── errors.py                # Error definitions
+├── scripts/
+│   ├── setup.py                     # Setup wizard
+│   ├── setup_cli_recording.ps1      # PowerShell wrapper setup
+│   └── doctor.py                    # Troubleshooting tool
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+├── requirements.txt                 # Python dependencies
+├── setup.py                         # Package setup
+└── README.md                        # Documentation
+```
+
+### 依存関係
+
+**requirements.txt**:
+```
+# Core
+chromadb>=0.4.0
+tiktoken>=0.5.0
+rank-bm25>=0.2.2
+pyyaml>=6.0
+
+# LLM
+requests>=2.31.0
+
+# File watching (for Obsidian integration)
+watchdog>=3.0.0
+
+# Utilities
+python-dateutil>=2.8.2
+```
+
+### エントリーポイント
+
+**main.py**:
+```python
+import sys
+import logging
+from src.config import load_config
+from src.mcp.protocol_handler import MCPProtocolHandler
+from src.services.ingestion import IngestionService
+from src.services.search import SearchService
+from src.services.consolidation import ConsolidationService
+from src.models.router import ModelRouter
+from src.models.local_llm import LocalLLMClient
+from src.models.cli_llm import CLILLMClient
+from src.storage.vector_db import ChromaVectorDB
+from src.storage.bm25_index import BM25Index
+from src.utils.logger import setup_logger
+
+def main():
+    """Main entry point for Context Orchestrator"""
+    
+    # Load configuration
+    config = load_config()
+    
+    # Setup logging
+    logger = setup_logger(config.data_dir)
+    logger.info("Starting Context Orchestrator...")
+    
+    # Initialize storage
+    vector_db = ChromaVectorDB(
+        collection_name='context_orchestrator',
+        persist_directory=f"{config.data_dir}/chroma_db"
+    )
+    bm25_index = BM25Index(persist_path=f"{config.data_dir}/bm25_index.pkl")
+
+    # Initialize LLM clients
+    local_llm = LocalLLMClient(
+        ollama_url=config.ollama_url,
+        embedding_model=config.embedding_model,
+        inference_model=config.inference_model
+    )
+    cli_llm = CLILLMClient(cli_command=config.cli_command)
+    model_router = ModelRouter(
+        local_llm_client=local_llm,
+        cli_llm_client=cli_llm
+    )
+
+    # Initialize processing
+    classifier = SchemaClassifier(model_router=model_router)
+    chunker = Chunker(max_tokens=512)
+    indexer = Indexer(
+        vector_db=vector_db,
+        bm25_index=bm25_index,
+        model_router=model_router
+    )
+
+    # Initialize services
+    ingestion_service = IngestionService(
+        vector_db=vector_db,
+        classifier=classifier,
+        chunker=chunker,
+        indexer=indexer,
+        model_router=model_router
+    )
+    search_service = SearchService(
+        vector_db=vector_db,
+        bm25_index=bm25_index,
+        model_router=model_router,
+        candidate_count=config.search.candidate_count,
+        result_count=config.search.result_count
+    )
+    consolidation_service = ConsolidationService(
+        vector_db=vector_db,
+        indexer=indexer,
+        model_router=model_router,
+        similarity_threshold=config.clustering.similarity_threshold,
+        min_cluster_size=config.clustering.min_cluster_size,
+        age_threshold_days=config.forgetting.age_threshold_days,
+        importance_threshold=config.forgetting.importance_threshold,
+        working_memory_retention_hours=config.working_memory.retention_hours
+    )
+    
+    # Initialize MCP handler
+    mcp_handler = MCPProtocolHandler(
+        ingestion_service,
+        search_service,
+        consolidation_service
+    )
+    
+    # Start listening on stdin
+    logger.info("Context Orchestrator is ready")
+    mcp_handler.start()
+
+if __name__ == "__main__":
+    main()
+```
+
+
+
+### セットアップウィザード
+
+**scripts/setup.py**:
+```python
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+def check_ollama():
+    """Check if Ollama is running"""
+    try:
+        import requests
+        response = requests.get("http://localhost:11434/api/tags", timeout=2)
+        return response.status_code == 200
+    except:
+        return False
+
+def install_ollama_models():
+    """Install required Ollama models"""
+    models = ["nomic-embed-text", "qwen2.5:7b"]
+    
+    for model in models:
+        print(f"Downloading {model}...")
+        subprocess.run(["ollama", "pull", model], check=True)
+        print(f"✓ {model} installed")
+
+def setup_powershell_wrapper():
+    """Setup PowerShell wrapper for CLI recording"""
+    profile_path = subprocess.run(
+        ["powershell", "-Command", "echo $PROFILE"],
+        capture_output=True,
+        text=True
+    ).stdout.strip()
+    
+    wrapper_script = Path(__file__).parent / "setup_cli_recording.ps1"
+    
+    # Read wrapper script
+    with open(wrapper_script, 'r') as f:
+        wrapper_code = f.read()
+    
+    # Append to PowerShell profile
+    with open(profile_path, 'a') as f:
+        f.write("\n\n# Context Orchestrator CLI Recording\n")
+        f.write(wrapper_code)
+    
+    print(f"✓ Added to PowerShell profile: {profile_path}")
+
+def main():
+    """Run setup wizard"""
+    print("Welcome to Context Orchestrator Setup!\n")
+    
+    # Check Ollama
+    print("[1/6] Checking Ollama installation...")
+    if check_ollama():
+        print("✓ Ollama is running")
+    else:
+        print("✗ Ollama is not running")
+        print("\nPlease install and start Ollama:")
+        print("  1. Install: winget install Ollama.Ollama")
+        print("  2. Start: ollama serve")
+        sys.exit(1)
+    
+    # Install models
+    print("\n[2/6] Installing required models...")
+    install_ollama_models()
+    
+    # Obsidian Vault path
+    print("\n[3/6] Obsidian Vault path:")
+    vault_path = input("Enter path (or press Enter to skip): ").strip()
+    if vault_path and os.path.exists(vault_path):
+        print(f"✓ Vault found: {vault_path}")
+    else:
+        print("Skipped.")
+        vault_path = None
+    
+    # Cloud LLM API keys
+    print("\n[4/6] Cloud LLM API keys (optional):")
+    api_key = input("Enter Anthropic API key (or press Enter to skip): ").strip()
+    if api_key:
+        print("✓ API key saved")
+    else:
+        print("Skipped.")
+    
+    # PowerShell wrapper
+    print("\n[5/6] PowerShell profile setup:")
+    response = input("Add CLI recording wrapper? (y/n): ").strip().lower()
+    if response == 'y':
+        setup_powershell_wrapper()
+    else:
+        print("Skipped.")
+    
+    # Batch schedule
+    print("\n[6/6] Batch processing schedule:")
+    schedule = input("Daily consolidation time (default: 03:00): ").strip()
+    if not schedule:
+        schedule = "03:00"
+    print(f"✓ Set to {schedule}")
+    
+    # Save configuration
+    config_dir = Path.home() / ".context-orchestrator"
+    config_dir.mkdir(exist_ok=True)
+    
+    config_content = f"""
+# Context Orchestrator Configuration
+data_dir: {config_dir}
+obsidian_vault_path: {vault_path or 'null'}
+ollama_url: http://localhost:11434
+embedding_model: nomic-embed-text
+inference_model: qwen2.5:7b
+cli_command: claude
+consolidation_schedule: "0 {schedule.split(':')[0]} * * *"
+"""
+    
+    with open(config_dir / "config.yaml", 'w') as f:
+        f.write(config_content)
+    
+    print("\n" + "="*60)
+    print("Setup complete! 🎉")
+    print("="*60)
+    print("\nNext steps:")
+    print("1. Restart PowerShell")
+    print("2. Try: claude \"test message\"")
+    print("3. Check: context-orchestrator status")
+
+if __name__ == "__main__":
+    main()
+```
+
+
+
+### PowerShellラッパースクリプト
+
+**scripts/setup_cli_recording.ps1**:
+```powershell
+# Context Orchestrator CLI Recording Wrapper
+
+function claude {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments=$true)]$args)
+    
+    # Check if this is an internal call (prevent infinite loop)
+    if ($env:CONTEXT_ORCHESTRATOR_INTERNAL -eq '1') {
+        & claude.exe $args
+        return
+    }
+    
+    # Execute original command and capture output
+    $output = & claude.exe $args 2>&1 | Tee-Object -Variable capturedOutput
+    $exitCode = $LASTEXITCODE
+    
+    # Send to Context Orchestrator in background (non-blocking)
+    Start-Job -ScriptBlock {
+        param($output, $timestamp)
+        
+        try {
+            # Prepare conversation data
+            $conversation = @{
+                user = $args[0]
+                assistant = $output
+                timestamp = $timestamp
+                source = "cli"
+                refs = @()
+            } | ConvertTo-Json
+            
+            # Send to Context Orchestrator via MCP
+            $request = @{
+                jsonrpc = "2.0"
+                id = 1
+                method = "ingest_conversation"
+                params = $conversation | ConvertFrom-Json
+            } | ConvertTo-Json
+            
+            # Write to stdin of Context Orchestrator process
+            # (Assumes Context Orchestrator is running as a service)
+            echo $request | context-orchestrator
+        } catch {
+            # Silently fail if Context Orchestrator is not running
+        }
+    } -ArgumentList ($capturedOutput -join "`n"), (Get-Date -Format "o")
+    
+    # Return original output and exit code
+    $output
+    exit $exitCode
+}
+
+function codex {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments=$true)]$args)
+    
+    # Same implementation as claude function
+    # (Omitted for brevity)
+}
+```
+
+### トラブルシューティングツール
+
+**scripts/doctor.py**:
+```python
+import subprocess
+import sys
+import os
+from pathlib import Path
+
+def check_ollama():
+    """Check if Ollama is running"""
+    try:
+        import requests
+        response = requests.get("http://localhost:11434/api/tags", timeout=2)
+        if response.status_code == 200:
+            print("✓ Ollama: Running")
+            return True
+        else:
+            print("✗ Ollama: Not responding")
+            return False
+    except:
+        print("✗ Ollama: Not running")
+        print("\nFix:")
+        print("  1. Start Ollama: ollama serve")
+        print("  2. Or install: winget install Ollama.Ollama")
+        return False
+
+def check_models():
+    """Check if required models are installed"""
+    try:
+        import requests
+        response = requests.get("http://localhost:11434/api/tags", timeout=2)
+        models = [m['name'] for m in response.json()['models']]
+        
+        required = ["nomic-embed-text", "qwen2.5:7b"]
+        missing = [m for m in required if m not in models]
+        
+        if not missing:
+            print(f"✓ Models: {', '.join(required)}")
+            return True
+        else:
+            print(f"✗ Models: Missing {', '.join(missing)}")
+            print("\nFix:")
+            for model in missing:
+                print(f"  ollama pull {model}")
+            return False
+    except:
+        return False
+
+def check_powershell_wrapper():
+    """Check if PowerShell wrapper is installed"""
+    try:
+        result = subprocess.run(
+            ["powershell", "-Command", "Get-Command claude"],
+            capture_output=True,
+            text=True
+        )
+        
+        if "claude" in result.stdout:
+            print("✓ PowerShell wrapper: Active")
+            return True
+        else:
+            print("✗ PowerShell wrapper: Not found")
+            print("\nFix:")
+            print("  1. Re-run setup: context-orchestrator setup --repair")
+            print("  2. Or manually add to profile: notepad $PROFILE")
+            return False
+    except:
+        return False
+
+def check_database():
+    """Check if database exists and is accessible"""
+    config_dir = Path.home() / ".context-orchestrator"
+    chroma_db = config_dir / "chroma_db" / "chroma.sqlite3"
+    
+    if chroma_db.exists():
+        print(f"✓ Database: Found ({chroma_db})")
+        return True
+    else:
+        print("✗ Database: Not found")
+        print("\nThis is normal for first-time setup.")
+        return False
+
+def main():
+    """Run diagnostic checks"""
+    print("Context Orchestrator Diagnostic Tool\n")
+    
+    checks = [
+        ("Ollama", check_ollama),
+        ("Models", check_models),
+        ("PowerShell wrapper", check_powershell_wrapper),
+        ("Database", check_database)
+    ]
+    
+    results = []
+    for name, check_func in checks:
+        print(f"\nChecking {name}...")
+        results.append(check_func())
+    
+    print("\n" + "="*60)
+    if all(results):
+        print("All checks passed! ✓")
+    else:
+        print("Some checks failed. Please follow the fix instructions above.")
+    print("="*60)
+
+if __name__ == "__main__":
+    main()
+```
+
+
+
+## Deployment and Operations
+
+### インストール手順
+
+```bash
+# 1. (Optional) Install via pip when package is published
+pip install context-orchestrator
+
+# 1b. Standard local setup
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# 2. Run setup wizard
+context-orchestrator setup
+
+# 3. Restart PowerShell
+# (Close and reopen PowerShell window)
+
+# 4. Verify installation
+context-orchestrator status
+```
+### セッションログと要約パイプライン（Requirement 26）
+
+**コンポーネント:**
+- SessionLogCollector (`src/services/session_log_collector.py`)
+  - ターミナル単位で UUID ベースの session_id を発行し、`logs/<session_id>.log` へ追記
+  - ログサイズが 10MB を超えたらローテーションし、現在のチャンクを継続監視
+- SessionSummaryWorker (`src/services/session_summary.py`)
+  - 閉じたログをジョブキューへ積み、Qwen2.5-7B（Ollama）で要約を生成
+  - session_id・開始/終了時刻・使用モデル付きの要約を保存し、失敗時はリトライキューへ再投入
+- セッション履歴 CLI (`session-history`)
+  - `src/cli.py` にサブコマンドを追加し、raw ログと要約を取得/表示
+
+**処理フロー:**
+1. PowerShell ラッパーや MCP クライアントが SessionLogCollector にイベントを送信し、ライブでログを追記
+2. ログがクローズされると SessionSummaryWorker が非同期要約ジョブを実行
+3. 要約とメタデータをセッション専用テーブル（例: SessionRepository）に保存し、CLI/UI から参照可能にする
+4. 失敗したジョブは最大3回まで自動リトライし、それでも失敗した場合は doctor コマンド経由で通知
+
+**設定パラメータ:**
+- logging.session_log_dir（デフォルト: ~/.context-orchestrator/logs）
+- logging.max_log_size_mb（デフォルト: 10）
+- logging.summary_model（デフォルト: qwen2.5:7b）
+
+
+### 運用コマンド
+
+```bash
+# Start Context Orchestrator (as MCP server)
+context-orchestrator start
+
+# Check system status
+context-orchestrator status
+
+# Run diagnostic checks
+context-orchestrator doctor
+
+# Manual consolidation
+context-orchestrator consolidate
+
+# List recent memories
+context-orchestrator list-recent --limit 20
+
+# Export memories
+context-orchestrator export --output backup.json
+
+# Import memories
+context-orchestrator import --input backup.json
+
+# View logs
+context-orchestrator logs --tail 100
+```
+
+### ログ管理
+
+**ログファイル**: `~/.context-orchestrator/logs/orchestrator.log`
+
+**ログレベル**:
+- DEBUG: 詳細なデバッグ情報
+- INFO: 通常の動作情報
+- WARNING: 警告（動作は継続）
+- ERROR: エラー（一部機能が失敗）
+- CRITICAL: 致命的エラー（システム停止）
+
+**ログローテーション**:
+- 1日1ファイル
+- 過去7日分を保持
+- 古いログは自動削除
+
+### パフォーマンス監視
+
+**メトリクス**:
+- 検索レイテンシ（目標: 200ms以内）
+- 記憶の登録速度（目標: 5秒以内）
+- メモリ使用量（常駐: 1GB、ピーク: 3GB）
+- ディスク使用量（10年で約100MB）
+
+**監視方法**:
+```bash
+# System status with metrics
+context-orchestrator status --verbose
+
+# Output:
+# Context Orchestrator Status:
+# ✓ Ollama: Running
+# ✓ Models: nomic-embed-text, qwen2.5:7b
+# ✓ Database: 1,234 memories (45.2 MB)
+# ✓ Obsidian Vault: Connected
+# ✓ PowerShell wrapper: Active
+# 
+# Performance Metrics:
+# - Average search latency: 187ms
+# - Memory usage: 1.2 GB
+# - Disk usage: 45.2 MB
+```
+
+## Security Considerations
+
+### プライバシー保護
+
+1. **ローカル処理優先**: 機密情報はローカルLLMで処理
+2. **クラウドLLM使用時の注意**: 
+   - 機密情報を含むタスクはローカルLLMで処理
+   - クラウドLLMには最小限の文脈のみ送信
+3. **記録の防止**: バックグラウンドCLI呼び出しは記録しない
+
+### データ保護
+
+1. **ローカルストレージ**: 全てのデータはローカルに保存
+2. **アクセス制御**: OSレベルのファイルアクセス制御
+3. **バックアップ**: ユーザーが手動でエクスポート可能
+
+### 認証
+
+1. **ローカル環境**: 認証不要（stdio通信）
+2. **将来の拡張**: HTTP/SSE方式でリモートアクセス時に認証を追加
+
+
+
+## Future Enhancements (Phase 2)
+
+### 1. 高度な再ランキング
+
+**ローカルLLMによる再ランキング**:
+- より正確な関連度評価
+- 文脈を理解した順序付け
+- 実装: `RerankerService` with Qwen2.5-7B
+
+### 2. 記憶の階層的圧縮
+
+**時間経過に応じた圧縮**:
+- Level 0 (生データ) → Level 1 (要約) → Level 2 (エッセンス) → Level 3 (アーカイブ)
+- 実装: `CompressionService` with CLI-based Cloud LLM
+
+### 3. 自発的な想起（Proactive Recall）
+
+**文脈に基づく自動想起**:
+- タスク開始時に類似した過去のタスクを提示
+- エラー発生時に過去の解決策を提示
+- 実装: `ProactiveRecallService`
+
+### 4. 記憶の関連付け（Memory Graph）
+
+**知識グラフの構築**:
+- 因果関係、時系列、共起の検出
+- グラフの可視化
+- 実装: `MemoryGraphService` with NetworkX
+
+### 5. 外部検索統合
+
+**Deep Research連携**:
+- 内部記憶が不足している場合、調査依頼書を生成
+- 外部調査結果を統合
+- 実装: `ExternalSearchService`
+
+### 6. HTTP/SSE方式のサポート
+
+**リモートアクセス対応**:
+- HTTPサーバとして動作
+- Server-Sent Eventsで通知
+- Bearer認証
+- 実装: `HTTPMCPHandler` with FastAPI
+
+## Conclusion
+
+本設計ドキュメントは、Context Orchestratorの実装に必要な全ての情報を提供する。各コンポーネントは明確に定義され、インターフェースは具体的に記述されている。Claude Codeでの実装を想定し、以下の点に注力した：
+
+1. **明確なモジュール分割**: 各コンポーネントの責任が明確
+2. **具体的なインターフェース**: 実装すべきメソッドとパラメータが明示
+3. **実装例の提供**: コードスニペットで実装イメージを提示
+4. **エラーハンドリング**: 想定されるエラーと対応方法を明記
+5. **テスト戦略**: テストの階層と具体例を提示
+
+次のステップは、タスクリストの作成である。設計ドキュメントに基づいて、実装タスクを段階的に分解し、Claude Codeが実行可能な形式で記述する。
+

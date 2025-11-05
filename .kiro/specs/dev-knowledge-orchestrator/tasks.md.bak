@@ -1,0 +1,215 @@
+# Implementation Plan - Context Orchestrator
+
+This document lists the implementation tasks for the Context Orchestrator (external brain system). Tasks are ordered to allow incremental delivery and are phrased so Claude Code / Sonnet 4.5 can execute them directly.
+
+## Task Legend
+- `[ ]`: task not yet started
+- `[x]`: task completed
+- `*`: optional task (nice-to-have, not core MVP)
+
+---
+
+## Phase 1: Project Scaffolding and Core Layout
+
+### 1. Repository Bootstrap
+- [ ] 1.1 Create the project directory structure
+  - Add `src/`, `tests/`, `scripts/`, `requirements.txt`, `setup.py`, and `README.md`
+  - _Requirements: Requirement 13_
+- [ ] 1.2 Prepare dependency manifest
+  - Populate `requirements.txt` with `chromadb`, `tiktoken`, `rank-bm25`, `pyyaml`, `requests`, `watchdog`, `python-dateutil`, `apscheduler`
+  - _Requirements: Requirement 13_
+- [ ] 1.3 Provide configuration template
+  - Author `config.yaml` template (fields: `data_dir`, `ollama_url`, `embedding_model`, `inference_model`, `cli_command`, etc.)
+  - _Requirements: Requirement 13_
+
+---
+
+## Phase 2: Storage Layer
+
+### 2. Vector and Keyword Retrieval
+- [ ] 2.1 Implement Chroma vector DB adapter (`src/storage/vector_db.py` > `ChromaVectorDB` with `add`, `search`, `get`, `delete`)
+  - _Requirements: Requirement 12_
+- [ ] 2.2 Implement BM25 index adapter (`src/storage/bm25_index.py` > `BM25Index` with `add_document`, `search`, `_rebuild_index`, `_save`, `_load`)
+  - _Requirements: Requirement 12_
+- [ ] 2.3 Define domain data models (`src/models/__init__.py` > `Memory`, `Chunk` dataclasses)
+  - _Requirements: Requirements 2, 3_
+
+---
+
+## Phase 3: Local LLM Client Layer
+
+### 3. Ollama Integration and Model Routing
+- [ ] 3.1 Implement `LocalLLMClient` (`src/models/local_llm.py`) with `generate_embedding`, `generate`
+  - _Requirements: Requirement 10_
+- [ ] 3.2 Implement `CLILLMClient` (`src/models/cli_llm.py`) with `generate`, `_call_cli_background`; respect `CONTEXT_ORCHESTRATOR_INTERNAL=1`
+  - _Requirements: Requirement 10_
+- [ ] 3.3 Implement `ModelRouter` (`src/models/router.py`) with `route`, `_is_lightweight_task` to pick local vs CLI-based models
+  - _Requirements: Requirement 10_
+
+---
+
+## Phase 4: Memory Processing Pipeline
+
+### 4. Classification, Chunking, Indexing
+- [ ] 4.1 Implement `SchemaClassifier` (`src/processing/classifier.py`) for Incident/Snippet/Decision/Process classification
+  - _Requirements: Requirement 2_
+- [ ] 4.2 Implement `Chunker` (`src/processing/chunker.py`) that respects headings, paragraphs, code blocks, and 512-token limit via `tiktoken`
+  - _Requirements: Requirement 3_
+- [ ] 4.3 Implement `Indexer` (`src/processing/indexer.py`) to push chunks into vector DB and BM25 index
+  - _Requirements: Requirement 3_
+
+---
+
+## Phase 5: Core Services
+
+### 5. Ingestion, Search, Consolidation
+- [ ] 5.1 Implement `IngestionService` (`src/services/ingestion.py`) with `ingest_conversation`, `_classify_schema`, `_chunk_content`, `_index_chunks`
+  - _Requirements: Requirements 1, 2, 3_
+- [ ] 5.2 Implement `SearchService` (`src/services/search.py`) with hybrid retrieval (`_generate_query_embedding`, `_vector_search`, `_bm25_search`, `_merge_results`, `_rerank`)
+  - _Requirements: Requirement 8_
+- [ ] 5.3 Implement `ConsolidationService` (`src/services/consolidation.py`) with `_migrate_working_memory`, `_cluster_similar_memories`, `_select_representative_memory`, `_forget_old_memories`
+  - _Requirements: Requirement 6_
+
+---
+
+## Phase 6: Session Management (Working Memory)
+
+### 6. PowerShell Session Capture
+- [ ] 6.1 Implement `SessionManager` (`src/services/session_manager.py`) handling `add_command`, `end_session`, `_format_session_log`, `_create_obsidian_note`, `_save_to_vault`
+  - _Requirements: Requirements 1, 4_
+- [ ] 6.2 Generate Obsidian notes from sessions and send content through local LLM summarization before writing to the vault
+  - _Requirements: Requirements 1.5, 9_
+
+---
+
+## Phase 7: MCP Protocol Handler
+
+### 7. stdio JSON-RPC Bridge
+- [ ] 7.1 Implement `MCPProtocolHandler` (`src/mcp/protocol_handler.py`) with `start`, `handle_request`, `_route_to_service`
+  - _Requirements: Requirement 11_
+- [ ] 7.2 Expose MCP tools (`ingest_conversation`, `search_memory`, `get_memory`, `list_recent_memories`, `consolidate_memories`)
+  - _Requirements: Requirement 11_
+
+---
+
+## Phase 8: Entry Point & Configuration
+
+### 8. Main Program and Utilities
+- [ ] 8.1 Implement config loader (`src/config.py` > `load_config` returning typed Config)
+  - _Requirements: Requirement 13_
+- [ ] 8.2 Implement logging utilities (`src/utils/logger.py` > `setup_logger`)
+  - _Requirements: Requirement 13_
+- [ ] 8.3 Implement custom errors (`src/utils/errors.py` with `OllamaConnectionError`, `ModelNotFoundError`, `CLICallError`, `DatabaseError`)
+  - _Requirements: Requirement 13_
+- [ ] 8.4 Implement main entry point (`src/main.py` > `main` to load config, init storage/services, start MCP handler)
+  - _Requirements: Requirements 11, 13_
+
+---
+
+## Phase 9: PowerShell Wrapper and Setup Scripts
+
+### 9. CLI Recording & Setup
+- [ ] 9.1 Build the PowerShell wrapper script
+  - Create `scripts/setup_cli_recording.ps1` and enable automatic profile insertion via `$PROFILE`
+  - Implement session ID issuance, background submission, and the `CONTEXT_ORCHESTRATOR_INTERNAL` guard
+  - Implementation hints (Claude Code Sonnet 4.5): wrap existing `claude` / `codex` calls with `Start-Process`, capture stdout, and push to MCP ingest asynchronously
+  - Reference: [design/PowerShell wrapper](design.md#powershellラッパースクリプト)
+  - _Requirements: Requirement 1, 26_
+- [ ] 9.2 Implement the setup wizard
+  - Create `scripts/setup.py` and guide users through Ollama check → model download → Vault configuration → PowerShell wrapper configuration
+  - Auto-verify/download recommended models (`nomic-embed-text`, `qwen2.5:7b`)
+  - Implementation hints: use `prompt_toolkit` (or similar) for interactive prompts and share an `install_ollama_models()` helper
+  - Reference: [design/Deployment and Operations](design.md#deployment-and-operations)
+  - _Requirements: Requirement 13_
+- [ ] 9.3 Implement the troubleshooting tool
+  - Create `scripts/doctor.py` with health checks for Ollama, model presence, PowerShell wrapper, and database connectivity
+  - On failure, print remediation steps to stdout (for example, how to restart `ollama serve`)
+  - _Requirements: Requirement 13_
+- [ ] 9.4 Implement the Session Log Collector
+  - Create `src/services/session_log_collector.py` with a `SessionLogCollector` class (`start_session`, `append_event`, `close_session`, `rotate_if_needed`)
+  - Append to `logs/<session_id>.log` per session and rotate when exceeding 10MB (`logging.max_log_size_mb` configurable)
+  - Implementation hints: use `Path.mkdir(parents=True, exist_ok=True)` and append UTF-8 text without extra logging wrappers
+  - Reference: [design/Session Logging & Summaries](design.md#セッションログと要約パイプラインrequirement-26)
+  - _Requirements: Requirement 26_
+- [ ] 9.5 Implement the Session Summary Worker
+  - Create `src/services/session_summary.py` with `SessionSummaryWorker` (`queue_log`, `run_once`, `_summarize_with_local_llm`, `_retry_failed_job`)
+  - Summarize via local LLM (`qwen2.5:7b`), store session_id/start/end/model metadata, and enqueue retries on failure with exponential backoff (max 3 attempts)
+  - Implementation hints: reuse `local_llm.generate()` and persist retry state in durable storage (e.g., SQLite table)
+  - Reference: [design/Session Logging & Summaries](design.md#セッションログと要約パイプラインrequirement-26)
+  - _Requirements: Requirement 26_
+- [ ] 9.6 Add the session history CLI command
+  - Extend `src/cli.py` with a `session-history` command to return raw logs and summaries by session_id
+  - Add options such as `--open` (launch raw log in default editor) and `--summary-only`
+  - Implementation hints: inject a session repository dependency and support both table and JSON output modes
+  - Reference: [design/Session Logging & Summaries](design.md#セッションログと要約パイプラインrequirement-26)
+  - _Requirements: Requirement 26_
+
+---
+
+## Phase 10: Overnight Consolidation Scheduler
+
+### 10. Automated Consolidation
+- [ ] 10.1 Integrate APScheduler (`src/main.py`) to run `consolidation_service.consolidate()` nightly at 03:00
+  - _Requirements: Requirement 6_
+- [ ] 10.2 Implement startup consolidation check (`check_and_run_consolidation`) to catch missed runs (>24h)
+  - _Requirements: Requirement 6_
+
+---
+
+## Phase 11: Obsidian Integration
+
+### 11. File Watcher and Parser
+- [ ] 11.1 Implement `ObsidianWatcher` (`src/services/obsidian_watcher.py`) using `watchdog` to detect `.md` changes
+  - _Requirements: Requirement 1.5_
+- [ ] 11.2 Implement `ObsidianParser` (`src/services/obsidian_parser.py`) to parse conversation notes (`**User:**` / `**Assistant:**`, Wikilinks)
+  - _Requirements: Requirements 1.5, 9_
+
+---
+
+## Phase 12: CLI Interface
+
+### 12. Command Implementation
+- [ ] 12.1 Implement CLI commands in `src/cli.py` (`status`, `doctor`, `consolidate`, `list-recent`, `export`, `import`)
+  - _Requirements: Requirement 13_
+- [ ] 12.2 Provide packaging entry point (`setup.py` / console script for `context-orchestrator`)
+  - _Requirements: Requirement 13_
+
+---
+
+## Phase 13: Testing and Documentation
+
+### 13. Tests and README
+- [ ]* 13.1 Author unit tests (`tests/unit/`) for Chunker, SchemaClassifier, Reranker
+  - _Requirements: Testing Strategy_
+- [ ]* 13.2 Author integration tests (`tests/integration/`) covering ingestion→indexing and search→reranking
+  - _Requirements: Testing Strategy_
+- [ ] 13.3 Write `README.md` (installation, setup, usage, troubleshooting)
+  - _Requirements: Requirement 13_
+
+---
+
+## Phase 14: Integration & Optimization
+
+### 14. System Hardening
+- [ ] 14.1 End-to-end validation (record → search → retrieve loop)
+  - _Requirements: All Requirements_
+- [ ] 14.2 Performance tuning (target search latency ≤200ms; profile and optimize bottlenecks)
+  - _Requirements: Requirement 8_
+- [ ] 14.3 Improve error handling (consistent messaging and structured logging across services)
+  - _Requirements: Requirement 13_
+
+---
+
+## Delivery Priorities
+- **MVP (highest)**: Phases 1–8 for MCP-ready core, Phase 9 PowerShell wrapper, Phase 13.3 README
+- **Next**: Phase 10 scheduler, Phase 11 Obsidian integration, Phase 12 CLI polish
+- **Optional**: Phase 13 unit/integration tests once core features pass smoke tests; Phase 14 performance tuning as capacity allows
+
+---
+
+## Notes
+1. Execute phases sequentially and validate functionality after each milestone.
+2. Keep implementation testable—add quick verification scripts whenever feasible.
+3. Document high-friction areas with inline comments and update specs/README continuously.
+4. Ensure external dependencies (Ollama, Chroma DB, filesystem watchers) have clear failure handling.
+5. Favor configuration-driven values over hard-coding (mirror fields from `config.yaml`).

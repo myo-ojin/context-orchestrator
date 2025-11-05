@@ -1,0 +1,76 @@
+# Context Orchestrator Configuration Template
+# Copy this file to ~/.context-orchestrator/config.yaml and customize
+
+# ============================================================================
+# Paths
+# ============================================================================
+data_dir: ~/.context-orchestrator
+obsidian_vault_path: null  # Optional: Path to Obsidian vault (e.g., C:\Users\...\ObsidianVault)
+
+# ============================================================================
+# Ollama Settings (Local LLM)
+# ============================================================================
+ollama_url: http://localhost:11434
+embedding_model: nomic-embed-text  # 137M model for embeddings
+inference_model: qwen2.5:7b             # 7B model for classification and short summaries
+
+# ============================================================================
+# CLI LLM (Cloud LLM for heavy tasks)
+# ============================================================================
+cli_command: claude  # Options: "claude", "codex"
+
+# ============================================================================
+# Search Parameters
+# ============================================================================
+search_candidate_count: 50      # Number of candidates from hybrid search
+search_result_count: 10         # Final number of results after reranking
+search_timeout_seconds: 2       # Maximum search time
+
+# ============================================================================
+# Clustering (Memory Consolidation)
+# ============================================================================
+similarity_threshold: 0.9       # Cosine similarity threshold for clustering (0.0-1.0)
+min_cluster_size: 2             # Minimum number of memories to form a cluster
+
+# ============================================================================
+# Forgetting (Memory Management)
+# ============================================================================
+age_threshold_days: 30          # Delete/compress memories older than this
+importance_threshold: 0.3       # Delete memories with importance score below this (0.0-1.0)
+compression_enabled: true       # Enable memory compression
+
+# ============================================================================
+# Working Memory
+# ============================================================================
+working_memory_retention_hours: 8  # Hours to retain working memory before migration
+auto_consolidate: true             # Automatically consolidate on completion
+
+# ============================================================================
+# Consolidation Schedule
+# ============================================================================
+consolidation_schedule: "0 3 * * *"  # Cron format: 3:00 AM daily
+consolidation_auto_enabled: true     # Enable automatic nightly consolidation
+
+# ============================================================================
+# Session Logging (Requirement 26)
+# ============================================================================
+logging:
+  session_log_dir: ~/.context-orchestrator/logs  # Directory for session logs
+  max_log_size_mb: 10                            # Max log file size before rotation
+  summary_model: qwen2.5:7b                      # Model for session summarization
+
+# ============================================================================
+# Advanced Settings (Optional)
+# ============================================================================
+# Reranking weights (must sum to 1.0)
+reranking_weights:
+  memory_strength: 0.3
+  recency: 0.2
+  refs_reliability: 0.1
+  bm25_score: 0.2
+  vector_similarity: 0.2
+
+# MCP settings
+mcp:
+  max_request_size_mb: 10       # Maximum MCP request size
+  timeout_seconds: 30           # MCP request timeout
