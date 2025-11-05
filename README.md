@@ -44,19 +44,34 @@ ollama pull qwen2.5:7b
 
 ## Usage
 
+### Start MCP Server
 ```bash
-# Start Context Orchestrator (MCP server)
+# Start Context Orchestrator as MCP server
 python -m src.main
 
-# Check system status
-python -m src.cli status
-
-# Run diagnostics
-python -m src.cli doctor
-
-# Manual consolidation
-python -m src.cli consolidate
+# Or use console entry point (if installed)
+context-orchestrator
 ```
+
+### CLI Commands
+
+```bash
+# System status and health
+python -m src.cli status      # Show comprehensive system status
+python -m src.cli doctor      # Run diagnostics
+
+# Memory management
+python -m src.cli consolidate         # Manual memory consolidation
+python -m src.cli list-recent --limit 20  # List recent memories
+python -m src.cli export --output backup.json  # Export memories
+python -m src.cli import --input backup.json   # Import memories
+
+# Session history
+python -m src.cli session-history  # List all sessions
+python -m src.cli session-history --session-id <id>  # Show specific session
+```
+
+See [CLAUDE.md](CLAUDE.md) for detailed CLI documentation.
 
 ## Architecture
 

@@ -184,10 +184,19 @@ This document lists the implementation tasks for the Context Orchestrator (exter
 ## Phase 12: CLI Interface
 
 ### 12. Command Implementation
-- [ ] 12.1 Implement CLI commands in `src/cli.py` (`status`, `doctor`, `consolidate`, `list-recent`, `export`, `import`)
+- [x] 12.1 Implement CLI commands in `src/cli.py` (`status`, `doctor`, `consolidate`, `list-recent`, `export`, `import`)
   - _Requirements: Requirement 13_
-- [ ] 12.2 Provide packaging entry point (`setup.py` / console script for `context-orchestrator`)
+  - Completed: All 7 commands fully implemented with comprehensive functionality
+  - status: Enhanced with Ollama, Vector DB, BM25, Obsidian, and consolidation checks
+  - doctor: Delegates to scripts/doctor.py
+  - consolidate: Full consolidation service integration with statistics
+  - list-recent: Lists recent memories with metadata
+  - session-history: Complete session log management with summary support
+  - export: JSON export with embeddings and metadata
+  - import: JSON import with --force option for overwriting
+- [x] 12.2 Provide packaging entry point (`setup.py` / console script for `context-orchestrator`)
   - _Requirements: Requirement 13_
+  - Completed: setup.py with console_scripts entry point configured
 
 ---
 

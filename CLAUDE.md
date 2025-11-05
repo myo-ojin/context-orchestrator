@@ -251,14 +251,85 @@ When `obsidian_vault_path` is set, ObsidianWatcher starts automatically on syste
 # Start Context Orchestrator as MCP server (stdio mode)
 python -m src.main
 
-# Run system health check
+# Or use console entry point (if installed with pip install -e .)
+context-orchestrator
+```
+
+### CLI Commands
+
+**System Status:**
+```bash
+# Show comprehensive system status
 python -m src.cli status
+# or: context-orchestrator status
 
-# Run diagnostics
+# Displays:
+# - Data directory status
+# - Ollama connection and models
+# - Vector DB (Chroma) statistics
+# - BM25 index status
+# - Session logs statistics
+# - Obsidian integration status
+# - Last consolidation time
+```
+
+**Health Check:**
+```bash
+# Run diagnostics and get remediation steps
 python -m src.cli doctor
+# or: context-orchestrator doctor
 
-# Manual memory consolidation
+# Checks:
+# - Ollama service status
+# - Required models (nomic-embed-text, qwen2.5:7b)
+# - Data directory permissions
+# - Database integrity
+# - Configuration validity
+```
+
+**Memory Consolidation:**
+```bash
+# Manually run memory consolidation
 python -m src.cli consolidate
+# or: context-orchestrator consolidate
+
+# Performs:
+# - Working memory → Short-term migration
+# - Clustering similar memories
+# - Forgetting old/unimportant memories
+# - Reports statistics (migrated, clustered, deleted)
+```
+
+**Memory Management:**
+```bash
+# List recent memories
+python -m src.cli list-recent --limit 20
+# or: context-orchestrator list-recent --limit 20
+
+# Export memories to JSON (backup)
+python -m src.cli export --output backup.json
+# or: context-orchestrator export --output backup.json
+
+# Import memories from JSON (restore)
+python -m src.cli import --input backup.json
+python -m src.cli import --input backup.json --force  # Overwrite existing
+# or: context-orchestrator import --input backup.json
+```
+
+**Session History:**
+```bash
+# List all sessions
+python -m src.cli session-history
+# or: context-orchestrator session-history
+
+# Show specific session log
+python -m src.cli session-history --session-id <session_id>
+
+# Show only summary
+python -m src.cli session-history --session-id <session_id> --summary-only
+
+# Open log in editor
+python -m src.cli session-history --session-id <session_id> --open
 ```
 
 ### Testing Commands
@@ -274,26 +345,6 @@ pytest tests/integration/
 
 # Run with coverage
 pytest --cov=src
-```
-
-### Utility Commands
-```bash
-# List recent memories
-python -m src.cli list-recent --limit 20
-
-# Export memories to JSON
-python -m src.cli export --output backup.json
-
-# Import memories from JSON
-python -m src.cli import --input backup.json
-
-# View logs
-python -m src.cli logs --tail 100
-
-# View session history
-python -m src.cli session-history --session-id <id>
-python -m src.cli session-history --open  # Open raw log in editor
-python -m src.cli session-history --summary-only  # Show summaries only
 ```
 
 ## Configuration
