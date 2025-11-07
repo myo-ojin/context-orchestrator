@@ -30,6 +30,8 @@ from src.utils.errors import (
 # Import storage layer
 from src.storage.vector_db import ChromaVectorDB
 from src.storage.bm25_index import BM25Index
+from src.storage.project_storage import ProjectStorage  # Phase 15
+from src.storage.bookmark_storage import BookmarkStorage  # Phase 15
 
 # Import processing layer
 from src.processing.classifier import SchemaClassifier
@@ -49,6 +51,8 @@ from src.services.session_manager import SessionManager
 from src.services.session_log_collector import SessionLogCollector
 from src.services.session_summary import SessionSummaryWorker
 from src.services.obsidian_watcher import ObsidianWatcher
+from src.services.project_manager import ProjectManager  # Phase 15
+from src.services.bookmark_manager import BookmarkManager  # Phase 15
 
 # Import MCP handler
 from src.mcp.protocol_handler import MCPProtocolHandler
@@ -181,7 +185,7 @@ def init_services(
     classifier: SchemaClassifier,
     chunker: Chunker,
     indexer: Indexer
-) -> tuple[IngestionService, SearchService, ConsolidationService, Optional[SessionManager], Optional[ObsidianWatcher]]:
+) -> tuple[IngestionService, SearchService, ConsolidationService, Optional[SessionManager], Optional[ObsidianWatcher], Optional[ProjectManager], Optional[BookmarkManager]]:
     """
     Initialize core services
 
@@ -195,7 +199,7 @@ def init_services(
         indexer: Indexer instance
 
     Returns:
-        Tuple of (ingestion_service, search_service, consolidation_service, session_manager, obsidian_watcher)
+        Tuple of (ingestion_service, search_service, consolidation_service, session_manager, obsidian_watcher, project_manager, bookmark_manager)
     """
     # Initialize Ingestion Service
     ingestion_service = IngestionService(
@@ -256,7 +260,41 @@ def init_services(
             logger.warning(f"Failed to initialize ObsidianWatcher: {e}")
             obsidian_watcher = None
 
-    return ingestion_service, search_service, consolidation_service, session_manager, obsidian_watcher
+    # Initialize Phase 15: Project Management
+    project_manager = None
+    bookmark_manager = None
+
+    try:
+        # Initialize Project Storage
+        project_storage_path = Path(config.data_dir) / 'projects.json'
+        project_storage = ProjectStorage(persist_path=str(project_storage_path))
+        logger.info(f"Initialized ProjectStorage: {project_storage_path}")
+
+        # Initialize Project Manager
+        project_manager = ProjectManager(
+            project_storage=project_storage,
+            model_router=model_router
+        )
+        logger.info("Initialized ProjectManager")
+
+        # Initialize Bookmark Storage
+        bookmark_storage_path = Path(config.data_dir) / 'bookmarks.json'
+        bookmark_storage = BookmarkStorage(persist_path=str(bookmark_storage_path))
+        logger.info(f"Initialized BookmarkStorage: {bookmark_storage_path}")
+
+        # Initialize Bookmark Manager
+        bookmark_manager = BookmarkManager(
+            bookmark_storage=bookmark_storage
+        )
+        logger.info("Initialized BookmarkManager")
+
+    except Exception as e:
+        logger.error(f"Failed to initialize Phase 15 components: {e}")
+        logger.warning("Project and bookmark management will not be available")
+        project_manager = None
+        bookmark_manager = None
+
+    return ingestion_service, search_service, consolidation_service, session_manager, obsidian_watcher, project_manager, bookmark_manager
 
 
 def check_and_run_consolidation(consolidation_service, data_dir: str) -> None:
@@ -338,7 +376,7 @@ def main(config_path: Optional[str] = None) -> None:
         classifier, chunker, indexer = init_processing(model_router, vector_db, bm25_index)
 
         # Initialize services
-        ingestion_service, search_service, consolidation_service, session_manager, obsidian_watcher = init_services(
+        ingestion_service, search_service, consolidation_service, session_manager, obsidian_watcher, project_manager, bookmark_manager = init_services(
             config,
             model_router,
             vector_db,
@@ -407,7 +445,9 @@ def main(config_path: Optional[str] = None) -> None:
             ingestion_service=ingestion_service,
             search_service=search_service,
             consolidation_service=consolidation_service,
-            session_manager=session_manager
+            session_manager=session_manager,
+            project_manager=project_manager,  # Phase 15
+            bookmark_manager=bookmark_manager  # Phase 15
         )
 
         logger.info("MCP Protocol Handler initialized")
