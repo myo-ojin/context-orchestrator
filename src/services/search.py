@@ -629,3 +629,91 @@ class SearchService:
         except Exception as e:
             logger.error(f"Error listing recent memories: {e}")
             return []
+
+    def search_in_project(
+        self,
+        project_id: str,
+        query: str,
+        top_k: Optional[int] = None,
+        additional_filters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Search memories within a specific project
+
+        Args:
+            project_id: Project ID to filter by
+            query: Search query string
+            top_k: Number of results to return (overrides default)
+            additional_filters: Optional additional metadata filters
+                (e.g., {'schema_type': 'Incident'})
+
+        Returns:
+            List of search result dicts, sorted by relevance (same as search())
+
+        Example:
+            >>> service = SearchService(...)
+            >>> results = service.search_in_project(
+            ...     project_id="proj-abc123",
+            ...     query="React hooks error",
+            ...     additional_filters={"schema_type": "Incident"}
+            ... )
+            >>> for result in results:
+            ...     print(f"{result['score']:.2f}: {result['content'][:100]}")
+
+        Requirements: Phase 15 - Project Management
+        """
+        try:
+            logger.info(f"Searching in project {project_id}: '{query[:100]}...'")
+
+            # Build filters with project_id
+            filters = {'project_id': project_id}
+
+            if additional_filters:
+                filters.update(additional_filters)
+
+            # Use standard search with project filter
+            results = self.search(query=query, top_k=top_k, filters=filters)
+
+            logger.info(f"Project search returned {len(results)} results")
+            return results
+
+        except Exception as e:
+            logger.error(f"Project search failed: {e}", exc_info=True)
+            return []
+
+    def list_project_memories(
+        self,
+        project_id: str,
+        limit: int = 20
+    ) -> List[Dict[str, Any]]:
+        """
+        List recent memories in a specific project
+
+        Args:
+            project_id: Project ID to filter by
+            limit: Maximum number of memories to return (default: 20)
+
+        Returns:
+            List of memory dicts with summary and metadata,
+            sorted by timestamp (newest first)
+
+        Example:
+            >>> service = SearchService(...)
+            >>> memories = service.list_project_memories("proj-abc123", limit=10)
+            >>> for mem in memories:
+            ...     print(f"{mem['memory_id']}: {mem['summary']}")
+
+        Requirements: Phase 15 - Project Management
+        """
+        try:
+            logger.info(f"Listing memories for project {project_id} (limit={limit})")
+
+            # Use list_recent with project filter
+            return self.list_recent(
+                limit=limit,
+                filter_metadata={'project_id': project_id}
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to list project memories: {e}")
+            return []
