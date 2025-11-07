@@ -29,6 +29,8 @@ __all__ = [
     # Data models
     'Memory',
     'Chunk',
+    'Project',
+    'SearchBookmark',
     'MemoryType',
     'SchemaType',
     # LLM clients
@@ -97,6 +99,7 @@ class Memory:
     memory_type: MemoryType = MemoryType.WORKING
     cluster_id: Optional[str] = None
     is_representative: bool = False
+    project_id: Optional[str] = None  # Phase 15: Project association
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
@@ -114,7 +117,8 @@ class Memory:
             'metadata': self.metadata,
             'memory_type': self.memory_type.value,
             'cluster_id': self.cluster_id,
-            'is_representative': self.is_representative
+            'is_representative': self.is_representative,
+            'project_id': self.project_id
         }
 
     @classmethod
@@ -134,7 +138,8 @@ class Memory:
             metadata=data.get('metadata', {}),
             memory_type=MemoryType(data.get('memory_type', 'working')),
             cluster_id=data.get('cluster_id'),
-            is_representative=data.get('is_representative', False)
+            is_representative=data.get('is_representative', False),
+            project_id=data.get('project_id')  # Phase 15: backward compatible
         )
 
 
@@ -182,6 +187,120 @@ class Chunk:
             tokens=data['tokens'],
             embedding=data.get('embedding'),
             metadata=data.get('metadata', {})
+        )
+
+
+@dataclass
+class Project:
+    """
+    Project data model (Phase 15: Project Management)
+
+    Represents a project for organizing memories by topic/codebase.
+    Inspired by NotebookLM's library management approach.
+
+    Attributes:
+        id: Unique identifier (UUID)
+        name: Project name
+        description: Project description
+        tags: Tags for categorization (e.g., ["react", "typescript"])
+        created_at: Creation timestamp
+        updated_at: Last update timestamp
+        memory_count: Number of memories associated with this project
+        last_accessed: Last time project was accessed/searched
+        metadata: Additional metadata (flexible dict)
+    """
+    id: str
+    name: str
+    description: str
+    tags: List[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
+    memory_count: int = 0
+    last_accessed: datetime = field(default_factory=datetime.now)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'tags': self.tags,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat(),
+            'memory_count': self.memory_count,
+            'last_accessed': self.last_accessed.isoformat(),
+            'metadata': self.metadata
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Project':
+        """Create Project from dictionary"""
+        return cls(
+            id=data['id'],
+            name=data['name'],
+            description=data['description'],
+            tags=data.get('tags', []),
+            created_at=datetime.fromisoformat(data['created_at']),
+            updated_at=datetime.fromisoformat(data['updated_at']),
+            memory_count=data.get('memory_count', 0),
+            last_accessed=datetime.fromisoformat(data.get('last_accessed', data['updated_at'])),
+            metadata=data.get('metadata', {})
+        )
+
+
+@dataclass
+class SearchBookmark:
+    """
+    Search bookmark data model (Phase 15: Search Enhancement)
+
+    Represents a saved search query for quick access to frequently used searches.
+    Similar to NotebookLM's smart query approach.
+
+    Attributes:
+        id: Unique identifier (UUID)
+        name: Bookmark name (e.g., "React Errors")
+        query: Search query string
+        filters: Search filters (e.g., {"schema_type": "Incident"})
+        created_at: Creation timestamp
+        usage_count: Number of times this bookmark has been used
+        last_used: Last time bookmark was executed
+        description: Optional description
+    """
+    id: str
+    name: str
+    query: str
+    filters: Dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=datetime.now)
+    usage_count: int = 0
+    last_used: datetime = field(default_factory=datetime.now)
+    description: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'query': self.query,
+            'filters': self.filters,
+            'created_at': self.created_at.isoformat(),
+            'usage_count': self.usage_count,
+            'last_used': self.last_used.isoformat(),
+            'description': self.description
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'SearchBookmark':
+        """Create SearchBookmark from dictionary"""
+        return cls(
+            id=data['id'],
+            name=data['name'],
+            query=data['query'],
+            filters=data.get('filters', {}),
+            created_at=datetime.fromisoformat(data['created_at']),
+            usage_count=data.get('usage_count', 0),
+            last_used=datetime.fromisoformat(data.get('last_used', data['created_at'])),
+            description=data.get('description', "")
         )
 
 
