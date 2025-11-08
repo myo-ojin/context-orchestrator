@@ -48,7 +48,8 @@ class SearchService:
         bm25_index: BM25Index,
         model_router: ModelRouter,
         candidate_count: int = 50,
-        result_count: int = 10
+        result_count: int = 10,
+        recency_half_life_hours: Optional[float] = None
     ):
         """
         Initialize Search Service
@@ -59,14 +60,19 @@ class SearchService:
             model_router: ModelRouter instance
             candidate_count: Number of candidates to retrieve
             result_count: Number of final results to return
+            recency_half_life_hours: Half-life (hours) for recency decay (default: 24h)
         """
         self.vector_db = vector_db
         self.bm25_index = bm25_index
         self.model_router = model_router
         self.candidate_count = candidate_count
         self.result_count = result_count
+        self.recency_half_life_hours = recency_half_life_hours or 24.0
 
-        logger.info(f"Initialized SearchService (candidates={candidate_count}, results={result_count})")
+        logger.info(
+            f"Initialized SearchService (candidates={candidate_count}, results={result_count}, "
+            f"recency_half_life={self.recency_half_life_hours}h)"
+        )
 
     def search(
         self,
@@ -130,7 +136,12 @@ class SearchService:
             logger.debug(f"Merged to {len(merged_results)} candidates")
 
             # Step 5: Rerank
-            final_results = self._rerank(merged_results, query, result_limit)
+            final_results = self._rerank(
+                merged_results,
+                query,
+                result_limit,
+                filters=filters
+            )
 
             # Calculate search time
             elapsed = (datetime.now() - start_time).total_seconds() * 1000
@@ -273,7 +284,8 @@ class SearchService:
         self,
         candidates: List[Dict[str, Any]],
         query: str,
-        top_k: int
+        top_k: int,
+        filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
         Rerank candidates using rule-based scoring
@@ -313,6 +325,9 @@ class SearchService:
             memory_strength = metadata.get('strength', 0.5)
             recency_score = self._calculate_recency_score(metadata)
             refs_reliability = self._calculate_refs_reliability(metadata)
+            metadata_bonus = self._calculate_metadata_alignment(metadata, query, filters)
+            # Slightly prioritize fresher tiers (working -> short -> long)
+            priority_score = self._memory_priority(metadata)
 
             # Combined score
             combined_score = (
@@ -320,8 +335,10 @@ class SearchService:
                 recency_score * 0.2 +
                 refs_reliability * 0.1 +
                 normalized_bm25 * 0.2 +
-                vector_sim * 0.2
+                vector_sim * 0.2 +
+                metadata_bonus
             )
+            combined_score = max(0.0, min(1.0, combined_score))
 
             # Add scores to result
             result = candidate.copy()
@@ -332,16 +349,17 @@ class SearchService:
                 'recency': recency_score,
                 'refs_reliability': refs_reliability,
                 'bm25': normalized_bm25,
-                'vector': vector_sim
+                'vector': vector_sim,
+                'metadata': metadata_bonus
             }
+            result['_priority'] = priority_score
 
             scored_results.append(result)
 
         # Sort by score (descending)
         scored_results.sort(key=lambda x: x['score'], reverse=True)
 
-        # Return top_k
-        final_results = scored_results[:top_k]
+        final_results = self._deduplicate_results(scored_results, top_k)
 
         logger.debug(f"Reranked to top {len(final_results)} results")
         return final_results
@@ -384,11 +402,13 @@ class SearchService:
                 return 0.5  # Default for unknown
 
             created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
-            age_days = (datetime.now() - created_at).days
+            age_hours = max(
+                0.0,
+                (datetime.now() - created_at).total_seconds() / 3600.0
+            )
 
-            # Exponential decay: score = e^(-age/30)
-            # 30 days = half-life
-            score = math.exp(-age_days / 30.0)
+            half_life = max(self.recency_half_life_hours, 1.0)
+            score = math.exp(-age_hours / half_life)
             return max(0.0, min(1.0, score))
 
         except Exception as e:
@@ -417,6 +437,151 @@ class SearchService:
 
         score = math.log(1 + ref_count) / math.log(11)
         return min(1.0, score)
+
+    def _calculate_metadata_alignment(
+        self,
+        metadata: Dict[str, Any],
+        query: str,
+        filters: Optional[Dict[str, Any]]
+    ) -> float:
+        """
+        Heuristic bonus based on metadata alignment with the query/filters.
+        Positive bonus for matching topic/severity/project, slight penalty for mismatches.
+        """
+        bonus = 0.0
+        query_lc = (query or "").lower()
+
+        topic = metadata.get('topic')
+        if topic:
+            topic_lc = str(topic).lower()
+            if topic_lc and topic_lc in query_lc:
+                bonus += 0.05
+            else:
+                bonus -= 0.01
+
+        severity = metadata.get('severity')
+        if severity and str(severity).lower() == 'high':
+            if any(keyword in query_lc for keyword in ('incident', 'inc', 'bug', 'sev', 'pager')):
+                bonus += 0.05
+
+        if filters and filters.get('project_id'):
+            if metadata.get('project_id') == filters['project_id']:
+                bonus += 0.03
+            else:
+                bonus -= 0.05
+
+        return bonus
+
+    def _memory_priority(self, metadata: Dict[str, Any]) -> int:
+        """
+        Lower numbers mean higher priority when collapsing duplicates.
+        Prefers working/short_term memories and metadata entries over raw chunks.
+        """
+        memory_type = str(metadata.get('memory_type', 'working')).lower()
+        type_priority = {
+            'working': 0,
+            'short_term': 1,
+            'long_term': 2
+        }
+        priority = type_priority.get(memory_type, 3)
+
+        if not metadata.get('is_memory_entry'):
+            if 'chunk_index' in metadata:
+                priority += 1
+            else:
+                priority += 2
+
+        return priority
+
+    def _deduplicate_results(
+        self,
+        scored_results: List[Dict[str, Any]],
+        top_k: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Collapse duplicate memories (metadata vs chunk, short_term vs long_term copies).
+        """
+        selected: List[Dict[str, Any]] = []
+        memory_index: Dict[Any, int] = {}
+        semantic_index: Dict[Any, int] = {}
+
+        for candidate in scored_results:
+            metadata = candidate.get('metadata', {})
+            memory_key = metadata.get('memory_id')
+            semantic_key = None
+            semantic_fields = (
+                metadata.get('project_id'),
+                metadata.get('topic'),
+                metadata.get('source'),
+                metadata.get('created_at')
+            )
+            if any(semantic_fields):
+                semantic_key = semantic_fields
+
+            if self._should_skip_candidate(candidate, memory_index, memory_key, selected):
+                continue
+
+            if self._should_skip_candidate(candidate, semantic_index, semantic_key, selected):
+                continue
+
+            selected.append(candidate)
+            idx = len(selected) - 1
+            if memory_key:
+                memory_index[memory_key] = idx
+            if semantic_key:
+                semantic_index[semantic_key] = idx
+
+        unique_results: List[Dict[str, Any]] = []
+        seen_ids = set()
+        for item in selected:
+            item_id = item.get('id')
+            if item_id in seen_ids:
+                continue
+            seen_ids.add(item_id)
+            unique_results.append(item)
+
+        trimmed = unique_results[:top_k]
+        for item in trimmed:
+            item.pop('_priority', None)
+        return trimmed
+
+    def _should_skip_candidate(
+        self,
+        candidate: Dict[str, Any],
+        index_map: Dict[Any, int],
+        key: Any,
+        selected: List[Dict[str, Any]]
+    ) -> bool:
+        """
+        Return True if candidate should be skipped due to an existing better entry for the same key.
+        """
+        if key is None:
+            return False
+
+        existing_idx = index_map.get(key)
+        if existing_idx is None or existing_idx >= len(selected):
+            return False
+
+        existing_candidate = selected[existing_idx]
+        if self._is_better_candidate(candidate, existing_candidate):
+            selected[existing_idx] = candidate
+            index_map[key] = existing_idx
+            return True
+
+        return True
+
+    @staticmethod
+    def _is_better_candidate(new: Dict[str, Any], existing: Dict[str, Any]) -> bool:
+        """
+        Decide whether `new` should replace `existing` when deduplicating.
+        """
+        new_priority = new.get('_priority', 999)
+        existing_priority = existing.get('_priority', 999)
+
+        if new_priority != existing_priority:
+            return new_priority < existing_priority
+
+        return new.get('score', 0.0) > existing.get('score', 0.0)
 
     def search_by_metadata(
         self,

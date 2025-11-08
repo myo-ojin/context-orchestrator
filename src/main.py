@@ -218,7 +218,8 @@ def init_services(
         bm25_index=bm25_index,
         model_router=model_router,
         candidate_count=config.search.candidate_count,
-        result_count=config.search.result_count
+        result_count=config.search.result_count,
+        recency_half_life_hours=float(config.working_memory.retention_hours)
     )
 
     logger.info("Initialized SearchService")

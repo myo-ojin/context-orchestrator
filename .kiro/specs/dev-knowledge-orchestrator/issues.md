@@ -25,6 +25,7 @@
 | #2025-11-05-02 | SearchService に get_memory / list_recent メソッドがない | 2025-11-05 | TBD | MCPProtocolHandler と CLI が呼び出す2つのメソッドを実装。全154テスト合格確認。 |
 | #2025-11-03-01 | Ollama 埋め込み API 呼び出しが 400 エラーになる | 2025-11-03 | TBD | `generate_embedding` を `input` キーで呼ぶよう修正。今後はユニットテスト追加を検討。 |
 | #2025-11-03-02 | Chunk メタデータに memory_id が入らず後工程で利用できない | 2025-11-03 | TBD | Chunker/Indexer で `memory_id` / `chunk_index` をメタデータへ埋め込み、検索・削除で参照可能にした。 |
+| #2025-11-09-01 | Hybrid search/rerank modernization plan | Proposed | 2025-11-09 | ryomy | QAM導入＋cross-encoder再ランク＋tier別recency設計 |
 
 ## Issue Details
 
@@ -150,3 +151,16 @@
 - **影響**: ConsolidationService・Indexer の欠落により、メモリ削除やクラスタリングが実行時に失敗する。
 - **進捗 (2025-11-03)**: ConsolidationService の migrate / cluster / forget 実装、Indexer.delete_by_memory_id、SearchService のフィルタ処理を実装。`pytest` 69 passed / 10 skipped、`pytest --cov=src` でカバレッジ 61% を確認。
 - **残課題**: Consolidation stats のメタデータ集計、LLM クライアント層のモック整備、Phase6 以降の機能追加時に再検証する。
+### #2025-11-09-01 Hybrid search/rerank modernization plan
+- **背景 / 課題**: timeline や change-feed など意図が明確なクエリでも working/short の最新メモが常に上位を占拠し、本来参照したい長期メモや専用トピックが埋もれている。bm25 が強い chunk がサマリより上に出るケースも残っており、現行ルールベース `_rerank` では改善の頭打ち。citereports/mcp_runs/mcp_run-20251109-035415.jsonl
+- **外部ベストプラクティス**:
+  1. Query Attribute Modeling (QAM) でクエリ属性を抽出し、ハイブリッド検索へ渡すと mAP が向上。citehttps://arxiv.org/abs/2508.04683?utm_source=openai
+  2. HYRR のようにハイブリッド retriever を前提に学習した cross-encoder rerank を入れるとランキング精度が安定。citehttps://arxiv.org/abs/2212.10528?utm_source=openai
+  3. CLEF CheckThat! 2025 優勝構成では dense 多め + BM25 少なめの候補を cross-encoder に渡して Precision@5 を大幅改善。citehttps://arxiv.org/abs/2505.23250?utm_source=openai
+  4. CaGR-RAG のようにクエリをクラスタリングして実行順を最適化すると tail latency を 51% 削減。citehttps://arxiv.org/abs/2505.01164?utm_source=openai
+- **Next Actions**:
+  1. LLM でクエリ属性 (topic/type/project) を抽出し、SearchService のフィルタ/metadata bonus に適用。
+  2. dense100 + BM2530 の候補を cross-encoder (BGE 等) に渡す rerank パスを追加し、ルール型 `_rerank` は fallback にする。
+  3. tier ごとに recency 係数を持てるよう `_calculate_recency_score` を再設計し、長期メモも vector/BM25 で浮上可能にする。
+  4. chunk はランキング対象から除外し、選ばれたメモの補足情報としてのみ返す。
+  5. `scripts.mcp_replay` で Precision@k / NDCG@k を自動計測し、クエリをトピックごとにバッチ処理して I/O キャッシュ効率を向上。

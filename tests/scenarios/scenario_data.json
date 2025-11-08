@@ -3,12 +3,18 @@
     {
       "name": "AppBrain",
       "description": "Knowledge orchestrator rollout for customer app",
-      "tags": ["app_dev", "orchestrator"]
+      "tags": [
+        "app_dev",
+        "orchestrator"
+      ]
     },
     {
       "name": "BugFixer",
       "description": "Incident response knowledge base",
-      "tags": ["bug", "incident"]
+      "tags": [
+        "bug",
+        "incident"
+      ]
     }
   ],
   "conversations": [
@@ -17,30 +23,49 @@
       "assistant": "Reuse the AppBrain release checklist. Start with the dual-write scaffold, then cut over after the smoke tests succeed.",
       "project": "AppBrain",
       "source": "scenario_app_dev",
-      "refs": ["ScenarioDoc-AppBrain"],
-      "metadata": {"topic": "timeline", "type": "guidance"}
+      "refs": [
+        "ScenarioDoc-AppBrain"
+      ],
+      "metadata": {
+        "topic": "timeline",
+        "type": "guidance"
+      },
+      "timestamp": "2025-11-08T10:00:00"
     },
     {
       "user": "How did we integrate the Postgres change feed during the previous release?",
       "assistant": "We buffered to S3 for 24h and replayed chunks with idempotent upserts. The AppBrain launch doc has the SQL snippet.",
       "project": "AppBrain",
       "source": "scenario_app_dev",
-      "refs": ["ScenarioDoc-AppBrain"]
+      "refs": [
+        "ScenarioDoc-AppBrain"
+      ],
+      "timestamp": "2025-11-05T09:30:00"
     },
     {
       "user": "What was the fix for the TypeError crash in the context chunker?",
       "assistant": "We patched the tokenizer fallback to guard against empty arrays. See BugFixer incident INC-204 for the patch steps.",
       "project": "BugFixer",
       "source": "scenario_bug",
-      "refs": ["INC-204"],
-      "metadata": {"severity": "high"}
+      "refs": [
+        "INC-204"
+      ],
+      "metadata": {
+        "severity": "high"
+      },
+      "timestamp": "2025-10-15T12:00:00"
     },
     {
       "user": "Remind me how we summarized long LLM conversations for the audit export.",
       "assistant": "Use the session_log_collector CLI to batch compress logs, then export via cmd_export with the audit tag.",
       "source": "scenario_general",
-      "refs": ["AuditGuide"],
-      "metadata": {"topic": "audit"}
+      "refs": [
+        "AuditGuide"
+      ],
+      "metadata": {
+        "topic": "audit"
+      },
+      "timestamp": "2025-08-01T08:00:00"
     }
   ]
 }

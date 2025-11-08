@@ -1,20 +1,77 @@
 [
-  {
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "search_memory",
-    "params": {"query": "timeline view orchestrator", "top_k": 3}
-  },
-  {
-    "jsonrpc": "2.0",
-    "id": 2,
-    "method": "search_memory",
-    "params": {"query": "TypeError chunker fix", "top_k": 3}
-  },
-  {
-    "jsonrpc": "2.0",
-    "id": 3,
-    "method": "search_in_project",
-    "params": {"project_name": "AppBrain", "query": "change feed", "top_k": 3}
-  }
+    {
+        "jsonrpc":  "2.0",
+        "id":  1,
+        "method":  "search_memory",
+        "params":  {
+                       "query":  "timeline view orchestrator",
+                       "top_k":  3
+                   }
+    },
+    {
+        "jsonrpc":  "2.0",
+        "id":  2,
+        "method":  "search_memory",
+        "params":  {
+                       "query":  "TypeError chunker fix",
+                       "top_k":  3
+                   }
+    },
+    {
+        "jsonrpc":  "2.0",
+        "id":  3,
+        "method":  "search_in_project",
+        "params":  {
+                       "project_name":  "AppBrain",
+                       "query":  "change feed",
+                       "top_k":  3
+                   }
+    },
+    {
+        "method":  "search_memory",
+        "params":  {
+                       "top_k":  3,
+                       "query":  "obsidian vault edits triage"
+                   },
+        "id":  4,
+        "jsonrpc":  "2.0"
+    },
+    {
+        "method":  "search_memory",
+        "params":  {
+                       "top_k":  3,
+                       "query":  "stale embeddings doctor report"
+                   },
+        "id":  5,
+        "jsonrpc":  "2.0"
+    },
+    {
+        "method":  "search_in_project",
+        "params":  {
+                       "query":  "dashboard pilot",
+                       "top_k":  3,
+                       "project_name":  "InsightOps"
+                   },
+        "id":  6,
+        "jsonrpc":  "2.0"
+    },
+    {
+        "method":  "search_in_project",
+        "params":  {
+                       "query":  "governance guardrails",
+                       "top_k":  3,
+                       "project_name":  "PhaseSync"
+                   },
+        "id":  7,
+        "jsonrpc":  "2.0"
+    },
+    {
+        "method":  "search_memory",
+        "params":  {
+                       "top_k":  3,
+                       "query":  "retention policy long term memories"
+                   },
+        "id":  8,
+        "jsonrpc":  "2.0"
+    }
 ]
