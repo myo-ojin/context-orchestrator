@@ -86,6 +86,7 @@ class IngestionService:
                 - source: str ('cli', 'obsidian', 'kiro', optional)
                 - refs: list[str] (source URLs, file paths, optional)
                 - metadata: dict (additional metadata, optional)
+                - project_id: str (project ID for association, optional) - Phase 15
 
         Returns:
             memory_id: str (unique identifier for the memory)
@@ -95,7 +96,8 @@ class IngestionService:
             >>> memory_id = service.ingest_conversation({
             ...     'user': 'How to fix TypeError?',
             ...     'assistant': 'Check null values...',
-            ...     'source': 'cli'
+            ...     'source': 'cli',
+            ...     'project_id': 'proj-abc123'  # Phase 15: optional
             ... })
             >>> print(memory_id)
             'mem-abc123...'
@@ -283,6 +285,9 @@ Summary:"""
         if 'tags' in metadata:
             tags.extend(metadata['tags'])
 
+        # Extract project_id (Phase 15)
+        project_id = conversation.get('project_id')
+
         # Create Memory object
         memory = Memory(
             id=memory_id,
@@ -298,7 +303,8 @@ Summary:"""
             metadata=metadata,
             memory_type=MemoryType.WORKING,  # Start in working memory
             cluster_id=None,
-            is_representative=False
+            is_representative=False,
+            project_id=project_id  # Phase 15: Project association
         )
 
         logger.debug(f"Created Memory: {memory.id} ({schema_type.value})")
@@ -383,6 +389,7 @@ Summary:"""
             metadata['importance'] = memory.importance
             metadata['created_at'] = memory.created_at.isoformat()
             metadata['is_memory_entry'] = True  # Flag to distinguish from chunks
+            metadata['project_id'] = memory.project_id  # Phase 15: Project association
 
             self.vector_db.add(
                 id=f"{memory.id}-metadata",
@@ -436,7 +443,8 @@ Summary:"""
                 metadata=metadata,
                 memory_type=MemoryType(metadata.get('memory_type', 'working')),
                 cluster_id=metadata.get('cluster_id'),
-                is_representative=metadata.get('is_representative', False)
+                is_representative=metadata.get('is_representative', False),
+                project_id=metadata.get('project_id')  # Phase 15: Project association
             )
 
             return memory

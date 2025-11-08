@@ -18,6 +18,8 @@ from src.services.ingestion import IngestionService
 from src.services.search import SearchService
 from src.services.consolidation import ConsolidationService
 from src.services.session_manager import SessionManager
+from src.services.project_manager import ProjectManager  # Phase 15
+from src.services.bookmark_manager import BookmarkManager  # Phase 15
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +34,16 @@ class MCPProtocolHandler:
     - get_memory: Get specific memory
     - list_recent_memories: List recent memories
     - consolidate_memories: Run consolidation
+    - create_project, list_projects, etc.: Project management (Phase 15)
+    - create_bookmark, use_bookmark, etc.: Bookmark management (Phase 15)
 
     Attributes:
         ingestion_service: IngestionService instance
         search_service: SearchService instance
         consolidation_service: ConsolidationService instance
         session_manager: SessionManager instance (optional)
+        project_manager: ProjectManager instance (optional) - Phase 15
+        bookmark_manager: BookmarkManager instance (optional) - Phase 15
     """
 
     def __init__(
@@ -45,7 +51,9 @@ class MCPProtocolHandler:
         ingestion_service: IngestionService,
         search_service: SearchService,
         consolidation_service: ConsolidationService,
-        session_manager: Optional[SessionManager] = None
+        session_manager: Optional[SessionManager] = None,
+        project_manager: Optional[ProjectManager] = None,  # Phase 15
+        bookmark_manager: Optional[BookmarkManager] = None  # Phase 15
     ):
         """
         Initialize MCP Protocol Handler
@@ -55,11 +63,15 @@ class MCPProtocolHandler:
             search_service: SearchService instance
             consolidation_service: ConsolidationService instance
             session_manager: Optional SessionManager instance
+            project_manager: Optional ProjectManager instance (Phase 15)
+            bookmark_manager: Optional BookmarkManager instance (Phase 15)
         """
         self.ingestion_service = ingestion_service
         self.search_service = search_service
         self.consolidation_service = consolidation_service
         self.session_manager = session_manager
+        self.project_manager = project_manager  # Phase 15
+        self.bookmark_manager = bookmark_manager  # Phase 15
 
         logger.info("Initialized MCPProtocolHandler")
 
@@ -243,6 +255,38 @@ class MCPProtocolHandler:
         # Tool: add_command (Phase 6)
         elif method == 'add_command':
             return self._tool_add_command(params)
+
+        # Tool: create_project (Phase 15)
+        elif method == 'create_project':
+            return self._tool_create_project(params)
+
+        # Tool: list_projects (Phase 15)
+        elif method == 'list_projects':
+            return self._tool_list_projects(params)
+
+        # Tool: get_project (Phase 15)
+        elif method == 'get_project':
+            return self._tool_get_project(params)
+
+        # Tool: delete_project (Phase 15)
+        elif method == 'delete_project':
+            return self._tool_delete_project(params)
+
+        # Tool: search_in_project (Phase 15)
+        elif method == 'search_in_project':
+            return self._tool_search_in_project(params)
+
+        # Tool: create_bookmark (Phase 15)
+        elif method == 'create_bookmark':
+            return self._tool_create_bookmark(params)
+
+        # Tool: list_bookmarks (Phase 15)
+        elif method == 'list_bookmarks':
+            return self._tool_list_bookmarks(params)
+
+        # Tool: use_bookmark (Phase 15)
+        elif method == 'use_bookmark':
+            return self._tool_use_bookmark(params)
 
         else:
             raise NotImplementedError(f"Unknown method: {method}")
@@ -566,6 +610,408 @@ class MCPProtocolHandler:
         logger.debug(f"Added command to session: session_id={session_id}, success={success}")
 
         return {'success': success}
+
+    # Phase 15: Project Management Tools
+
+    def _tool_create_project(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Tool: create_project (Phase 15)
+
+        Creates a new project for organizing memories.
+
+        Args:
+            params: {
+                'name': str,
+                'description': str,
+                'tags': list[str] (optional)
+            }
+
+        Returns:
+            {
+                'project_id': str,
+                'name': str,
+                'created_at': str
+            }
+
+        Raises:
+            ValueError: If project_manager is not available or parameters invalid
+        """
+        if not self.project_manager:
+            raise ValueError("Project management is not enabled")
+
+        name = params.get('name')
+        description = params.get('description')
+        tags = params.get('tags', [])
+
+        if not name:
+            raise ValueError("name parameter is required")
+        if not description:
+            raise ValueError("description parameter is required")
+
+        # Create project
+        project = self.project_manager.create_project(
+            name=name,
+            description=description,
+            tags=tags
+        )
+
+        logger.info(f"Created project: {project.id} ({project.name})")
+
+        return {
+            'project_id': project.id,
+            'name': project.name,
+            'description': project.description,
+            'tags': project.tags,
+            'created_at': project.created_at.isoformat()
+        }
+
+    def _tool_list_projects(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Tool: list_projects (Phase 15)
+
+        Lists all projects.
+
+        Args:
+            params: {} (no parameters)
+
+        Returns:
+            {
+                'projects': [
+                    {
+                        'project_id': str,
+                        'name': str,
+                        'description': str,
+                        'tags': list[str],
+                        'memory_count': int,
+                        'last_accessed': str
+                    },
+                    ...
+                ]
+            }
+
+        Raises:
+            ValueError: If project_manager is not available
+        """
+        if not self.project_manager:
+            raise ValueError("Project management is not enabled")
+
+        projects = self.project_manager.list_projects()
+
+        project_list = [
+            {
+                'project_id': p.id,
+                'name': p.name,
+                'description': p.description,
+                'tags': p.tags,
+                'memory_count': p.memory_count,
+                'last_accessed': p.last_accessed.isoformat()
+            }
+            for p in projects
+        ]
+
+        logger.debug(f"Listed {len(project_list)} projects")
+
+        return {'projects': project_list}
+
+    def _tool_get_project(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Tool: get_project (Phase 15)
+
+        Gets a project by ID or name.
+
+        Args:
+            params: {
+                'project_id': str (optional),
+                'name': str (optional)
+            }
+
+        Returns:
+            {
+                'project_id': str,
+                'name': str,
+                'description': str,
+                'tags': list[str],
+                'memory_count': int,
+                'created_at': str,
+                'last_accessed': str
+            }
+
+        Raises:
+            ValueError: If project_manager is not available or project not found
+        """
+        if not self.project_manager:
+            raise ValueError("Project management is not enabled")
+
+        project_id = params.get('project_id')
+        name = params.get('name')
+
+        if not project_id and not name:
+            raise ValueError("Either project_id or name must be provided")
+
+        if project_id:
+            project = self.project_manager.get_project(project_id)
+        else:
+            project = self.project_manager.get_project_by_name(name)
+
+        if not project:
+            raise ValueError(f"Project not found: {project_id or name}")
+
+        return {
+            'project_id': project.id,
+            'name': project.name,
+            'description': project.description,
+            'tags': project.tags,
+            'memory_count': project.memory_count,
+            'created_at': project.created_at.isoformat(),
+            'last_accessed': project.last_accessed.isoformat(),
+            'metadata': project.metadata
+        }
+
+    def _tool_delete_project(self, params: Dict[str, Any]) -> Dict[str, bool]:
+        """
+        Tool: delete_project (Phase 15)
+
+        Deletes a project by ID.
+
+        Args:
+            params: {
+                'project_id': str
+            }
+
+        Returns:
+            {'success': bool}
+
+        Raises:
+            ValueError: If project_manager is not available or project_id missing
+        """
+        if not self.project_manager:
+            raise ValueError("Project management is not enabled")
+
+        project_id = params.get('project_id')
+        if not project_id:
+            raise ValueError("project_id parameter is required")
+
+        success = self.project_manager.delete_project(project_id)
+
+        logger.info(f"Deleted project: {project_id}, success={success}")
+
+        return {'success': success}
+
+    def _tool_search_in_project(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Tool: search_in_project (Phase 15)
+
+        Searches memories within a specific project.
+
+        Args:
+            params: {
+                'project_id': str,
+                'query': str,
+                'top_k': int (optional),
+                'filters': dict (optional)
+            }
+
+        Returns:
+            {
+                'results': [
+                    {
+                        'id': str,
+                        'content': str,
+                        'score': float,
+                        'metadata': dict
+                    },
+                    ...
+                ]
+            }
+
+        Raises:
+            ValueError: If parameters invalid
+        """
+        project_id = params.get('project_id')
+        query = params.get('query')
+        top_k = params.get('top_k')
+        additional_filters = params.get('filters')
+
+        if not project_id:
+            raise ValueError("project_id parameter is required")
+        if not query:
+            raise ValueError("query parameter is required")
+
+        # Search in project
+        results = self.search_service.search_in_project(
+            project_id=project_id,
+            query=query,
+            top_k=top_k,
+            additional_filters=additional_filters
+        )
+
+        logger.info(f"Project search returned {len(results)} results")
+
+        return {'results': results}
+
+    # Phase 15: Bookmark Management Tools
+
+    def _tool_create_bookmark(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Tool: create_bookmark (Phase 15)
+
+        Creates a new search bookmark.
+
+        Args:
+            params: {
+                'name': str,
+                'query': str,
+                'filters': dict (optional),
+                'description': str (optional)
+            }
+
+        Returns:
+            {
+                'bookmark_id': str,
+                'name': str,
+                'query': str,
+                'created_at': str
+            }
+
+        Raises:
+            ValueError: If bookmark_manager is not available or parameters invalid
+        """
+        if not self.bookmark_manager:
+            raise ValueError("Bookmark management is not enabled")
+
+        name = params.get('name')
+        query = params.get('query')
+        filters = params.get('filters', {})
+        description = params.get('description', '')
+
+        if not name:
+            raise ValueError("name parameter is required")
+        if not query:
+            raise ValueError("query parameter is required")
+
+        # Create bookmark
+        bookmark = self.bookmark_manager.create_bookmark(
+            name=name,
+            query=query,
+            filters=filters,
+            description=description
+        )
+
+        logger.info(f"Created bookmark: {bookmark.id} ({bookmark.name})")
+
+        return {
+            'bookmark_id': bookmark.id,
+            'name': bookmark.name,
+            'query': bookmark.query,
+            'filters': bookmark.filters,
+            'created_at': bookmark.created_at.isoformat()
+        }
+
+    def _tool_list_bookmarks(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Tool: list_bookmarks (Phase 15)
+
+        Lists all search bookmarks.
+
+        Args:
+            params: {} (no parameters)
+
+        Returns:
+            {
+                'bookmarks': [
+                    {
+                        'bookmark_id': str,
+                        'name': str,
+                        'query': str,
+                        'filters': dict,
+                        'usage_count': int,
+                        'last_used': str
+                    },
+                    ...
+                ]
+            }
+
+        Raises:
+            ValueError: If bookmark_manager is not available
+        """
+        if not self.bookmark_manager:
+            raise ValueError("Bookmark management is not enabled")
+
+        bookmarks = self.bookmark_manager.list_bookmarks()
+
+        bookmark_list = [
+            {
+                'bookmark_id': b.id,
+                'name': b.name,
+                'query': b.query,
+                'filters': b.filters,
+                'usage_count': b.usage_count,
+                'last_used': b.last_used.isoformat(),
+                'description': b.description
+            }
+            for b in bookmarks
+        ]
+
+        logger.debug(f"Listed {len(bookmark_list)} bookmarks")
+
+        return {'bookmarks': bookmark_list}
+
+    def _tool_use_bookmark(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Tool: use_bookmark (Phase 15)
+
+        Executes a saved bookmark search.
+
+        Args:
+            params: {
+                'bookmark_id': str (optional),
+                'name': str (optional),
+                'top_k': int (optional)
+            }
+
+        Returns:
+            {
+                'bookmark_name': str,
+                'results': [...]  # Same as search_memory
+            }
+
+        Raises:
+            ValueError: If bookmark_manager is not available or bookmark not found
+        """
+        if not self.bookmark_manager:
+            raise ValueError("Bookmark management is not enabled")
+
+        bookmark_id = params.get('bookmark_id')
+        name = params.get('name')
+        top_k = params.get('top_k')
+
+        if not bookmark_id and not name:
+            raise ValueError("Either bookmark_id or name must be provided")
+
+        # Execute bookmark
+        if bookmark_id:
+            bookmark_data = self.bookmark_manager.execute_bookmark(bookmark_id)
+        else:
+            bookmark_data = self.bookmark_manager.execute_bookmark_by_name(name)
+
+        if not bookmark_data:
+            raise ValueError(f"Bookmark not found: {bookmark_id or name}")
+
+        # Execute search with bookmark query and filters
+        results = self.search_service.search(
+            query=bookmark_data['query'],
+            top_k=top_k,
+            filters=bookmark_data['filters']
+        )
+
+        logger.info(f"Bookmark search '{bookmark_data['bookmark_name']}' returned {len(results)} results")
+
+        return {
+            'bookmark_name': bookmark_data['bookmark_name'],
+            'query': bookmark_data['query'],
+            'filters': bookmark_data['filters'],
+            'results': results
+        }
 
     # Helper methods for JSON-RPC responses
 
