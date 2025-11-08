@@ -180,8 +180,11 @@ class ChromaVectorDB:
 
             embedding = None
             embeddings = result.get('embeddings')
-            if embeddings and embeddings[0]:
-                embedding = embeddings[0]
+            if embeddings is not None and len(embeddings) > 0:
+                first = embeddings[0]
+                # Avoid truth-value checks on numpy arrays
+                if first is not None:
+                    embedding = first
 
             return {
                 'id': result['ids'][0],
@@ -211,15 +214,20 @@ class ChromaVectorDB:
         Returns:
             List of dicts with keys: id, metadata, and optionally content/embedding.
         """
-        include = ['ids', 'metadatas']
+        include = ['metadatas']
         if include_documents:
             include.append('documents')
         if include_embeddings:
             include.append('embeddings')
 
         try:
+            where_arg = None
+            if filter_metadata and len(filter_metadata) == 1:
+                # Simple equality filter is supported directly
+                where_arg = filter_metadata
+
             results = self.collection.get(
-                where=filter_metadata,
+                where=where_arg,
                 include=include
             )
 
@@ -239,8 +247,18 @@ class ChromaVectorDB:
                 if include_documents and idx < len(documents):
                     entry['content'] = documents[idx]
 
-                if include_embeddings and idx < len(embeddings) and embeddings[idx]:
+                if include_embeddings and idx < len(embeddings):
                     entry['embedding'] = embeddings[idx]
+
+                # Apply client-side filtering when multiple keys are provided
+                if filter_metadata and len(filter_metadata) > 0:
+                    ok = True
+                    for k, v in filter_metadata.items():
+                        if metadata.get(k) != v:
+                            ok = False
+                            break
+                    if not ok:
+                        continue
 
                 items.append(entry)
 

@@ -391,6 +391,12 @@ Summary:"""
             metadata['is_memory_entry'] = True  # Flag to distinguish from chunks
             metadata['project_id'] = memory.project_id  # Phase 15: Project association
 
+            # Chroma metadata must be simple scalars; drop None and complex types
+            def _is_simple(v):
+                return isinstance(v, (str, int, float, bool))
+
+            metadata = {k: v for k, v in metadata.items() if v is not None and _is_simple(v)}
+
             self.vector_db.add(
                 id=f"{memory.id}-metadata",
                 embedding=embedding,
