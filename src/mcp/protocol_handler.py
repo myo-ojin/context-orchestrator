@@ -376,10 +376,11 @@ class MCPProtocolHandler:
         filter_metadata = params.get('filter_metadata')
 
         # Search memories
+        # Map filter_metadata to service 'filters' parameter
         results = self.search_service.search(
             query=query,
             top_k=top_k,
-            filter_metadata=filter_metadata
+            filters=filter_metadata
         )
 
         logger.info(f"Searched memories: query='{query}', results={len(results)}")
