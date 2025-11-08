@@ -1,0 +1,20 @@
+﻿[
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "search_memory",
+    "params": {"query": "timeline view orchestrator", "top_k": 3}
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "search_memory",
+    "params": {"query": "TypeError chunker fix", "top_k": 3}
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "search_in_project",
+    "params": {"project_name": "AppBrain", "query": "change feed", "top_k": 3}
+  }
+]
