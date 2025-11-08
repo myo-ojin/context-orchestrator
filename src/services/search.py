@@ -15,7 +15,7 @@ Search pipeline:
 Requirements: Requirement 8 (MVP - Hybrid Search)
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
 import logging
 import math
@@ -23,6 +23,9 @@ import math
 from src.models import ModelRouter
 from src.storage.vector_db import ChromaVectorDB
 from src.storage.bm25_index import BM25Index
+from src.services.project_manager import ProjectManager
+from src.services.query_attributes import QueryAttributeExtractor, QueryAttributes
+from src.services.rerankers import CrossEncoderReranker
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +52,10 @@ class SearchService:
         model_router: ModelRouter,
         candidate_count: int = 50,
         result_count: int = 10,
-        recency_half_life_hours: Optional[float] = None
+        recency_half_life_hours: Optional[float] = None,
+        project_manager: Optional[ProjectManager] = None,
+        query_attribute_extractor: Optional[QueryAttributeExtractor] = None,
+        cross_encoder_reranker: Optional[CrossEncoderReranker] = None,
     ):
         """
         Initialize Search Service
@@ -61,6 +67,10 @@ class SearchService:
             candidate_count: Number of candidates to retrieve
             result_count: Number of final results to return
             recency_half_life_hours: Half-life (hours) for recency decay (default: 24h)
+            recency_half_life_hours: Half-life (hours) for recency decay (default: 24h)
+            project_manager: Optional ProjectManager for project-name -> ID mapping
+            query_attribute_extractor: Optional extractor for query hints
+            cross_encoder_reranker: Optional reranker for LLM-based scoring
         """
         self.vector_db = vector_db
         self.bm25_index = bm25_index
@@ -68,6 +78,9 @@ class SearchService:
         self.candidate_count = candidate_count
         self.result_count = result_count
         self.recency_half_life_hours = recency_half_life_hours or 24.0
+        self.project_manager = project_manager
+        self.query_attribute_extractor = query_attribute_extractor or QueryAttributeExtractor()
+        self.cross_encoder_reranker = cross_encoder_reranker
 
         logger.info(
             f"Initialized SearchService (candidates={candidate_count}, results={result_count}, "
@@ -108,6 +121,8 @@ class SearchService:
         """
         try:
             result_limit = top_k if top_k is not None else self.result_count
+            query_attributes = self._extract_query_attributes(query)
+            filters = self._prepare_filters(filters, query_attributes)
 
             logger.info(f"Searching for: '{query[:100]}...' (top_k={result_limit})")
             start_time = datetime.now()
@@ -140,8 +155,10 @@ class SearchService:
                 merged_results,
                 query,
                 result_limit,
-                filters=filters
+                filters=filters,
+                query_attributes=query_attributes
             )
+            final_results = self._apply_cross_encoder_rerank(query, final_results)
 
             # Calculate search time
             elapsed = (datetime.now() - start_time).total_seconds() * 1000
@@ -280,12 +297,75 @@ class SearchService:
 
         return list(merged.values())
 
+    def _extract_query_attributes(self, query: str) -> Optional[QueryAttributes]:
+        if not self.query_attribute_extractor or not query:
+            return None
+        try:
+            return self.query_attribute_extractor.extract(query)
+        except Exception as exc:  # pragma: no cover - safeguard
+            logger.warning(f"Attribute extraction failed: {exc}")
+            return None
+
+    def _prepare_filters(
+        self,
+        filters: Optional[Dict[str, Any]],
+        query_attributes: Optional[QueryAttributes]
+    ) -> Optional[Dict[str, Any]]:
+        if filters:
+            combined = dict(filters)
+        else:
+            combined = {}
+
+        if query_attributes and query_attributes.has_hints():
+            self._apply_attribute_filters(combined, query_attributes)
+
+        return combined if combined else None
+
+    def _apply_attribute_filters(
+        self,
+        filters: Dict[str, Any],
+        query_attributes: QueryAttributes
+    ) -> None:
+        if not self.project_manager or 'project_id' in filters:
+            return
+
+        project_name = query_attributes.project_name
+        if not project_name:
+            return
+
+        try:
+            project = self.project_manager.get_project_by_name(project_name)
+            if project:
+                filters['project_id'] = project.id
+                logger.debug(
+                    "Applied project filter from query attributes: %s -> %s",
+                    project_name,
+                    project.id
+                )
+        except Exception as exc:
+            logger.warning(f"Failed to map project hint '{project_name}': {exc}")
+
+    def _apply_cross_encoder_rerank(
+        self,
+        query: str,
+        results: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        if not self.cross_encoder_reranker or not results:
+            return results
+        try:
+            reranked = self.cross_encoder_reranker.rerank(query, results)
+            return reranked if reranked else results
+        except Exception as exc:
+            logger.warning(f"Cross-encoder rerank failed: {exc}")
+            return results
+
     def _rerank(
         self,
         candidates: List[Dict[str, Any]],
         query: str,
         top_k: int,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
+        query_attributes: Optional[QueryAttributes] = None
     ) -> List[Dict[str, Any]]:
         """
         Rerank candidates using rule-based scoring
@@ -325,7 +405,12 @@ class SearchService:
             memory_strength = metadata.get('strength', 0.5)
             recency_score = self._calculate_recency_score(metadata)
             refs_reliability = self._calculate_refs_reliability(metadata)
-            metadata_bonus = self._calculate_metadata_alignment(metadata, query, filters)
+            metadata_bonus = self._calculate_metadata_alignment(
+                metadata,
+                query,
+                filters,
+                query_attributes
+            )
             # Slightly prioritize fresher tiers (working -> short -> long)
             priority_score = self._memory_priority(metadata)
 
@@ -442,7 +527,8 @@ class SearchService:
         self,
         metadata: Dict[str, Any],
         query: str,
-        filters: Optional[Dict[str, Any]]
+        filters: Optional[Dict[str, Any]],
+        query_attributes: Optional[QueryAttributes]
     ) -> float:
         """
         Heuristic bonus based on metadata alignment with the query/filters.
@@ -469,6 +555,20 @@ class SearchService:
                 bonus += 0.03
             else:
                 bonus -= 0.05
+
+        if query_attributes:
+            if query_attributes.topic:
+                if topic and str(topic).lower() == query_attributes.topic.lower():
+                    bonus += 0.05
+                elif topic:
+                    bonus -= 0.01
+            if query_attributes.doc_type:
+                doc_type = metadata.get('type')
+                if doc_type and str(doc_type).lower() == query_attributes.doc_type.lower():
+                    bonus += 0.03
+            if query_attributes.severity and severity:
+                if str(severity).lower() == query_attributes.severity.lower():
+                    bonus += 0.02
 
         return bonus
 

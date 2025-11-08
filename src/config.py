@@ -38,6 +38,8 @@ class SearchConfig:
     candidate_count: int = 50
     result_count: int = 10
     timeout_seconds: int = 2
+    cross_encoder_enabled: bool = True
+    cross_encoder_top_k: int = 5
 
 
 @dataclass
@@ -231,7 +233,9 @@ def _parse_config(data: Dict[str, Any]) -> Config:
         search=SearchConfig(
             candidate_count=search_data.get('candidate_count', SearchConfig.candidate_count),
             result_count=search_data.get('result_count', SearchConfig.result_count),
-            timeout_seconds=search_data.get('timeout_seconds', SearchConfig.timeout_seconds)
+            timeout_seconds=search_data.get('timeout_seconds', SearchConfig.timeout_seconds),
+            cross_encoder_enabled=search_data.get('cross_encoder_enabled', SearchConfig.cross_encoder_enabled),
+            cross_encoder_top_k=search_data.get('cross_encoder_top_k', SearchConfig.cross_encoder_top_k),
         ),
 
         clustering=ClusteringConfig(
@@ -310,7 +314,9 @@ def save_config(config: Config, config_path: Optional[str] = None) -> None:
         'search': {
             'candidate_count': config.search.candidate_count,
             'result_count': config.search.result_count,
-            'timeout_seconds': config.search.timeout_seconds
+            'timeout_seconds': config.search.timeout_seconds,
+            'cross_encoder_enabled': config.search.cross_encoder_enabled,
+            'cross_encoder_top_k': config.search.cross_encoder_top_k,
         },
 
         'clustering': {

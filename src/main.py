@@ -53,6 +53,8 @@ from src.services.session_summary import SessionSummaryWorker
 from src.services.obsidian_watcher import ObsidianWatcher
 from src.services.project_manager import ProjectManager  # Phase 15
 from src.services.bookmark_manager import BookmarkManager  # Phase 15
+from src.services.query_attributes import QueryAttributeExtractor
+from src.services.rerankers import CrossEncoderReranker
 
 # Import MCP handler
 from src.mcp.protocol_handler import MCPProtocolHandler
@@ -212,14 +214,60 @@ def init_services(
 
     logger.info("Initialized IngestionService")
 
+    # Initialize Phase 15: Project Management
+    project_manager = None
+    bookmark_manager = None
+    query_attribute_extractor = QueryAttributeExtractor()
+    cross_encoder_reranker = None
+
+    try:
+        # Initialize Project Storage
+        project_storage_path = Path(config.data_dir) / 'projects.json'
+        project_storage = ProjectStorage(persist_path=str(project_storage_path))
+        logger.info(f"Initialized ProjectStorage: {project_storage_path}")
+
+        # Initialize Project Manager
+        project_manager = ProjectManager(
+            project_storage=project_storage,
+            model_router=model_router
+        )
+        logger.info("Initialized ProjectManager")
+
+        # Initialize Bookmark Storage
+        bookmark_storage_path = Path(config.data_dir) / 'bookmarks.json'
+        bookmark_storage = BookmarkStorage(persist_path=str(bookmark_storage_path))
+        logger.info(f"Initialized BookmarkStorage: {bookmark_storage_path}")
+
+        # Initialize Bookmark Manager
+        bookmark_manager = BookmarkManager(
+            bookmark_storage=bookmark_storage
+        )
+        logger.info("Initialized BookmarkManager")
+
+    except Exception as e:
+        logger.error(f"Failed to initialize Phase 15 components: {e}")
+        logger.warning("Project and bookmark management will not be available")
+        project_manager = None
+        bookmark_manager = None
+
     # Initialize Search Service
+    if config.search.cross_encoder_enabled:
+        cross_encoder_reranker = CrossEncoderReranker(
+            model_router=model_router,
+            max_candidates=config.search.cross_encoder_top_k,
+            enabled=True
+        )
+
     search_service = SearchService(
         vector_db=vector_db,
         bm25_index=bm25_index,
         model_router=model_router,
         candidate_count=config.search.candidate_count,
         result_count=config.search.result_count,
-        recency_half_life_hours=float(config.working_memory.retention_hours)
+        recency_half_life_hours=float(config.working_memory.retention_hours),
+        project_manager=project_manager,
+        query_attribute_extractor=query_attribute_extractor,
+        cross_encoder_reranker=cross_encoder_reranker
     )
 
     logger.info("Initialized SearchService")
@@ -260,40 +308,6 @@ def init_services(
         except ValueError as e:
             logger.warning(f"Failed to initialize ObsidianWatcher: {e}")
             obsidian_watcher = None
-
-    # Initialize Phase 15: Project Management
-    project_manager = None
-    bookmark_manager = None
-
-    try:
-        # Initialize Project Storage
-        project_storage_path = Path(config.data_dir) / 'projects.json'
-        project_storage = ProjectStorage(persist_path=str(project_storage_path))
-        logger.info(f"Initialized ProjectStorage: {project_storage_path}")
-
-        # Initialize Project Manager
-        project_manager = ProjectManager(
-            project_storage=project_storage,
-            model_router=model_router
-        )
-        logger.info("Initialized ProjectManager")
-
-        # Initialize Bookmark Storage
-        bookmark_storage_path = Path(config.data_dir) / 'bookmarks.json'
-        bookmark_storage = BookmarkStorage(persist_path=str(bookmark_storage_path))
-        logger.info(f"Initialized BookmarkStorage: {bookmark_storage_path}")
-
-        # Initialize Bookmark Manager
-        bookmark_manager = BookmarkManager(
-            bookmark_storage=bookmark_storage
-        )
-        logger.info("Initialized BookmarkManager")
-
-    except Exception as e:
-        logger.error(f"Failed to initialize Phase 15 components: {e}")
-        logger.warning("Project and bookmark management will not be available")
-        project_manager = None
-        bookmark_manager = None
 
     return ingestion_service, search_service, consolidation_service, session_manager, obsidian_watcher, project_manager, bookmark_manager
 
