@@ -39,7 +39,7 @@ class SearchConfig:
     result_count: int = 10
     timeout_seconds: int = 2
     cross_encoder_enabled: bool = True
-    cross_encoder_top_k: int = 5
+    cross_encoder_top_k: int = 3
 
 
 @dataclass

@@ -45,6 +45,12 @@ class SearchService:
         result_count: Number of final results (default: 10)
     """
 
+    _TIER_HALF_LIFE_MULTIPLIER = {
+        'working': 1.0,
+        'short_term': 3.0,
+        'long_term': 6.0
+    }
+
     def __init__(
         self,
         vector_db: ChromaVectorDB,
@@ -492,7 +498,9 @@ class SearchService:
                 (datetime.now() - created_at).total_seconds() / 3600.0
             )
 
-            half_life = max(self.recency_half_life_hours, 1.0)
+            memory_type = str(metadata.get('memory_type', 'working')).lower()
+            multiplier = self._TIER_HALF_LIFE_MULTIPLIER.get(memory_type, 4.0)
+            half_life = max(self.recency_half_life_hours * multiplier, 1.0)
             score = math.exp(-age_hours / half_life)
             return max(0.0, min(1.0, score))
 
@@ -641,9 +649,14 @@ class SearchService:
             unique_results.append(item)
 
         trimmed = unique_results[:top_k]
+        trimmed = self._filter_memory_entries(trimmed)
         for item in trimmed:
             item.pop('_priority', None)
         return trimmed
+
+    def _filter_memory_entries(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        filtered = [item for item in results if item.get('metadata', {}).get('is_memory_entry')]
+        return filtered if filtered else results
 
     def _should_skip_candidate(
         self,

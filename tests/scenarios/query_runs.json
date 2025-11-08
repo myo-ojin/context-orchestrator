@@ -1,77 +1,99 @@
 [
-    {
-        "jsonrpc":  "2.0",
-        "id":  1,
-        "method":  "search_memory",
-        "params":  {
-                       "query":  "timeline view orchestrator",
-                       "top_k":  3
-                   }
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "search_memory",
+      "params": {"query": "timeline view orchestrator", "top_k": 3}
     },
-    {
-        "jsonrpc":  "2.0",
-        "id":  2,
-        "method":  "search_memory",
-        "params":  {
-                       "query":  "TypeError chunker fix",
-                       "top_k":  3
-                   }
-    },
-    {
-        "jsonrpc":  "2.0",
-        "id":  3,
-        "method":  "search_in_project",
-        "params":  {
-                       "project_name":  "AppBrain",
-                       "query":  "change feed",
-                       "top_k":  3
-                   }
-    },
-    {
-        "method":  "search_memory",
-        "params":  {
-                       "top_k":  3,
-                       "query":  "obsidian vault edits triage"
-                   },
-        "id":  4,
-        "jsonrpc":  "2.0"
-    },
-    {
-        "method":  "search_memory",
-        "params":  {
-                       "top_k":  3,
-                       "query":  "stale embeddings doctor report"
-                   },
-        "id":  5,
-        "jsonrpc":  "2.0"
-    },
-    {
-        "method":  "search_in_project",
-        "params":  {
-                       "query":  "dashboard pilot",
-                       "top_k":  3,
-                       "project_name":  "InsightOps"
-                   },
-        "id":  6,
-        "jsonrpc":  "2.0"
-    },
-    {
-        "method":  "search_in_project",
-        "params":  {
-                       "query":  "governance guardrails",
-                       "top_k":  3,
-                       "project_name":  "PhaseSync"
-                   },
-        "id":  7,
-        "jsonrpc":  "2.0"
-    },
-    {
-        "method":  "search_memory",
-        "params":  {
-                       "top_k":  3,
-                       "query":  "retention policy long term memories"
-                   },
-        "id":  8,
-        "jsonrpc":  "2.0"
+    "relevance": {
+      "topic": ["timeline", "release"],
+      "ideal_hits": 2
     }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "search_memory",
+      "params": {"query": "TypeError chunker fix", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["chunker"],
+      "severity": ["high"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "method": "search_in_project",
+      "params": {"project_name": "AppBrain", "query": "change feed", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["ingestion"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "method": "search_memory",
+      "params": {"query": "obsidian vault edits triage", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["obsidian"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "method": "search_memory",
+      "params": {"query": "stale embeddings doctor report", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["health", "report"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 6,
+      "method": "search_in_project",
+      "params": {"project_name": "InsightOps", "query": "dashboard pilot", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["dashboard", "demo"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 7,
+      "method": "search_in_project",
+      "params": {"project_name": "PhaseSync", "query": "governance guardrails", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["governance", "policy"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 8,
+      "method": "search_memory",
+      "params": {"query": "retention policy long term memories", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["policy"],
+      "ideal_hits": 2
+    }
+  }
 ]

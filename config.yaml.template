@@ -32,7 +32,7 @@ search:
   result_count: 10         # Final number of results after reranking
   timeout_seconds: 2       # Maximum search time
   cross_encoder_enabled: true  # Enable LLM cross-encoder reranking
-  cross_encoder_top_k: 5       # How many candidates to rescore with cross-encoder
+  cross_encoder_top_k: 3       # How many candidates to rescore with cross-encoder
 
 # ============================================================================
 # Clustering (Memory Consolidation)
