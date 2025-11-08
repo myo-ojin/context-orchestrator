@@ -111,13 +111,13 @@ class LocalLLMClient:
             model = self.embedding_model
 
         try:
+            # Some Ollama versions expect `input`, others accept only `prompt` for embeddings.
+            # First try with `input`; if empty, retry once with `prompt` for compatibility.
+            payload_input = {"model": model, "input": text}
             response = requests.post(
                 f"{self.ollama_url}/api/embeddings",
-                json={
-                    "model": model,
-                    "input": text
-                },
-                timeout=30
+                json=payload_input,
+                timeout=30,
             )
 
             if response.status_code == 404:
@@ -129,12 +129,27 @@ class LocalLLMClient:
 
             response.raise_for_status()
             result = response.json()
+            embedding = result.get("embedding", [])
 
-            embedding = result.get('embedding', [])
+            if not embedding:
+                # Retry with `prompt` key (Windows builds 0.12.x may require this)
+                logger.debug("Empty embedding with 'input'; retrying with 'prompt'.")
+                payload_prompt = {"model": model, "prompt": text}
+                response = requests.post(
+                    f"{self.ollama_url}/api/embeddings",
+                    json=payload_prompt,
+                    timeout=30,
+                )
+                response.raise_for_status()
+                result = response.json()
+                embedding = result.get("embedding", [])
+
             if not embedding:
                 raise ValueError("Empty embedding returned")
 
-            logger.debug(f"Generated embedding (dim={len(embedding)}) for text: {text[:50]}...")
+            logger.debug(
+                f"Generated embedding (dim={len(embedding)}) for text: {text[:50]}..."
+            )
             return embedding
 
         except requests.exceptions.RequestException as e:
