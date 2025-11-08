@@ -15,6 +15,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 import argparse
+import builtins
 
 from src.config import load_config
 from src.utils.logger import setup_logger, get_logger
@@ -491,6 +492,9 @@ def cmd_import(args):
     """Import memories from JSON file"""
     try:
         from src.storage.bm25_index import BM25Index
+        from src.models.router import ModelRouter
+        from src.models.local_llm import LocalLLMClient
+        from src.models.cli_llm import CLILLMClient
 
         config = load_config(args.config)
 
@@ -534,6 +538,17 @@ def cmd_import(args):
 
         bm25_index = BM25Index(persist_path=str(bm25_path))
 
+        # Build model router for embeddings if import data has no embeddings
+        local_llm = LocalLLMClient(
+            ollama_url=config.ollama.url,
+            embedding_model=config.ollama.embedding_model,
+            inference_model=config.ollama.inference_model,
+        )
+        cli_llm = CLILLMClient(cli_command=config.cli.command)
+        router = ModelRouter(local_llm, cli_llm,
+                             embedding_model=config.ollama.embedding_model,
+                             inference_model=config.ollama.inference_model)
+
         # Import memories
         print("Importing memories...")
         imported_count = 0
@@ -557,12 +572,21 @@ def cmd_import(args):
                     skipped_count += 1
                     continue
 
-                # Add to vector DB
+                # Ensure embedding exists
+                if not embedding:
+                    try:
+                        embedding = router.generate_embedding(content)
+                    except Exception as e:
+                        logger.error(f"Embedding generation failed for {memory_id}: {e}")
+                        skipped_count += 1
+                        continue
+
+                # Add to vector DB (wrapper signature)
                 vector_db.add(
-                    ids=[memory_id],
-                    documents=[content],
-                    metadatas=[metadata],
-                    embeddings=[embedding] if embedding else None
+                    id=memory_id,
+                    embedding=embedding,
+                    metadata=metadata,
+                    document=content,
                 )
 
                 # Add to BM25 index
@@ -608,6 +632,10 @@ def main():
         help='Path to config file'
     )
 
+    parser.add_argument(
+        '--no-emoji', action='store_true', help='Disable emoji/symbols in output'
+    )
+
     subparsers = parser.add_subparsers(dest='command', help='Command')
 
     # status command
@@ -648,6 +676,38 @@ def main():
 
     # Parse args
     args = parser.parse_args()
+
+    # Install safe print wrapper for Windows cp932 consoles
+    def _supports_unicode() -> bool:
+        try:
+            test = '✓📁🤖💾🔍📝📓🌙'
+            (sys.stdout.encoding and test.encode(sys.stdout.encoding)) or test.encode('utf-8')
+            return True
+        except Exception:
+            return False
+
+    EMOJI_ON = (not args.no_emoji) and _supports_unicode()
+
+    _MAP = {
+        '✓': 'OK', '✗': 'NG', '📁': '[DIR]', '🤖': '[Ollama]', '💾': '[DB]',
+        '🔍': '[Search]', '📝': '[Logs]', '📓': '[Obsidian]', '🌙': '[Cron]'
+    }
+
+    orig_print = builtins.print
+
+    def safe_print(*pargs, **pkwargs):
+        def _safe(s):
+            if isinstance(s, str) and not EMOJI_ON:
+                for k, v in _MAP.items():
+                    s = s.replace(k, v)
+            return s
+        try:
+            return orig_print(*tuple(_safe(a) for a in pargs), **pkwargs)
+        except UnicodeEncodeError:
+            # Fallback without emoji
+            return orig_print(*tuple(_safe(a) for a in pargs), **pkwargs)
+
+    builtins.print = safe_print
 
     if not args.command:
         parser.print_help()

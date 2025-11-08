@@ -79,6 +79,13 @@ class LoggingConfig:
 
 
 @dataclass
+class RouterConfig:
+    """Routing thresholds/configuration"""
+    short_summary_max_tokens: int = 100
+    long_summary_min_tokens: int = 500
+
+
+@dataclass
 class Config:
     """
     System configuration
@@ -106,6 +113,7 @@ class Config:
     working_memory: WorkingMemoryConfig = field(default_factory=WorkingMemoryConfig)
     consolidation: ConsolidationConfig = field(default_factory=ConsolidationConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    router: RouterConfig = field(default_factory=RouterConfig)
 
     def __post_init__(self):
         """Expand paths after initialization"""
@@ -203,6 +211,7 @@ def _parse_config(data: Dict[str, Any]) -> Config:
     working_memory_data = data.get('working_memory', {})
     consolidation_data = data.get('consolidation', {})
     logging_data = data.get('logging', {})
+    router_data = data.get('router', {})
 
     # Create config object
     config = Config(
@@ -251,6 +260,11 @@ def _parse_config(data: Dict[str, Any]) -> Config:
             max_log_size_mb=logging_data.get('max_log_size_mb', LoggingConfig.max_log_size_mb),
             summary_model=logging_data.get('summary_model', LoggingConfig.summary_model),
             level=logging_data.get('level', LoggingConfig.level)
+        ),
+
+        router=RouterConfig(
+            short_summary_max_tokens=router_data.get('short_summary_max_tokens', RouterConfig.short_summary_max_tokens),
+            long_summary_min_tokens=router_data.get('long_summary_min_tokens', RouterConfig.long_summary_min_tokens),
         )
     )
 
@@ -325,6 +339,11 @@ def save_config(config: Config, config_path: Optional[str] = None) -> None:
             'max_log_size_mb': config.logging.max_log_size_mb,
             'summary_model': config.logging.summary_model,
             'level': config.logging.level
+        },
+
+        'router': {
+            'short_summary_max_tokens': config.router.short_summary_max_tokens,
+            'long_summary_min_tokens': config.router.long_summary_min_tokens,
         }
     }
 

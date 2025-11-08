@@ -54,7 +54,9 @@ class ModelRouter:
         local_llm_client: LocalLLMClient,
         cli_llm_client: CLILLMClient,
         embedding_model: str = "nomic-embed-text",
-        inference_model: str = "qwen2.5:7b"
+        inference_model: str = "qwen2.5:7b",
+        short_summary_max_tokens: int = 100,
+        long_summary_min_tokens: int = 500,
     ):
         """
         Initialize Model Router
@@ -69,10 +71,16 @@ class ModelRouter:
         self.cli_llm_client = cli_llm_client
         self.embedding_model = embedding_model
         self.inference_model = inference_model
+        self.short_summary_max_tokens = short_summary_max_tokens
+        self.long_summary_min_tokens = long_summary_min_tokens
 
         logger.info("Initialized ModelRouter")
         logger.info(f"  Embedding model: {embedding_model}")
         logger.info(f"  Inference model: {inference_model}")
+        logger.info(
+            f"  Routing thresholds: short<=%d, long>=%d"
+            % (short_summary_max_tokens, long_summary_min_tokens)
+        )
 
     def route(
         self,
@@ -220,7 +228,11 @@ class ModelRouter:
 
         # Auto-decide based on length if not specified
         if use_cloud is None:
-            task_type = 'long_summary' if max_length > 500 else 'short_summary'
+            task_type = (
+                'long_summary'
+                if max_length and max_length >= self.long_summary_min_tokens
+                else 'short_summary'
+            )
         else:
             task_type = 'long_summary' if use_cloud else 'short_summary'
 

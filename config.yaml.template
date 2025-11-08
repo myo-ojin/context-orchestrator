@@ -76,6 +76,13 @@ logging:
   level: INFO
 
 # ============================================================================
+# Router (Model Routing Thresholds)
+# ============================================================================
+router:
+  short_summary_max_tokens: 100   # <= this uses local LLM
+  long_summary_min_tokens: 500    # >= this uses cloud LLM
+
+# ============================================================================
 # Advanced Settings (Optional)
 # ============================================================================
 # Reranking weights (consumer components may read these)
@@ -90,4 +97,3 @@ reranking_weights:
 mcp:
   max_request_size_mb: 10   # Maximum MCP request size
   timeout_seconds: 30       # MCP request timeout
-

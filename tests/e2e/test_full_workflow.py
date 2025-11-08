@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 End-to-end validation tests for Context Orchestrator
@@ -16,6 +16,7 @@ Requirements: All Requirements (Phase 14.1)
 import pytest
 import tempfile
 import shutil
+import time
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Any
@@ -38,7 +39,14 @@ def temp_data_dir():
     """Create temporary data directory for tests"""
     temp_dir = tempfile.mkdtemp()
     yield temp_dir
-    shutil.rmtree(temp_dir)
+    try:
+        shutil.rmtree(temp_dir)
+    except Exception:
+        time.sleep(0.5)
+        try:
+            shutil.rmtree(temp_dir)
+        except Exception:
+            pass
 
 
 @pytest.fixture
@@ -70,33 +78,45 @@ def test_services(temp_data_dir, mock_local_llm):
         persist_directory=str(Path(temp_data_dir) / "chroma_db")
     )
 
-    bm25_index = BM25Index(
-        index_path=str(Path(temp_data_dir) / "bm25_index.pkl")
+    bm25_index = BM25Index(persist_path=str(Path(temp_data_dir) / "bm25_index.pkl")
     )
 
+    # Minimal model router stub (matches runtime expectations)
+    class _MR:
+        def generate_embedding(self, text: str):
+            return mock_local_llm.generate_embedding(text)
+        def route(self, task_type: str, **kwargs):
+            # classification returns a label string
+            if task_type == 'classification':
+                return 'Incident'
+            return ''
+
+    mr = _MR()
+
     # Initialize processing components
-    classifier = SchemaClassifier(llm_client=mock_local_llm)
+    classifier = SchemaClassifier(model_router=mr)
     chunker = Chunker()
-    indexer = Indexer(vector_db=vector_db, bm25_index=bm25_index)
+    indexer = Indexer(vector_db=vector_db, bm25_index=bm25_index, model_router=mr)
 
     # Initialize services
     ingestion_service = IngestionService(
+        vector_db=vector_db,
         classifier=classifier,
         chunker=chunker,
         indexer=indexer,
-        llm_client=mock_local_llm
+        model_router=mr,
     )
 
     search_service = SearchService(
         vector_db=vector_db,
         bm25_index=bm25_index,
-        llm_client=mock_local_llm
+        model_router=mr,
     )
 
     consolidation_service = ConsolidationService(
         vector_db=vector_db,
-        bm25_index=bm25_index,
-        llm_client=mock_local_llm
+        indexer=indexer,
+        model_router=mr,
     )
 
     return {
@@ -112,7 +132,7 @@ class TestEndToEndWorkflow:
     """End-to-end workflow validation tests"""
 
     def test_basic_ingestion_and_retrieval(self, test_services):
-        """Test: Ingest conversation → Search → Retrieve"""
+        """Test: Ingest conversation 竊・Search 竊・Retrieve"""
         ingestion = test_services['ingestion']
         search = test_services['search']
 
@@ -147,7 +167,7 @@ class TestEndToEndWorkflow:
         assert found, "Ingested conversation not found in search results"
 
     def test_multiple_conversations_retrieval(self, test_services):
-        """Test: Ingest multiple conversations → Search → Verify ranking"""
+        """Test: Ingest multiple conversations 竊・Search 竊・Verify ranking"""
         ingestion = test_services['ingestion']
         search = test_services['search']
 
@@ -188,7 +208,7 @@ class TestEndToEndWorkflow:
         assert 'binary search' in top_result['content'].lower()
 
     def test_consolidation_workflow(self, test_services):
-        """Test: Ingest → Consolidate → Verify clustering"""
+        """Test: Ingest 竊・Consolidate 竊・Verify clustering"""
         ingestion = test_services['ingestion']
         consolidation = test_services['consolidation']
         search = test_services['search']
@@ -291,8 +311,8 @@ class TestEndToEndWorkflow:
         search = test_services['search']
 
         conversation = {
-            'user': 'Pythonでエラーハンドリングを実装する方法は？',
-            'assistant': '`try-except`ブロックを使用します：\n```python\ntry:\n    risky_operation()\nexcept ValueError as e:\n    print(f"エラー: {e}")\n```',
+            'user': 'Python縺ｧ繧ｨ繝ｩ繝ｼ繝上Φ繝峨Μ繝ｳ繧ｰ繧貞ｮ溯｣・☆繧区婿豕輔・・・,
+            'assistant': '`try-except`繝悶Ο繝・け繧剃ｽｿ逕ｨ縺励∪縺呻ｼ喀n```python\ntry:\n    risky_operation()\nexcept ValueError as e:\n    print(f"繧ｨ繝ｩ繝ｼ: {e}")\n```',
             'source': 'claude_cli',
             'refs': []
         }
@@ -300,7 +320,7 @@ class TestEndToEndWorkflow:
         memory_id = ingestion.ingest_conversation(conversation)
 
         # Search in Japanese
-        results = search.search("Pythonエラーハンドリング", limit=5)
+        results = search.search("Python繧ｨ繝ｩ繝ｼ繝上Φ繝峨Μ繝ｳ繧ｰ", limit=5)
 
         # Should handle Japanese text without crashing
         assert memory_id is not None
@@ -484,7 +504,7 @@ class TestPerformance:
 
         latency_ms = (end_time - start_time) * 1000
 
-        # Target: ≤200ms (from requirements)
+        # Target: 竕､200ms (from requirements)
         # Note: May be higher in test environment without optimizations
         assert latency_ms < 2000, f"Search latency {latency_ms}ms exceeds reasonable bounds (should be <2000ms in test env)"
 
@@ -535,3 +555,6 @@ def test_full_system_integration():
     Run manually with: pytest tests/e2e/test_full_workflow.py::test_full_system_integration -v
     """
     pytest.skip("Manual integration test - requires Ollama service")
+
+
+
