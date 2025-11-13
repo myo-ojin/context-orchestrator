@@ -30,6 +30,13 @@ An external brain system that acts as an MCP (Model Context Protocol) server, en
 - 💾 **Backup/Restore**: Export and import memories with `export`/`import` commands
 - 📋 **Session History**: View and manage session logs and summaries
 
+### Testing & Quality Assurance
+
+- 🧪 **Edge Case Testing**: 48 comprehensive tests covering special characters, emoji, extreme inputs
+- 📈 **Load Testing**: Memory leak detection, concurrent query validation, thread safety checks
+- 📊 **Quality Metrics**: Precision/Recall/F1 analysis, false positive/negative detection
+- 🎯 **Query Pattern Coverage**: 50 diverse queries across 5 categories for comprehensive validation
+
 ## Quick Start
 
 ### Prerequisites
@@ -93,6 +100,34 @@ python scripts/performance_profiler.py  # Run performance benchmarks
 ```
 
 See [CLAUDE.md](CLAUDE.md) for detailed CLI documentation.
+
+### Testing & Quality Assurance
+
+Context Orchestrator includes comprehensive test suites to ensure reliability and performance:
+
+```bash
+# Unit tests (including edge cases)
+pytest tests/unit/services/test_search_edge_cases.py  # 48 edge case tests (100% pass)
+
+# Regression testing
+python -m scripts.run_regression_ci  # Compare against baseline metrics
+
+# Load testing
+python -m scripts.load_test --num-queries 100  # Consecutive query load test
+python -m scripts.concurrent_test --concurrency 5 --rounds 10  # Parallel query test
+
+# Quality review
+python -m scripts.quality_review --samples-per-topic 5  # Topic-based quality analysis
+
+# Query pattern testing
+python -m scripts.mcp_replay --requests tests/scenarios/diverse_queries.json  # 50 diverse queries
+```
+
+**Test Coverage:**
+- **Edge Cases** (48 tests): Zero-hit queries, special characters (20 types), emoji (9 types), whitespace (6 types), extreme length queries, project ID filtering
+- **Load Tests**: 100 consecutive queries with memory leak detection, concurrent execution with thread safety validation
+- **Quality Metrics**: Precision/Recall/F1, false positive/negative rates, score distribution analysis
+- **Query Patterns**: 50 diverse queries across 5 categories (long/short, multilingual, technical/natural, domain-specific, vague/specific)
 
 ### Structured Summaries & Scenario Loader
 
