@@ -1,0 +1,28 @@
+{
+  "created_at": "2025-11-13T08:30:05.513532Z",
+  "source_run": "mcp_run-20251113-170221.jsonl",
+  "phase": "3g",
+  "description": "Phase 3g baseline after memory ID mismatch fix",
+  "metrics": {
+    "macro_precision": 0.886,
+    "macro_ndcg": 1.47,
+    "cache_hit_rate": 0.21,
+    "llm_calls": 67,
+    "pairs_scored": 86,
+    "prefetch_hits": 7,
+    "prefetch_misses": 20,
+    "zero_hit_queries": 0,
+    "total_queries": 15
+  },
+  "thresholds": {
+    "macro_precision_min": 0.8,
+    "macro_ndcg_min": 1.2,
+    "cache_hit_rate_min": 0.15,
+    "zero_hit_queries_max": 2
+  },
+  "embedding_quality_thresholds": {
+    "exact_match_min": 0.95,
+    "summary_min": 0.7,
+    "full_content_min": 0.5
+  }
+}
