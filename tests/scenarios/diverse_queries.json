@@ -1,0 +1,854 @@
+[
+  {
+    "_category": "long_vs_short",
+    "_description": "Long query (100+ words)",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 101,
+      "method": "search_memory",
+      "params": {
+        "query": "I am looking for detailed information about the implementation of the change feed ingestion pipeline in the AppBrain project. Specifically, I need to understand how we handle errors during the ingestion process, what retry mechanisms are in place, and how we ensure data consistency when the pipeline fails partway through processing a batch of events. Additionally, I would like to know if there are any known issues or edge cases that we've encountered in production, and what monitoring or alerting systems we have set up to detect when the ingestion pipeline is not functioning correctly.",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["change feed", "ingestion", "error handling"],
+      "ideal_hits": 3
+    }
+  },
+  {
+    "_category": "long_vs_short",
+    "_description": "Short query (1 word)",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 102,
+      "method": "search_memory",
+      "params": {
+        "query": "chunker",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["chunker"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "long_vs_short",
+    "_description": "Short query (2 words)",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 103,
+      "method": "search_memory",
+      "params": {
+        "query": "timeline view",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["timeline"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "long_vs_short",
+    "_description": "Long query (50+ words)",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 104,
+      "method": "search_memory",
+      "params": {
+        "query": "Can you help me understand the architecture decisions we made when designing the cross-encoder reranking system? I want to know why we chose to implement a three-layer cache (L1, L2, L3), what the trade-offs were between using complete query matching versus keyword-based matching, and whether there were any alternative approaches we considered but ultimately decided against.",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["cross-encoder", "cache", "architecture"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "long_vs_short",
+    "_description": "Medium query (20 words)",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 105,
+      "method": "search_memory",
+      "params": {
+        "query": "What is the current approach for handling session management and how does it integrate with the project memory pool functionality that was recently implemented?",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["session", "project memory pool"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "long_vs_short",
+    "_description": "Short query (3 words)",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 106,
+      "method": "search_memory",
+      "params": {
+        "query": "BM25 search errors",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["BM25", "errors"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "long_vs_short",
+    "_description": "Very long query (150+ words)",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 107,
+      "method": "search_memory",
+      "params": {
+        "query": "I need comprehensive information about our embedding quality testing framework. This includes understanding what metrics we use to evaluate embedding quality, such as cosine similarity thresholds for exact matches, full content comparisons, and summary comparisons. I also want to know how we established the baseline values for these metrics and what acceptable ranges we consider to be passing criteria. Furthermore, I'm interested in learning about the CI integration aspects of this testing, specifically how we automatically detect regressions in embedding quality, what happens when a test fails, and whether there are any fallback mechanisms or alerts that get triggered. Additionally, please provide information about the embedding models we use, such as nomic-embed-text, and why we chose this particular model over alternatives. Finally, I'd like to understand how frequently we run these tests and whether there are any plans to expand the testing coverage to include additional embedding models or quality metrics in the future.",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["embedding", "quality", "testing"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "long_vs_short",
+    "_description": "Short query (1 word)",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 108,
+      "method": "search_memory",
+      "params": {
+        "query": "reranking",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["reranking"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "long_vs_short",
+    "_description": "Medium-long query (40 words)",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 109,
+      "method": "search_memory",
+      "params": {
+        "query": "Looking for documentation or discussion about the query attribute modeling system, specifically how it extracts topic, document type, project name, and severity attributes from user queries and what confidence thresholds we use to determine when to fall back to LLM-based extraction.",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["query attributes", "QAM"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "long_vs_short",
+    "_description": "Short query (4 words)",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 110,
+      "method": "search_memory",
+      "params": {
+        "query": "Ollama model configuration issues",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["Ollama", "configuration"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "multilingual",
+    "_description": "Japanese technical query",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 201,
+      "method": "search_memory",
+      "params": {
+        "query": "チャンカーの実装で発生したTypeErrorの修正方法を教えてください",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["chunker", "TypeError"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "multilingual",
+    "_description": "Spanish technical query",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 202,
+      "method": "search_memory",
+      "params": {
+        "query": "¿Cómo funciona el sistema de caché de tres niveles para el cross-encoder?",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["cache", "cross-encoder"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "multilingual",
+    "_description": "Japanese architecture query",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 203,
+      "method": "search_memory",
+      "params": {
+        "query": "プロジェクトメモリプールの設計思想とワークフローAの実装について",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["project memory pool", "workflow"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "multilingual",
+    "_description": "Spanish error query",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 204,
+      "method": "search_memory",
+      "params": {
+        "query": "Errores de ingestion en el change feed y cómo manejarlos",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["ingestion", "errors", "change feed"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "multilingual",
+    "_description": "Japanese performance query",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 205,
+      "method": "search_memory",
+      "params": {
+        "query": "検索レイテンシの最適化とキャッシュヒット率の改善戦略",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["latency", "cache", "optimization"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "multilingual",
+    "_description": "English mixed with Japanese terms",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 206,
+      "method": "search_memory",
+      "params": {
+        "query": "BM25インデックスのパフォーマンス問題 and optimization strategies",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["BM25", "performance"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "multilingual",
+    "_description": "Spanish configuration query",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 207,
+      "method": "search_memory",
+      "params": {
+        "query": "Configuración del modelo Ollama y problemas de embedding",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["Ollama", "embedding", "configuration"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "multilingual",
+    "_description": "Japanese testing query",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 208,
+      "method": "search_memory",
+      "params": {
+        "query": "エンベディング品質テストのCI統合とベースライン設定",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["embedding", "testing", "CI"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "multilingual",
+    "_description": "Spanish memory query",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 209,
+      "method": "search_memory",
+      "params": {
+        "query": "Sistema de consolidación de memoria y estrategias de olvido",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["consolidation", "forgetting"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "multilingual",
+    "_description": "Japanese session query",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 210,
+      "method": "search_memory",
+      "params": {
+        "query": "セッション管理とプロジェクト自動判定の仕組み",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["session", "project detection"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "technical_vs_natural",
+    "_description": "Heavy technical jargon",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 301,
+      "method": "search_memory",
+      "params": {
+        "query": "LRU cache TTL configuration for cross-encoder reranking with LLM fallback heuristics",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["cache", "cross-encoder", "LLM"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "technical_vs_natural",
+    "_description": "Natural language",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 302,
+      "method": "search_memory",
+      "params": {
+        "query": "How do I make the search faster when there are a lot of results?",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["performance", "search"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "technical_vs_natural",
+    "_description": "Technical with acronyms",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 303,
+      "method": "search_memory",
+      "params": {
+        "query": "QAM LLM routing with langdetect fallback and NDCG metrics",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["QAM", "metrics"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "technical_vs_natural",
+    "_description": "Natural conversational",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 304,
+      "method": "search_memory",
+      "params": {
+        "query": "I remember we had a problem with the chunker breaking on Japanese text, what was the solution?",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["chunker", "Japanese"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "technical_vs_natural",
+    "_description": "Technical implementation details",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 305,
+      "method": "search_memory",
+      "params": {
+        "query": "ChromaDB filter_metadata $and operator implementation for project memory pool filtering",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["ChromaDB", "filtering", "project memory pool"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "technical_vs_natural",
+    "_description": "Natural problem description",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 306,
+      "method": "search_memory",
+      "params": {
+        "query": "The search results are not very relevant to my query, what can I do to improve this?",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["search", "relevance"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "technical_vs_natural",
+    "_description": "Technical error codes",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 307,
+      "method": "search_memory",
+      "params": {
+        "query": "filter_dict TypeError unexpected keyword argument in vector_db.list_by_metadata",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["error", "vector_db"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "technical_vs_natural",
+    "_description": "Natural workflow question",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 308,
+      "method": "search_memory",
+      "params": {
+        "query": "What steps do I need to follow to set up a new project in the system?",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["project", "setup"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "technical_vs_natural",
+    "_description": "Technical performance metrics",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 309,
+      "method": "search_memory",
+      "params": {
+        "query": "Macro Precision NDCG baseline regression detection thresholds",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["metrics", "baseline", "regression"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "technical_vs_natural",
+    "_description": "Natural exploratory question",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 310,
+      "method": "search_memory",
+      "params": {
+        "query": "Tell me about the recent improvements to the memory system",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["memory", "improvements"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "domain_specific",
+    "_description": "Architecture domain",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 401,
+      "method": "search_in_project",
+      "params": {
+        "project_name": "AppBrain",
+        "query": "microservices architecture patterns",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["architecture", "microservices"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "domain_specific",
+    "_description": "Code domain",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 402,
+      "method": "search_memory",
+      "params": {
+        "query": "Python async/await implementation patterns for concurrent LLM calls",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["code", "async", "LLM"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "domain_specific",
+    "_description": "Operations domain",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 403,
+      "method": "search_memory",
+      "params": {
+        "query": "deployment rollback procedures and monitoring alerts",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["deployment", "monitoring"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "domain_specific",
+    "_description": "Configuration domain",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 404,
+      "method": "search_memory",
+      "params": {
+        "query": "config.yaml reranking weights and cache size parameters",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["configuration", "reranking", "cache"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "domain_specific",
+    "_description": "Testing domain",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 405,
+      "method": "search_memory",
+      "params": {
+        "query": "pytest fixtures for mock LLM responses and embedding generation",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["testing", "pytest", "mocking"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "domain_specific",
+    "_description": "Architecture - data flow",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 406,
+      "method": "search_in_project",
+      "params": {
+        "project_name": "AppBrain",
+        "query": "event sourcing and CQRS patterns",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["architecture", "event sourcing"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "domain_specific",
+    "_description": "Code - algorithms",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 407,
+      "method": "search_memory",
+      "params": {
+        "query": "keyword extraction algorithm with stop word filtering",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["keyword extraction", "algorithm"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "domain_specific",
+    "_description": "Operations - performance",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 408,
+      "method": "search_memory",
+      "params": {
+        "query": "memory profiling and resource usage monitoring",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["performance", "monitoring"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "domain_specific",
+    "_description": "Configuration - models",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 409,
+      "method": "search_memory",
+      "params": {
+        "query": "Ollama model selection and embedding model configuration",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["Ollama", "configuration", "embedding"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "domain_specific",
+    "_description": "Testing - regression",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 410,
+      "method": "search_memory",
+      "params": {
+        "query": "regression test baselines and CI integration",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["regression", "testing", "CI"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "vague_vs_specific",
+    "_description": "Vague general question",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 501,
+      "method": "search_memory",
+      "params": {
+        "query": "problems",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["error", "issue"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "vague_vs_specific",
+    "_description": "Highly specific",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 502,
+      "method": "search_memory",
+      "params": {
+        "query": "filter_dict to filter_metadata parameter rename in project_memory_pool.py line 108",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["filter_metadata", "project_memory_pool"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "vague_vs_specific",
+    "_description": "Vague about improvements",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 503,
+      "method": "search_memory",
+      "params": {
+        "query": "recent changes",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["updates", "changes"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "vague_vs_specific",
+    "_description": "Specific bug report",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 504,
+      "method": "search_memory",
+      "params": {
+        "query": "L3 semantic cache similarity scores 0.39-0.72 below threshold 0.85 root cause analysis",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["L3 cache", "similarity", "threshold"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "vague_vs_specific",
+    "_description": "Vague about features",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 505,
+      "method": "search_memory",
+      "params": {
+        "query": "search stuff",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["search"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "vague_vs_specific",
+    "_description": "Specific implementation",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 506,
+      "method": "search_memory",
+      "params": {
+        "query": "enriched summary generation with top 5 keywords and representative headings in ingestion.py",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["enriched summary", "ingestion"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "vague_vs_specific",
+    "_description": "Vague troubleshooting",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 507,
+      "method": "search_memory",
+      "params": {
+        "query": "not working",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["error", "bug"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "vague_vs_specific",
+    "_description": "Specific configuration",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 508,
+      "method": "search_memory",
+      "params": {
+        "query": "cross_encoder_cache_size 128 and cross_encoder_cache_ttl_seconds 28800 settings",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["cross-encoder", "configuration", "cache"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "_category": "vague_vs_specific",
+    "_description": "Vague about architecture",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 509,
+      "method": "search_memory",
+      "params": {
+        "query": "system design",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["architecture", "design"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "_category": "vague_vs_specific",
+    "_description": "Specific metric query",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 510,
+      "method": "search_memory",
+      "params": {
+        "query": "Macro Precision 0.886 and Macro NDCG 1.470 Phase 3g baseline metrics",
+        "top_k": 5
+      }
+    },
+    "relevance": {
+      "topic": ["metrics", "precision", "NDCG"],
+      "ideal_hits": 2
+    }
+  }
+]

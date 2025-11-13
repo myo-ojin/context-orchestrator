@@ -198,6 +198,27 @@ class QueryAttributeExtractor:
         "rfc": "design",
         "proposal": "design",
 
+        # Phase 2.1: Error/Bug docs
+        "error": "incident",
+        "bug": "incident",
+        "fix": "incident",
+        "typeerror": "incident",
+        "exception": "incident",
+        "crash": "incident",
+
+        # Phase 2.2: Operational docs
+        "triage": "checklist",
+        "vault": "guide",
+        "edits": "changelog",
+        "feed": "guide",
+
+        # Phase 2.3: Project/Summary docs
+        "summary": "report",
+        "overview": "report",
+        "status": "report",
+        "resumen": "report",  # Spanish
+        "piloto": "guide",    # Spanish
+
         # Phase 3.1: Japanese DocType Keywords
         "手順書": "guide",
         "チェックリスト": "checklist",

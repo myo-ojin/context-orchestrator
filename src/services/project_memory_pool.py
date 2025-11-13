@@ -103,13 +103,14 @@ class ProjectMemoryPool:
         start = time.perf_counter()
 
         try:
-            # Fetch all memory entries for this project
+            # Phase 2: Fetch all memory entries for this project (include stored embeddings)
             memories = self.vector_db.list_by_metadata(
                 filter_metadata={
                     'project_id': project_id,
                     'is_memory_entry': True
                 },
-                include_documents=True
+                include_documents=True,
+                include_embeddings=True  # Phase 2: Fetch stored embeddings
             )
 
             if not memories:
@@ -124,7 +125,7 @@ class ProjectMemoryPool:
             )
             memories_limited = memories_sorted[:self.max_memories_per_project]
 
-            # Generate embeddings for each memory
+            # Phase 2: Reuse stored embeddings (enriched summary embeddings)
             embeddings: Dict[str, List[float]] = {}
             metadata_map: Dict[str, Dict[str, Any]] = {}
 
@@ -133,21 +134,32 @@ class ProjectMemoryPool:
                 if not candidate_id:
                     continue
 
-                content = memory.get('content', '')
-                if not content:
-                    continue
-
-                try:
-                    embedding = self.model_router.generate_embedding(content)
-                    embeddings[candidate_id] = embedding
+                # Phase 2: Use stored embedding directly (no re-computation needed)
+                stored_embedding = memory.get('embedding')
+                if stored_embedding:
+                    embeddings[candidate_id] = stored_embedding
                     metadata_map[candidate_id] = memory.get('metadata', {})
-                except Exception as exc:  # pragma: no cover
-                    logger.warning(
-                        "Failed to generate embedding for %s: %s",
-                        candidate_id,
-                        exc
-                    )
-                    continue
+                else:
+                    # Fallback: Generate embedding from content if not stored
+                    content = memory.get('content', '')
+                    if not content:
+                        continue
+
+                    try:
+                        embedding = self.model_router.generate_embedding(content)
+                        embeddings[candidate_id] = embedding
+                        metadata_map[candidate_id] = memory.get('metadata', {})
+                        logger.debug(
+                            "Generated fallback embedding for %s (no stored embedding)",
+                            candidate_id
+                        )
+                    except Exception as exc:  # pragma: no cover
+                        logger.warning(
+                            "Failed to generate embedding for %s: %s",
+                            candidate_id,
+                            exc
+                        )
+                        continue
 
             pool = {
                 'project_id': project_id,

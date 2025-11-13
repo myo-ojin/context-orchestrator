@@ -627,6 +627,42 @@ class IngestionService:
             logger.error(f"Indexing failed: {e}")
             raise
 
+    def _build_enriched_summary(self, memory: Memory) -> str:
+        """
+        Build enriched summary from memory (Phase 2: Memory Representation Refresh)
+
+        Combines:
+        1. Original summary
+        2. Top keywords from content
+        3. Representative heading (first heading from content)
+
+        Args:
+            memory: Memory object
+
+        Returns:
+            Enriched summary string
+        """
+        from src.utils.keyword_extractor import extract_keywords
+
+        parts = [memory.summary]
+
+        # Extract top keywords from content
+        if memory.content:
+            keywords = extract_keywords(memory.content, top_n=5, min_length=3)
+            if keywords:
+                parts.append(f"Keywords: {', '.join(keywords)}")
+
+        # Extract representative heading from content (first markdown heading)
+        if memory.content:
+            heading_match = re.search(r'^#{1,3}\s+(.+)$', memory.content, re.MULTILINE)
+            if heading_match:
+                heading = heading_match.group(1).strip()
+                parts.append(f"Topic: {heading}")
+
+        enriched = " | ".join(parts)
+        logger.debug(f"Enriched summary for {memory.id}: {enriched[:100]}...")
+        return enriched
+
     def _store_memory_metadata(self, memory: Memory) -> None:
         """
         Store memory metadata in vector DB
@@ -638,8 +674,11 @@ class IngestionService:
             memory: Memory object
         """
         try:
-            # Generate embedding for summary (lighter than full content)
-            embedding = self.model_router.generate_embedding(memory.summary)
+            # Phase 2: Build enriched summary (original + keywords + heading)
+            enriched_summary = self._build_enriched_summary(memory)
+
+            # Generate embedding for enriched summary (richer context than raw summary)
+            embedding = self.model_router.generate_embedding(enriched_summary)
 
             # Store in vector DB with special prefix
             metadata = memory.metadata.copy()
@@ -651,6 +690,7 @@ class IngestionService:
             metadata['created_at'] = memory.created_at.isoformat()
             metadata['is_memory_entry'] = True  # Flag to distinguish from chunks
             metadata['project_id'] = memory.project_id  # Phase 15: Project association
+            metadata['enriched_summary'] = enriched_summary  # Phase 2: Store enriched version
 
             # Chroma metadata must be simple scalars; drop None and complex types
             def _is_simple(v):
@@ -662,10 +702,10 @@ class IngestionService:
                 id=f"{memory.id}-metadata",
                 embedding=embedding,
                 metadata=metadata,
-                document=memory.summary
+                document=enriched_summary  # Phase 2: Store enriched summary as document
             )
 
-            logger.debug(f"Stored memory metadata: {memory.id}")
+            logger.debug(f"Stored memory metadata with enriched summary: {memory.id}")
 
         except Exception as e:
             logger.error(f"Failed to store memory metadata: {e}")

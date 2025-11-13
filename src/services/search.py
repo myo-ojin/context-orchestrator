@@ -7,12 +7,12 @@ Provides hybrid search (vector + BM25) with reranking.
 
 Search pipeline:
 1. Generate query embedding (local LLM)
-2. Vector search (Chroma) → top 50 candidates
-3. BM25 search → top 50 candidates
+2. Vector search (Chroma) → top 100 candidates (Phase 3)
+3. BM25 search → top 50 candidates (Phase 3)
 4. Merge and deduplicate results
 5. Rerank by rule-based scoring → top 10 results
 
-Requirements: Requirement 8 (MVP - Hybrid Search)
+Requirements: Requirement 8 (MVP - Hybrid Search), Phase 3 (Chunk/Vector Retrieval Tuning)
 """
 
 from typing import List, Dict, Any, Optional, Tuple

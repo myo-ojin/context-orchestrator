@@ -3,12 +3,12 @@
 """
 Text Chunker
 
-Splits text into semantic chunks of maximum 512 tokens.
+Splits text into semantic chunks between 256-384 tokens (Phase 3 optimization).
 Preserves Markdown structure (headings, paragraphs, code blocks).
 
 Uses tiktoken for token counting (cl100k_base encoding).
 
-Requirements: Requirement 3 (MVP - Chunking)
+Requirements: Requirement 3 (MVP - Chunking), Phase 3 (Chunk/Vector Retrieval Tuning)
 """
 
 from typing import List, Dict, Any, Optional
@@ -31,26 +31,31 @@ class Chunker:
     """
     Chunker for splitting text into semantic units
 
-    Splits text into chunks with maximum 512 tokens.
+    Splits text into chunks between 256-384 tokens (Phase 3 optimization).
     Respects Markdown structure:
     - Primary split: Headings (#, ##, ###)
     - Secondary split: Paragraphs (\\n\\n)
     - Never split: Code blocks (```...```)
+    - Merge tiny chunks (<256 tokens)
+    - Break large chunks (>384 tokens)
 
     Attributes:
         tokenizer: tiktoken tokenizer
-        max_tokens: Maximum tokens per chunk (default: 512)
+        max_tokens: Maximum tokens per chunk (default: 384, Phase 3)
+        min_tokens: Minimum tokens per chunk (default: 256, Phase 3)
     """
 
-    def __init__(self, tokenizer_name: str = "cl100k_base", max_tokens: int = 512):
+    def __init__(self, tokenizer_name: str = "cl100k_base", max_tokens: int = 384, min_tokens: int = 256):
         """
         Initialize Chunker
 
         Args:
             tokenizer_name: tiktoken encoding name (default: cl100k_base)
-            max_tokens: Maximum tokens per chunk (default: 512)
+            max_tokens: Maximum tokens per chunk (default: 384, Phase 3)
+            min_tokens: Minimum tokens per chunk (default: 256, Phase 3)
         """
         self.max_tokens = max_tokens
+        self.min_tokens = min_tokens
 
         # Initialize tokenizer
         if tiktoken is not None:
@@ -108,6 +113,9 @@ class Chunker:
 
         # Step 4: Restore code blocks
         chunks_text = self._restore_code_blocks(chunks_text, code_blocks)
+
+        # Step 4.5: Merge tiny chunks (Phase 3 optimization)
+        chunks_text = self._merge_tiny_chunks(chunks_text)
 
         # Step 5: Create Chunk objects
         chunks = []
@@ -411,3 +419,61 @@ class Chunker:
         else:
             # Split into multiple chunks
             return self.chunk(conversation_text, memory_id, metadata)
+
+    def _merge_tiny_chunks(self, chunks: List[str]) -> List[str]:
+        """
+        Merge chunks smaller than min_tokens with adjacent chunks (Phase 3 optimization)
+
+        Args:
+            chunks: List of chunk texts
+
+        Returns:
+            List of merged chunk texts (all >= min_tokens unless impossible)
+
+        Example:
+            >>> chunker = Chunker(min_tokens=256)
+            >>> tiny_chunks = ["small", "text", "here"]  # each <256 tokens
+            >>> merged = chunker._merge_tiny_chunks(tiny_chunks)
+            >>> len(merged) < len(tiny_chunks)
+            True
+        """
+        if not chunks or len(chunks) == 1:
+            return chunks
+
+        merged = []
+        buffer = ""
+
+        for chunk in chunks:
+            chunk_tokens = self._count_tokens(chunk)
+
+            if not buffer:
+                buffer = chunk
+                continue
+
+            buffer_tokens = self._count_tokens(buffer)
+
+            # If buffer is large enough, flush it
+            if buffer_tokens >= self.min_tokens:
+                merged.append(buffer)
+                buffer = chunk
+                continue
+
+            # Try to merge buffer + chunk
+            combined = buffer + "\n\n" + chunk
+            combined_tokens = self._count_tokens(combined)
+
+            if combined_tokens <= self.max_tokens:
+                # Merge successful
+                buffer = combined
+            else:
+                # Can't merge without exceeding max_tokens
+                # Flush buffer and start new
+                merged.append(buffer)
+                buffer = chunk
+
+        # Flush remaining buffer
+        if buffer:
+            merged.append(buffer)
+
+        logger.debug(f"Merged tiny chunks: {len(chunks)} → {len(merged)}")
+        return merged

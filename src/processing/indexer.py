@@ -95,6 +95,7 @@ class Indexer:
         Index chunks in Chroma vector DB
 
         Generates embeddings and stores in vector database.
+        Adds salience weight metadata (Phase 3 optimization).
 
         Args:
             chunks: List of Chunk objects
@@ -112,6 +113,10 @@ class Indexer:
                 metadata = dict(chunk.metadata or {})
                 metadata.setdefault('memory_id', chunk.memory_id)
                 metadata.setdefault('chunk_index', metadata.get('chunk_index', i))
+
+                # Phase 3: Add salience weight (token length normalization)
+                salience_weight = self._calculate_salience_weight(chunk)
+                metadata['salience_weight'] = salience_weight
 
                 # Add to vector DB
                 self.vector_db.add(
@@ -280,3 +285,57 @@ class Indexer:
         self.index(chunks)
 
         logger.info(f"Reindexed {len(chunks)} chunks")
+
+    def _calculate_salience_weight(self, chunk: Chunk) -> float:
+        """
+        Calculate salience weight for a chunk (Phase 3 optimization)
+
+        Salience weight favors concise but informative chunks using token length normalization.
+
+        Formula:
+        - Optimal range: 256-384 tokens (Phase 3 chunk size)
+        - Penalty for tiny chunks (<256 tokens): linear decay
+        - Penalty for oversized chunks (>384 tokens): logarithmic decay
+        - Weight range: 0.5-1.0
+
+        Args:
+            chunk: Chunk object
+
+        Returns:
+            Salience weight (0.5-1.0)
+
+        Example:
+            >>> chunk = Chunk(id="c1", content="...", tokens=320, ...)
+            >>> weight = indexer._calculate_salience_weight(chunk)
+            >>> 0.9 <= weight <= 1.0
+            True
+        """
+        tokens = chunk.tokens if chunk.tokens else len(chunk.content.split())
+
+        # Optimal range (Phase 3): 256-384 tokens
+        min_tokens = 256
+        max_tokens = 384
+        optimal_mid = (min_tokens + max_tokens) / 2  # 320 tokens
+
+        if min_tokens <= tokens <= max_tokens:
+            # Perfect range: weight 0.95-1.0
+            # Slightly favor chunks closer to optimal_mid
+            distance_from_optimal = abs(tokens - optimal_mid) / (max_tokens - min_tokens)
+            weight = 1.0 - (distance_from_optimal * 0.05)
+            return max(0.95, min(1.0, weight))
+
+        elif tokens < min_tokens:
+            # Tiny chunks: linear penalty
+            # 128 tokens → 0.75, 64 tokens → 0.5
+            ratio = tokens / min_tokens
+            weight = 0.5 + (ratio * 0.45)
+            return max(0.5, min(0.95, weight))
+
+        else:  # tokens > max_tokens
+            # Oversized chunks: logarithmic penalty
+            # 512 tokens → 0.85, 768 tokens → 0.70, 1024 tokens → 0.60
+            import math
+            excess_ratio = (tokens - max_tokens) / max_tokens
+            penalty = math.log1p(excess_ratio) * 0.15
+            weight = 0.95 - penalty
+            return max(0.5, min(0.95, weight))

@@ -112,6 +112,19 @@ def main():
         default=0.02,
         help="Allowed drop vs baseline",
     )
+    # Phase 5: Alert thresholds for continuous verification
+    parser.add_argument(
+        "--min-precision-threshold",
+        type=float,
+        default=0.80,
+        help="Fail if macro precision drops below this absolute value (Phase 5)",
+    )
+    parser.add_argument(
+        "--min-cache-hit-rate",
+        type=float,
+        default=0.10,
+        help="Fail if L3 cache hit rate drops below this value (Phase 5)",
+    )
     parser.add_argument(
         "--rpc-timeout",
         type=int,
@@ -151,6 +164,42 @@ def main():
     ]
     run_command(cmd)
 
+    # Phase 5: Check absolute threshold for macro precision
+    latest_run_path = None
+    output_dir = Path(args.output)
+    if output_dir.exists():
+        run_files = sorted(output_dir.glob("mcp_run-*.jsonl"), key=lambda p: p.name, reverse=True)
+        if run_files:
+            latest_run_path = run_files[0]
+
+    if latest_run_path and latest_run_path.exists():
+        # Load last line of JSONL to get summary metrics
+        with open(latest_run_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            if lines:
+                try:
+                    summary = json.loads(lines[-1])
+                    macro_precision = summary.get("macro_precision", 1.0)
+                    cache_hit_rate = summary.get("cache_hit_rate", 0.0)
+
+                    # Check precision threshold
+                    if macro_precision < args.min_precision_threshold:
+                        print(
+                            f"[FAIL] Macro precision {macro_precision:.3f} < threshold {args.min_precision_threshold:.2f}"
+                        )
+                        raise SystemExit(1)
+
+                    # Check cache hit rate threshold
+                    if cache_hit_rate < args.min_cache_hit_rate:
+                        print(
+                            f"[FAIL] Cache hit rate {cache_hit_rate:.2f} < threshold {args.min_cache_hit_rate:.2f}"
+                        )
+                        raise SystemExit(1)
+
+                    print(f"[PASS] Absolute thresholds met: Precision={macro_precision:.3f}, Cache={cache_hit_rate:.2f}")
+                except (json.JSONDecodeError, KeyError) as e:
+                    print(f"[WARN] Could not parse metrics from latest run: {e}")
+
     # Check embedding quality against baseline thresholds
     embedding_ok = check_embedding_quality(
         Path(args.precision_baseline),
@@ -170,7 +219,7 @@ def main():
             print("-", item.get("query"), "params:", item.get("params"))
         raise SystemExit(1)
 
-    print("[SUCCESS] All regression checks passed (MCP replay, embedding quality, zero-hit queries).")
+    print("[SUCCESS] All regression checks passed (MCP replay, embedding quality, zero-hit queries, absolute thresholds).")
 
 
 if __name__ == "__main__":

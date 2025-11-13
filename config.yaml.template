@@ -46,8 +46,8 @@ search:
     - risk summary
   project_prefetch_top_k: 5                # How many results to score during prefetch
   project_prefetch_max_queries: 3          # Limit number of seed queries per project
-  vector_candidate_count: 100  # How many vector hits to pull before merging
-  bm25_candidate_count: 30     # How many BM25 hits to pull before merging
+  vector_candidate_count: 100  # How many vector hits to pull before merging (Phase 3)
+  bm25_candidate_count: 50     # How many BM25 hits to pull before merging (Phase 3)
   query_attribute_min_confidence: 0.4  # Minimum LLM confidence to override heuristics
   query_attribute_llm_enabled: true    # Use LLM to enrich query hints when heuristics are insufficient
 
