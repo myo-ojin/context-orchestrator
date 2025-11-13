@@ -14,10 +14,25 @@ Handles conversation ingestion pipeline:
 Requirements: Requirements 1, 2, 3 (MVP - Recording, Classification, Chunking)
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 from datetime import datetime
+from dataclasses import dataclass, asdict
 import logging
+import os
+import re
+import time
 import uuid
+
+try:
+    from langdetect import detect as _langdetect_detect
+    from langdetect import DetectorFactory, LangDetectException
+
+    DetectorFactory.seed = 0
+except Exception:  # pragma: no cover - optional dependency fallback
+    _langdetect_detect = None
+
+    class LangDetectException(Exception):
+        """Fallback exception when langdetect is unavailable."""
 
 from src.models import (
     Memory,
@@ -31,6 +46,42 @@ from src.processing.indexer import Indexer
 from src.storage.vector_db import ChromaVectorDB
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class LanguageRoutingMetrics:
+    """Aggregate stats for language-based routing decisions."""
+
+    total_requests: int = 0
+    local_requests: int = 0
+    cloud_requests: int = 0
+    cloud_failures: int = 0
+    cloud_latency_ms_total: float = 0.0
+    cloud_latency_ms_max: float = 0.0
+    last_cloud_latency_ms: float = 0.0
+
+    def record(self, target: str, duration_ms: float, success: bool) -> None:
+        self.total_requests += 1
+        if target == 'cloud':
+            self.cloud_requests += 1
+            self.cloud_latency_ms_total += duration_ms
+            self.last_cloud_latency_ms = duration_ms
+            if duration_ms > self.cloud_latency_ms_max:
+                self.cloud_latency_ms_max = duration_ms
+            if not success:
+                self.cloud_failures += 1
+        else:
+            self.local_requests += 1
+
+    def snapshot(self) -> Dict[str, Any]:
+        avg_cloud_latency = (
+            self.cloud_latency_ms_total / self.cloud_requests
+            if self.cloud_requests
+            else 0.0
+        )
+        base = asdict(self)
+        base["avg_cloud_latency_ms"] = avg_cloud_latency
+        return base
 
 
 class IngestionService:
@@ -54,7 +105,9 @@ class IngestionService:
         classifier: SchemaClassifier,
         chunker: Chunker,
         indexer: Indexer,
-        model_router: ModelRouter
+        model_router: ModelRouter,
+        supported_languages: Optional[List[str]] = None,
+        language_fallback_strategy: str = "cloud"
     ):
         """
         Initialize Ingestion Service
@@ -71,6 +124,17 @@ class IngestionService:
         self.chunker = chunker
         self.indexer = indexer
         self.model_router = model_router
+        self.supported_languages: Set[str] = {
+            (lang or "").lower()
+            for lang in (supported_languages or ["en", "ja", "es"])
+            if lang
+        }
+        self.language_fallback_strategy = (
+            language_fallback_strategy.lower()
+            if language_fallback_strategy
+            else "cloud"
+        )
+        self._routing_metrics = LanguageRoutingMetrics()
 
         logger.info("Initialized IngestionService")
 
@@ -208,32 +272,229 @@ class IngestionService:
         """
         user_message = conversation.get('user', '')
         assistant_message = conversation.get('assistant', '')
+        metadata = conversation.get('metadata', {}) or {}
 
-        # Build summarization prompt
+        hints = self._extract_summary_hints(conversation, metadata)
+        language_code = self._detect_language(user_message, assistant_message)
+        override_language = (
+            conversation.get('language_override')
+            or metadata.get('language_override')
+            or os.getenv('CONTEXT_ORCHESTRATOR_LANG_OVERRIDE')
+        )
+        if override_language:
+            override_language = override_language.lower()
+            if override_language != language_code:
+                logger.info(
+                    "Language override applied (detected=%s -> override=%s)",
+                    language_code,
+                    override_language,
+                )
+            language_code = override_language
+
+        routing_target = self._determine_summary_routing(language_code)
+
         content = f"User: {user_message}\n\nAssistant: {assistant_message}"
-        prompt = f"""Summarize the following conversation in 1-2 sentences (max 100 tokens).
-Focus on the key points and outcome.
-
-Conversation:
----
-{content[:1000]}
----
-
-Summary:"""
-
-        try:
-            # Use local LLM for short summary (Req-10)
-            summary = self.model_router.route(
-                task_type='short_summary',
-                prompt=prompt,
-                max_tokens=100
+        attempts = 2
+        for attempt in range(1, attempts + 1):
+            prompt = self._build_structured_prompt(
+                content=content,
+                hints=hints,
+                language_code=language_code,
+                enforce_notice=(attempt > 1)
             )
-            return summary.strip()
+            start_time = time.perf_counter()
+            try:
+                summary = self.model_router.route(
+                    task_type='short_summary',
+                    prompt=prompt,
+                    max_tokens=200,
+                    temperature=0.0,
+                    force_routing=routing_target
+                )
+            except Exception as exc:
+                logger.error(f"Summary generation failed (attempt {attempt}): {exc}")
+                summary = ""
+            duration_ms = (time.perf_counter() - start_time) * 1000
 
-        except Exception as e:
-            logger.error(f"Summary generation failed: {e}")
-            # Fallback: use first 100 chars of user message
-            return user_message[:100] + "..."
+            cleaned = summary.strip() if isinstance(summary, str) else ""
+            is_valid = bool(cleaned and self._is_structured_summary(cleaned))
+            self._routing_metrics.record(routing_target, duration_ms, is_valid)
+
+            if routing_target == 'cloud':
+                logger.info(
+                    "Language routing fallback (lang=%s) attempt %d finished in %.1f ms (success=%s)",
+                    language_code,
+                    attempt,
+                    duration_ms,
+                    is_valid,
+                )
+
+            if is_valid:
+                return cleaned
+
+            logger.warning(
+                "Structured summary validation failed (attempt %d). Retrying...",
+                attempt
+            )
+
+        logger.error("Structured summary generation failed after retries; using fallback.")
+        return self._build_fallback_summary(
+            hints=hints,
+            language_code=language_code,
+            user_message=user_message,
+            assistant_message=assistant_message
+        )
+
+    @classmethod
+    def _detect_language(cls, *texts: str) -> str:
+        corpus = " ".join(filter(None, texts)).strip()
+        if not corpus:
+            return "en"
+
+        detected = None
+        if _langdetect_detect:
+            try:
+                detected = _langdetect_detect(corpus)
+            except LangDetectException:
+                detected = None
+
+        if detected:
+            detected = detected.lower()
+            if detected == 'zh-cn' or detected == 'zh-tw':
+                detected = 'zh'
+            return detected
+
+        if cls._JAPANESE_PATTERN.search(corpus):
+            return "ja"
+        if cls._SPANISH_PATTERN.search(corpus):
+            return "es"
+        return "en"
+
+    @classmethod
+    def _build_structured_prompt(
+        cls,
+        content: str,
+        hints: Dict[str, str],
+        language_code: str,
+        enforce_notice: bool = False
+    ) -> str:
+        language = cls._LANGUAGE_MAP.get(language_code, "English")
+        metadata_hint = (
+            f"- Topic: {hints['topic']}\n"
+            f"- DocType: {hints['doc_type']}\n"
+            f"- Project: {hints['project']}"
+        )
+        notice = "Output EXACTLY the headers and bullet list." if enforce_notice else "Follow the format strictly."
+        return (
+            f"You are a summarization assistant. Respond in {language}.\n"
+            f"Known metadata:\n{metadata_hint}\n\n"
+            f"Summarize the conversation in the same language.\n"
+            f"{notice}\n\n"
+            "Required format:\n"
+            "Topic: <value>\n"
+            "DocType: <value>\n"
+            "Project: <value>\n"
+            "KeyActions:\n"
+            "- <assistant guidance 1>\n"
+            "- <assistant guidance 2>\n"
+            "(bullet list can be 1-3 items.)\n\n"
+            "Do not add extra commentary before or after the headers.\n\n"
+            f"Conversation:\n---\n{content[:1500]}\n---\n\nSummary:"
+        )
+
+    @classmethod
+    def _is_structured_summary(cls, summary: str) -> bool:
+        if not summary:
+            return False
+        lines = [line.rstrip() for line in summary.splitlines()]
+        stripped = [line.strip() for line in lines if line.strip()]
+        if len(stripped) < 5:
+            return False
+
+        expected = cls._STRUCTURED_HEADERS
+        for header, line in zip(expected, stripped[:4]):
+            if not line.startswith(header):
+                return False
+
+        # Ensure KeyActions line is exactly header (no inline text)
+        key_actions_idx = None
+        for idx, line in enumerate(lines):
+            if line.strip().startswith("KeyActions:"):
+                key_actions_idx = idx
+                break
+        if key_actions_idx is None:
+            return False
+
+        bullets = [
+            lines[i].lstrip()
+            for i in range(key_actions_idx + 1, len(lines))
+            if lines[i].strip()
+        ]
+        if not bullets:
+            return False
+        if not all(bullet.startswith("- ") for bullet in bullets):
+            return False
+        return True
+
+    @classmethod
+    def is_structured_summary(cls, summary: str) -> bool:
+        """Public helper for validating structured summary format."""
+        return cls._is_structured_summary(summary)
+
+    def get_language_routing_metrics(self) -> Dict[str, Any]:
+        """Expose aggregated language routing metrics for monitoring."""
+        return self._routing_metrics.snapshot()
+
+    @staticmethod
+    def _extract_summary_hints(
+        conversation: Dict[str, Any],
+        metadata: Dict[str, Any]
+    ) -> Dict[str, str]:
+        def _pick(*keys):
+            for key in keys:
+                value = metadata.get(key) or conversation.get(key)
+                if value:
+                    return str(value)
+            return "UNKNOWN"
+
+        return {
+            "topic": _pick('topic'),
+            "doc_type": _pick('doc_type', 'type'),
+            "project": _pick('project', 'project_name', 'project_id')
+        }
+
+    @classmethod
+    def _build_fallback_summary(
+        cls,
+        hints: Dict[str, str],
+        language_code: str,
+        user_message: str,
+        assistant_message: str
+    ) -> str:
+        user_excerpt = (user_message or "").strip()[:80] or "N/A"
+        assistant_excerpt = (assistant_message or "").strip()[:80] or "N/A"
+        language = cls._LANGUAGE_MAP.get(language_code, "English")
+        return "\n".join([
+            f"Topic: {hints['topic']}",
+            f"DocType: {hints['doc_type']}",
+            f"Project: {hints['project']}",
+            "KeyActions:",
+            f"- [{language}] User: {user_excerpt}",
+            f"- [{language}] Assistant: {assistant_excerpt}"
+        ])
+
+    def _determine_summary_routing(self, language_code: Optional[str]) -> str:
+        """
+        Decide whether to use local or cloud LLM based on detected language.
+        """
+        if not language_code:
+            return 'local'
+
+        normalized = language_code.lower()
+        if normalized in self.supported_languages:
+            return 'local'
+
+        return 'cloud' if self.language_fallback_strategy == 'cloud' else 'local'
 
     def _create_memory(
         self,
@@ -521,3 +782,11 @@ Summary:"""
         except Exception as e:
             logger.error(f"Failed to get ingestion stats: {e}")
             return {}
+    _STRUCTURED_HEADERS = ("Topic:", "DocType:", "Project:", "KeyActions:")
+    _LANGUAGE_MAP = {
+        "ja": "Japanese",
+        "es": "Spanish",
+        "en": "English",
+    }
+    _JAPANESE_PATTERN = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
+    _SPANISH_PATTERN = re.compile(r"[¿¡ñÑáéíóúÁÉÍÓÚ]")

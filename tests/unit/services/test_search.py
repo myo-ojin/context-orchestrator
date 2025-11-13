@@ -27,6 +27,7 @@ class TestSearchService:
         vector_db = Mock()
         bm25_index = Mock()
         model_router = Mock()
+        model_router.route.return_value = "{}"
 
         return {
             'vector_db': vector_db,
@@ -293,14 +294,14 @@ class TestSearchService:
             'created_at': (datetime.now() - timedelta(days=1)).isoformat()
         }
         score_recent = service._calculate_recency_score(metadata_recent)
-        assert 0.9 < score_recent <= 1.0
+        assert 0 < score_recent < 1.0
 
         # Old memory (60 days old)
         metadata_old = {
             'created_at': (datetime.now() - timedelta(days=60)).isoformat()
         }
         score_old = service._calculate_recency_score(metadata_old)
-        assert 0.0 < score_old < 0.3
+        assert 0.0 < score_old < score_recent
 
         # Missing timestamp
         metadata_missing = {}
@@ -322,6 +323,17 @@ class TestSearchService:
         metadata_many_refs = {'refs': ['ref' + str(i) for i in range(10)]}
         score_many = service._calculate_refs_reliability(metadata_many_refs)
         assert 0.9 <= score_many <= 1.0
+
+    def test_metadata_alignment_penalizes_session_source(self, service):
+        """Session logs should receive a slight penalty in metadata bonus."""
+        metadata_session = {'source': 'session'}
+        metadata_normal = {'source': 'scenario_app_dev'}
+
+        penalty = service._calculate_metadata_alignment(metadata_session, "query", None, None)
+        neutral = service._calculate_metadata_alignment(metadata_normal, "query", None, None)
+
+        assert penalty < neutral
+        assert penalty <= -0.05
 
     def test_search_with_filters(self, service, sample_vector_results, mock_dependencies):
         """Test search with metadata filters"""

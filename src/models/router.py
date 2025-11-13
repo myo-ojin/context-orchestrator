@@ -90,7 +90,8 @@ class ModelRouter:
         max_tokens: Optional[int] = None,
         temperature: float = 0.7,
         timeout: int = 60,
-        fallback_to_local: bool = True
+        fallback_to_local: bool = True,
+        force_routing: Optional[str] = None
     ) -> Any:
         """
         Route task to appropriate LLM
@@ -129,6 +130,10 @@ class ModelRouter:
 
         # Determine routing
         routing = self.TASK_ROUTING[task_type]
+        if force_routing:
+            if force_routing not in ('local', 'cloud'):
+                raise ValueError("force_routing must be 'local' or 'cloud'")
+            routing = force_routing
         logger.debug(f"Routing task '{task_type}' to {routing}")
 
         # Handle embedding separately (different interface)

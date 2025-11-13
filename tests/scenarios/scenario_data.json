@@ -40,7 +40,13 @@
       "refs": [
         "ScenarioDoc-AppBrain"
       ],
-      "timestamp": "2025-11-05T09:30:00"
+      "timestamp": "2025-11-09T09:30:00",
+      "metadata": {
+        "topic": "ingestion",
+        "doc_type": "runbook",
+        "tags": "change-feed",
+        "memory_type_hint": "short_term"
+      }
     },
     {
       "user": "What was the fix for the TypeError crash in the context chunker?",
@@ -51,7 +57,8 @@
         "INC-204"
       ],
       "metadata": {
-        "severity": "high"
+        "severity": "high",
+        "topic": "chunker"
       },
       "timestamp": "2025-10-15T12:00:00"
     },
@@ -66,6 +73,1097 @@
         "topic": "audit"
       },
       "timestamp": "2025-08-01T08:00:00"
+    },
+    {
+      "user": "Ops triage: the Obsidian vault edits backlog needs a pass every hour until the reviewers approve.",
+      "assistant": "Use `session_log_collector --window 1h` to bundle the edits, label them as drafts, and rerun triage after each reviewer ack. Do not sync until the backlog count drops below five.",
+      "project": "AppBrain",
+      "source": "scenario_ops",
+      "metadata": {
+        "topic": "obsidian",
+        "doc_type": "triage",
+        "tags": "ops",
+        "memory_type_hint": "working"
+      },
+      "timestamp": "2025-11-09T05:00:00"
+    },
+    {
+      "user": "We need a release gating checklist for the next AppBrain incremental rollout.",
+      "assistant": "Run `release checklist --project AppBrain` and follow the gating steps: freeze new deployments, enable the dual-write shadow, verify smoke tests, then cut traffic in 10% increments.",
+      "project": "AppBrain",
+      "source": "scenario_release",
+      "metadata": {
+        "topic": "release",
+        "doc_type": "runbook",
+        "tags": "checklist,appbrain"
+      },
+      "timestamp": "2025-11-09T11:00:00"
+    },
+    {
+      "user": "¿Qué checklist seguimos para congelar los despliegues de AppBrain antes del corte?",
+      "assistant": "Ejecuta `release checklist --project AppBrain --freeze-only`, confirma que el modo dual-write está activo y registra el resultado en `release_notes/appbrain/freeze-log.md` antes de escalar al equipo de operaciones.",
+      "project": "AppBrain",
+      "source": "scenario_release_es",
+      "metadata": {
+        "topic": "release",
+        "doc_type": "runbook",
+        "language": "es",
+        "tags": "checklist,freeze"
+      },
+      "timestamp": "2025-11-09T12:30:00"
+    },
+    {
+      "user": "セキュリティ監査ログを24時間分まとめて提出する必要があります。どの CLI を使えばいい？",
+      "assistant": "`security_audit collect --window 24h` を実行し、`appbrain_audit` バケットにアップロードしてから監査チャンネルへリンクを共有してください。",
+      "project": "AppBrain",
+      "source": "scenario_audit",
+      "refs": [
+        "AuditGuide"
+      ],
+      "metadata": {
+        "topic": "security_audit",
+        "doc_type": "report",
+        "memory_type_hint": "long_term",
+        "language": "ja"
+      },
+      "timestamp": "2025-07-15T04:00:00"
+    },
+    {
+      "user": "Our embeddings health check triggered a stale vector warning. Summarize the doctor report so we can refresh safely.",
+      "assistant": "Run `python -m scripts.doctor --pipeline embeddings_health`, confirm the doctor report matches the 7-day baseline, then rehydrate the vectors via `chunker refresh --doctor-report latest`. Attach the report to INC-742 before closing.",
+      "project": "BugFixer",
+      "source": "scenario_health",
+      "metadata": {
+        "topic": "health",
+        "doc_type": "report",
+        "severity": "high",
+        "tags": "doctor-report",
+        "memory_type_hint": "short_term"
+      },
+      "timestamp": "2025-11-08T12:30:00"
+    },
+    {
+      "user": "BugFixer で発生した TypeError を再発させないための再デプロイ手順は？",
+      "assistant": "INC-204 の再発防止チェックリストを開き、`chunker deploy --project BugFixer --incident INC-204 --mode redeploy` を実行します。その後 `doctor report --verify chunker --attach INC-204` で検証結果を添付し、`logs/bugfixer/incidents/INC-204` に再デプロイログと再発防止メモをアップロードしてください。",
+      "project": "BugFixer",
+      "source": "scenario_bug_jp",
+      "metadata": {
+        "topic": "chunker",
+        "doc_type": "runbook",
+        "language": "ja",
+        "severity": "medium",
+        "tags": "再発防止,再デプロイ,INC-204"
+      },
+      "timestamp": "2025-11-10T11:45:00"
+    },
+    {
+      "user": "Document the retention policy for long-term memories in PhaseSync.",
+      "assistant": "Long-term memories stay online indefinitely but require quarterly audits. Use `cli status --snapshot` to capture metrics, run consolidation to ensure importance >0.5, and place the report in `/governance/retention`. Never purge long_term entries without a policy review.",
+      "project": "PhaseSync",
+      "source": "scenario_governance",
+      "metadata": {
+        "topic": "policy",
+        "doc_type": "policy",
+        "tags": "retention",
+        "memory_type_hint": "long_term"
+      },
+      "timestamp": "2025-07-01T10:00:00"
+    },
+    {
+      "user": "Necesitamos confirmar la política de retención para los tableros financieros.",
+      "assistant": "Aplica la política de 180 días, añade la etiqueta `FINANCE-RET` y archiva el reporte cifrado en S3 Vault.",
+      "project": "InsightOps",
+      "source": "scenario_retention",
+      "refs": [
+        "RetentionPlaybook"
+      ],
+      "metadata": {
+        "topic": "retention_policy",
+        "doc_type": "policy",
+        "memory_type_hint": "mid_term",
+        "language": "es",
+        "severity": "medium"
+      },
+      "timestamp": "2025-09-20T13:00:00"
+    },
+    {
+      "user": "Walk me through the backlog purge steps when the Postgres change feed falls 6 hours behind.",
+      "assistant": "Use the change-feed backlog runbook: pause dual-write, buffer events to S3, run `scripts/change_feed_replay --window 6h`, and verify idempotent upserts before resuming production.",
+      "project": "AppBrain",
+      "source": "scenario_change_backlog",
+      "metadata": {
+        "topic": "ingestion",
+        "doc_type": "runbook",
+        "tags": "change-feed,backlog",
+        "memory_type_hint": "short_term"
+      },
+      "timestamp": "2025-11-04T07:45:00"
+    },
+    {
+      "user": "The embeddings doctor report flagged vector drift for the incident war room last night.",
+      "assistant": "Collect the drift snapshots with `python -m scripts.doctor --pipeline embeddings_health --attach`, compare to the INC-742 baseline, then run `chunker refresh --doctor-report latest` to regenerate vectors.",
+      "project": "BugFixer",
+      "source": "scenario_doctor_followup",
+      "metadata": {
+        "topic": "health",
+        "doc_type": "report",
+        "severity": "medium",
+        "tags": "doctor-report,embeddings",
+        "memory_type_hint": "short_term"
+      },
+      "timestamp": "2025-11-07T02:10:00"
+    },
+    {
+      "user": "New compliance dashboard pilot starts Monday; summarize the kickoff tasks for PM, Eng, and Compliance.",
+      "assistant": "Create the shared checklist, align PMとEngのメトリクス、そしてテナント開放前にコンプライアンスのドライランを予約してください。",
+      "project": "PhaseSync",
+      "source": "scenario_compliance",
+      "refs": [
+        "CompliancePilot"
+      ],
+      "metadata": {
+        "topic": "compliance_dashboard",
+        "doc_type": "guidance",
+        "memory_type_hint": "short_term",
+        "language": "en"
+      },
+      "timestamp": "2025-11-06T10:30:00"
+    },
+    {
+      "user": "We need a long-term retention audit log for the PhaseSync governance board.",
+      "assistant": "Run `cli status --snapshot retention`, archive the metrics in `/governance/retention/audit-2025Q3.md`, and record the decision in the governance board minutes.",
+      "project": "PhaseSync",
+      "source": "scenario_retention_audit",
+      "metadata": {
+        "topic": "policy",
+        "doc_type": "policy",
+        "tags": "retention,audit",
+        "memory_type_hint": "long_term"
+      },
+      "timestamp": "2025-06-15T09:00:00"
+    },
+    {
+      "user": "What guardrails do we enforce before approving governance exceptions in PhaseSync?",
+      "assistant": "Governance exceptions require dual approval, logs in `/governance/guardrails`, and a rollback plan. Use the guardrail checklist to confirm justification, blast radius, and retention impact.",
+      "project": "PhaseSync",
+      "source": "scenario_guardrails",
+      "metadata": {
+        "topic": "governance",
+        "doc_type": "policy",
+        "tags": "guardrails",
+        "memory_type_hint": "short_term"
+      },
+      "timestamp": "2025-09-20T14:30:00"
+    },
+    {
+      "user": "PhaseSync のガバナンス例外を承認する前に確認すべき手順は？",
+      "assistant": "例外チケットを `/governance/exceptions` に追加し、二重承認を取得したあと `rollback plan` テンプレを埋め、最後に `retention audit --project PhaseSync` を追記してください。",
+      "project": "PhaseSync",
+      "source": "scenario_guardrails_jp",
+      "metadata": {
+        "topic": "governance",
+        "doc_type": "checklist",
+        "language": "ja",
+        "tags": "guardrails,exception"
+      },
+      "timestamp": "2025-09-21T08:15:00"
+    },
+    {
+      "user": "Summarize the InsightOps dashboard pilot so we can brief the field team.",
+      "assistant": "The pilot used the Redwood telemetry set, ran for 48h, and surfaced latency spikes. Include the KPI screenshots and note that the beta dashboard lives at `/dashboards/insightops/pilot.md`.",
+      "project": "InsightOps",
+      "source": "scenario_dashboard",
+      "metadata": {
+        "topic": "dashboard",
+        "doc_type": "report",
+        "tags": "pilot",
+        "memory_type_hint": "short_term"
+      },
+      "timestamp": "2025-11-03T11:15:00"
+    },
+    {
+      "user": "¿Puedes preparar un resumen en español del piloto InsightOps con la telemetría Redwood?",
+      "assistant": "Incluye las métricas de latencia en `/dashboards/insightops/redwood.md`, adjunta las capturas KPI y envía el reporte al canal `#insightops-field` antes del fin del día.",
+      "project": "InsightOps",
+      "source": "scenario_dashboard_es",
+      "metadata": {
+        "topic": "dashboard",
+        "doc_type": "report",
+        "language": "es",
+        "tags": "pilot,redwood"
+      },
+      "timestamp": "2025-11-03T18:45:00"
+    },
+    {
+      "user": "タイムラインを再同期する手順は？",
+      "assistant": "AppBrain の timeline restore playbook を参照してください。`timeline sync --project AppBrain --window 24h` を実行し、再同期後に dual-write チェックリストを完了してから `status timeline --project AppBrain` で確認します。",
+      "project": "AppBrain",
+      "source": "scenario_app_dev",
+      "refs": [
+        "TimelinePlaybook"
+      ],
+      "metadata": {
+        "topic": "timeline",
+        "doc_type": "guide",
+        "language": "ja"
+      },
+      "timestamp": "2025-11-10T09:00:00"
+    },
+    {
+      "user": "¿Cómo priorizamos los incidentes críticos?",
+      "assistant": "Aplica la matriz SEV. Marca incidentes como SEV-A si afectan producción, asigna puente en menos de 5 min y ejecuta `incident deploy --project BugFixer --sev high`. Documenta cada paso en INC-crit y ejecuta el runbook de escalado.",
+      "project": "BugFixer",
+      "source": "scenario_bug",
+      "refs": [
+        "IncidentMatrix"
+      ],
+      "metadata": {
+        "topic": "incident",
+        "doc_type": "process",
+        "language": "es",
+        "severity": "high"
+      },
+      "timestamp": "2025-11-10T09:30:00"
+    },
+    {
+      "user": "How should we structure the vector indexing pipeline for AppBrain?",
+      "assistant": "Use a two-stage approach: first embed documents with nomic-embed-text, then index in Chroma DB with metadata filters. Keep batch size at 100 docs for optimal throughput.",
+      "project": "AppBrain",
+      "source": "scenario_architecture",
+      "refs": [
+        "AppBrain-VectorPipeline"
+      ],
+      "metadata": {
+        "topic": "vector_indexing",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-01T11:00:00"
+    },
+    {
+      "user": "What chunking strategy should we use for long documents in AppBrain?",
+      "assistant": "Split by markdown headings first, then by paragraphs if chunks exceed 512 tokens. Never split code blocks. Use tiktoken for accurate token counting.",
+      "project": "AppBrain",
+      "source": "scenario_architecture",
+      "refs": [
+        "AppBrain-ChunkStrategy"
+      ],
+      "metadata": {
+        "topic": "chunking",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-01T12:00:00"
+    },
+    {
+      "user": "How do we handle concurrent writes to vector database in AppBrain?",
+      "assistant": "Chroma DB handles concurrency internally. For high-throughput scenarios, queue writes in batches and use background workers with exponential backoff on conflicts.",
+      "project": "AppBrain",
+      "source": "scenario_architecture",
+      "refs": [
+        "AppBrain-Concurrency"
+      ],
+      "metadata": {
+        "topic": "concurrency",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-01T13:00:00"
+    },
+    {
+      "user": "What caching strategy for embeddings in AppBrain?",
+      "assistant": "Implement 3-layer cache: L1 exact matches (LRU, 128 entries), L2 keyword matches (top 3), L3 semantic similarity (cosine >0.85). TTL 8 hours.",
+      "project": "AppBrain",
+      "source": "scenario_architecture",
+      "refs": [
+        "AppBrain-CacheDesign"
+      ],
+      "metadata": {
+        "topic": "caching",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-01T14:00:00"
+    },
+    {
+      "user": "How to implement project-scoped search in AppBrain?",
+      "assistant": "Add project_id to metadata filters. When project confirmed (confidence >0.75), pre-load memory pool and filter candidates before reranking. Expected 70% reduction.",
+      "project": "AppBrain",
+      "source": "scenario_architecture",
+      "refs": [
+        "AppBrain-ProjectScope"
+      ],
+      "metadata": {
+        "topic": "project_search",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-01T15:00:00"
+    },
+    {
+      "user": "Show me the code for generating embeddings in AppBrain.",
+      "assistant": "Use ModelRouter.generate_embedding(text). Returns List[float] with 768 dimensions from nomic-embed-text. Cache results in memory pool for reuse.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-EmbeddingCode"
+      ],
+      "metadata": {
+        "topic": "embedding_generation",
+        "doc_type": "snippet"
+      },
+      "timestamp": "2025-11-01T16:00:00"
+    },
+    {
+      "user": "How do we filter candidates by memory IDs in AppBrain?",
+      "assistant": "Use list comprehension: pool_candidates = [c for c in all_candidates if get_memory_id(c) in memory_ids]. Reduces 100 to ~30 candidates.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-FilterCode"
+      ],
+      "metadata": {
+        "topic": "candidate_filtering",
+        "doc_type": "snippet"
+      },
+      "timestamp": "2025-11-01T17:00:00"
+    },
+    {
+      "user": "What is the cross-encoder reranking flow in AppBrain?",
+      "assistant": "Check L1/L2/L3 caches first. If miss, call LLM to score (query, candidate) pair. Store in all 3 caches. Use 3-parallel execution for throughput.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-RerankFlow"
+      ],
+      "metadata": {
+        "topic": "reranking",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-01T18:00:00"
+    },
+    {
+      "user": "How to warm the semantic cache in AppBrain?",
+      "assistant": "Call ProjectMemoryPool.warm_cache(reranker, project_id). Loads all project memories, generates embeddings, and populates L3 cache. Query-agnostic optimization.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-WarmCache"
+      ],
+      "metadata": {
+        "topic": "cache_warming",
+        "doc_type": "snippet"
+      },
+      "timestamp": "2025-11-01T19:00:00"
+    },
+    {
+      "user": "Show the graduated degradation workflow implementation in AppBrain.",
+      "assistant": "Step 1: search_within_pool(). Step 2: is_result_sufficient() check. Step 3: If insufficient, fallback to full search. Logs \"Pool filtering: X→Y candidates\".",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-WorkflowA"
+      ],
+      "metadata": {
+        "topic": "graduated_degradation",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-01T20:00:00"
+    },
+    {
+      "user": "How do we calculate result sufficiency in AppBrain?",
+      "assistant": "Check: len(results) >= top_k AND min_score >= 0.3. Returns True if both conditions met, False otherwise.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-Sufficiency"
+      ],
+      "metadata": {
+        "topic": "result_sufficiency",
+        "doc_type": "snippet"
+      },
+      "timestamp": "2025-11-01T21:00:00"
+    },
+    {
+      "user": "What is the memory pool loading logic in AppBrain?",
+      "assistant": "Fetch memories by project_id with is_memory_entry=True filter. Sort by created_at desc. Limit to max_memories_per_project (default 100). Generate embeddings for each.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-PoolLoading"
+      ],
+      "metadata": {
+        "topic": "memory_pool_loading",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-01T22:00:00"
+    },
+    {
+      "user": "How do we extract memory IDs from candidates in AppBrain?",
+      "assistant": "Check metadata.memory_id for chunks, or use candidate ID if is_memory_entry=True. Return empty string if neither found.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-MemoryIDExtraction"
+      ],
+      "metadata": {
+        "topic": "memory_id_extraction",
+        "doc_type": "snippet"
+      },
+      "timestamp": "2025-11-01T23:00:00"
+    },
+    {
+      "user": "Show the prefetch_project implementation in AppBrain.",
+      "assistant": "Dual strategy: (1) ProjectMemoryPool.warm_cache() for L3, (2) Execute prefetch queries for L1/L2. Logs pool_stats with memories_loaded and cache_entries_added.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-Prefetch"
+      ],
+      "metadata": {
+        "topic": "prefetch_project",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-02T00:00:00"
+    },
+    {
+      "user": "What parallel execution strategy does AppBrain use?",
+      "assistant": "Use ThreadPoolExecutor with max_workers=2 for vector+BM25 search, max_workers=3 for cross-encoder reranking. Reduces latency from 118s to 40s per query.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-Parallel"
+      ],
+      "metadata": {
+        "topic": "parallel_execution",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-02T01:00:00"
+    },
+    {
+      "user": "How do we monitor cache hit rates in AppBrain?",
+      "assistant": "Call get_reranker_metrics() MCP tool. Returns L1/L2/L3 hit rates, LLM call count, avg latency. Target: total hit rate >60%.",
+      "project": "AppBrain",
+      "source": "scenario_ops",
+      "refs": [
+        "AppBrain-CacheMetrics"
+      ],
+      "metadata": {
+        "topic": "monitoring",
+        "doc_type": "runbook"
+      },
+      "timestamp": "2025-11-02T02:00:00"
+    },
+    {
+      "user": "What performance targets for AppBrain search?",
+      "assistant": "Search latency ≤200ms (typical 80ms without reranking). LLM calls ≤20 per query. Cache hit rate ≥60%. Precision ≥84%. Zero-hit queries = 0.",
+      "project": "AppBrain",
+      "source": "scenario_ops",
+      "refs": [
+        "AppBrain-PerformanceTargets"
+      ],
+      "metadata": {
+        "topic": "performance_targets",
+        "doc_type": "specification"
+      },
+      "timestamp": "2025-11-02T03:00:00"
+    },
+    {
+      "user": "How to debug memory pool filtering in AppBrain?",
+      "assistant": "Check logs for \"Pool filtering: X→Y candidates\". If Y=0, verify project_id metadata. If Y=X, memory pool not loaded. Expected ratio ~30%.",
+      "project": "AppBrain",
+      "source": "scenario_ops",
+      "refs": [
+        "AppBrain-DebugPool"
+      ],
+      "metadata": {
+        "topic": "debugging",
+        "doc_type": "runbook"
+      },
+      "timestamp": "2025-11-02T04:00:00"
+    },
+    {
+      "user": "What triggers project memory pool loading in AppBrain?",
+      "assistant": "SessionManager.set_project_hint() with confidence >0.75 triggers prefetch_project(). This loads pool and warms L3 cache automatically.",
+      "project": "AppBrain",
+      "source": "scenario_ops",
+      "refs": [
+        "AppBrain-PoolTrigger"
+      ],
+      "metadata": {
+        "topic": "pool_loading_trigger",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-02T05:00:00"
+    },
+    {
+      "user": "How to measure memory pool effectiveness in AppBrain?",
+      "assistant": "Compare LLM calls before/after pool integration. Track candidate reduction ratio (expect 70%). Monitor L3 cache hit rate (target >40%).",
+      "project": "AppBrain",
+      "source": "scenario_ops",
+      "refs": [
+        "AppBrain-PoolEffectiveness"
+      ],
+      "metadata": {
+        "topic": "effectiveness_measurement",
+        "doc_type": "analysis"
+      },
+      "timestamp": "2025-11-02T06:00:00"
+    },
+    {
+      "user": "What are key config parameters for AppBrain memory pool?",
+      "assistant": "max_memories_per_project: 100, pool_ttl_seconds: 28800 (8h), project_prefetch_min_confidence: 0.75, semantic_similarity_threshold: 0.85.",
+      "project": "AppBrain",
+      "source": "scenario_config",
+      "refs": [
+        "AppBrain-PoolConfig"
+      ],
+      "metadata": {
+        "topic": "configuration",
+        "doc_type": "specification"
+      },
+      "timestamp": "2025-11-02T07:00:00"
+    },
+    {
+      "user": "How to tune semantic similarity threshold in AppBrain?",
+      "assistant": "Default 0.85 is conservative. Lower to 0.70-0.75 for higher hit rate (trade precision). Measure via get_reranker_metrics() after changes.",
+      "project": "AppBrain",
+      "source": "scenario_config",
+      "refs": [
+        "AppBrain-ThresholdTuning"
+      ],
+      "metadata": {
+        "topic": "threshold_tuning",
+        "doc_type": "guidance"
+      },
+      "timestamp": "2025-11-02T08:00:00"
+    },
+    {
+      "user": "What cache sizes should we use in AppBrain?",
+      "assistant": "L1/L2: 128 entries each (OrderedDict with LRU eviction). L3: unlimited (Dict per candidate_id). TTL: 28800s (8 hours) for all layers.",
+      "project": "AppBrain",
+      "source": "scenario_config",
+      "refs": [
+        "AppBrain-CacheSizes"
+      ],
+      "metadata": {
+        "topic": "cache_sizing",
+        "doc_type": "specification"
+      },
+      "timestamp": "2025-11-02T09:00:00"
+    },
+    {
+      "user": "How many parallel reranking workers for AppBrain?",
+      "assistant": "cross_encoder_max_parallel: 3 (default). Increase to 5-10 if CPU allows. Monitor queue_wait_ms via metrics. Use fallback_mode: heuristic if wait >500ms.",
+      "project": "AppBrain",
+      "source": "scenario_config",
+      "refs": [
+        "AppBrain-ParallelTuning"
+      ],
+      "metadata": {
+        "topic": "parallel_tuning",
+        "doc_type": "guidance"
+      },
+      "timestamp": "2025-11-02T10:00:00"
+    },
+    {
+      "user": "What prefetch queries should we use for AppBrain?",
+      "assistant": "Use actual user query patterns. Default: \"project status\", \"open issues\", \"risk summary\". Update based on query_runs.json analysis. Max 3 queries.",
+      "project": "AppBrain",
+      "source": "scenario_config",
+      "refs": [
+        "AppBrain-PrefetchQueries"
+      ],
+      "metadata": {
+        "topic": "prefetch_queries",
+        "doc_type": "guidance"
+      },
+      "timestamp": "2025-11-02T11:00:00"
+    },
+    {
+      "user": "How to test memory pool functionality in AppBrain?",
+      "assistant": "Unit tests: test_load_project, test_warm_cache, test_get_memory_ids. Integration: check pool_stats in prefetch_project response. Verify >0 memories_loaded.",
+      "project": "AppBrain",
+      "source": "scenario_testing",
+      "refs": [
+        "AppBrain-PoolTesting"
+      ],
+      "metadata": {
+        "topic": "testing",
+        "doc_type": "guidance"
+      },
+      "timestamp": "2025-11-02T12:00:00"
+    },
+    {
+      "user": "What regression tests validate AppBrain memory pool?",
+      "assistant": "Run mcp_replay with AppBrain-heavy scenarios. Verify: Precision ≥84%, LLM calls reduction, cache hit rate increase. Check zero_hits.json for regressions.",
+      "project": "AppBrain",
+      "source": "scenario_testing",
+      "refs": [
+        "AppBrain-RegressionTests"
+      ],
+      "metadata": {
+        "topic": "regression_testing",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-02T13:00:00"
+    },
+    {
+      "user": "How to validate cache warming in AppBrain?",
+      "assistant": "Check logs for \"[Prefetch] Warmed L3 cache\" with >0 memories_loaded. Query same project immediately after—L3 hit rate should spike.",
+      "project": "AppBrain",
+      "source": "scenario_testing",
+      "refs": [
+        "AppBrain-CacheValidation"
+      ],
+      "metadata": {
+        "topic": "cache_validation",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-02T14:00:00"
+    },
+    {
+      "user": "What are success criteria for AppBrain memory pool?",
+      "assistant": "LLM calls ≤20 per query (vs 44 baseline). Candidate reduction 100→30 (70%). L3 cache hit rate >40%. Precision maintained ≥84%.",
+      "project": "AppBrain",
+      "source": "scenario_testing",
+      "refs": [
+        "AppBrain-SuccessCriteria"
+      ],
+      "metadata": {
+        "topic": "success_criteria",
+        "doc_type": "specification"
+      },
+      "timestamp": "2025-11-02T15:00:00"
+    },
+    {
+      "user": "How to measure graduated degradation effectiveness in AppBrain?",
+      "assistant": "Parse logs for \"Pool filtering\" and \"Sufficient results from pool\". Calculate pool-only success rate. Target: >70% queries satisfied by pool alone.",
+      "project": "AppBrain",
+      "source": "scenario_testing",
+      "refs": [
+        "AppBrain-WorkflowAMetrics"
+      ],
+      "metadata": {
+        "topic": "workflow_metrics",
+        "doc_type": "analysis"
+      },
+      "timestamp": "2025-11-02T16:00:00"
+    },
+    {
+      "user": "How should we structure the vector indexing pipeline for AppBrain?",
+      "assistant": "Use a two-stage approach: first embed documents with nomic-embed-text, then index in Chroma DB with metadata filters. Keep batch size at 100 docs for optimal throughput.",
+      "project": "AppBrain",
+      "source": "scenario_architecture",
+      "refs": [
+        "AppBrain-VectorPipeline"
+      ],
+      "metadata": {
+        "topic": "vector_indexing",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-01T11:00:00"
+    },
+    {
+      "user": "What chunking strategy should we use for long documents in AppBrain?",
+      "assistant": "Split by markdown headings first, then by paragraphs if chunks exceed 512 tokens. Never split code blocks. Use tiktoken for accurate token counting.",
+      "project": "AppBrain",
+      "source": "scenario_architecture",
+      "refs": [
+        "AppBrain-ChunkStrategy"
+      ],
+      "metadata": {
+        "topic": "chunking",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-01T12:00:00"
+    },
+    {
+      "user": "How do we handle concurrent writes to vector database in AppBrain?",
+      "assistant": "Chroma DB handles concurrency internally. For high-throughput scenarios, queue writes in batches and use background workers with exponential backoff on conflicts.",
+      "project": "AppBrain",
+      "source": "scenario_architecture",
+      "refs": [
+        "AppBrain-Concurrency"
+      ],
+      "metadata": {
+        "topic": "concurrency",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-01T13:00:00"
+    },
+    {
+      "user": "What caching strategy for embeddings in AppBrain?",
+      "assistant": "Implement 3-layer cache: L1 exact matches (LRU, 128 entries), L2 keyword matches (top 3), L3 semantic similarity (cosine >0.85). TTL 8 hours.",
+      "project": "AppBrain",
+      "source": "scenario_architecture",
+      "refs": [
+        "AppBrain-CacheDesign"
+      ],
+      "metadata": {
+        "topic": "caching",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-01T14:00:00"
+    },
+    {
+      "user": "How to implement project-scoped search in AppBrain?",
+      "assistant": "Add project_id to metadata filters. When project confirmed (confidence >0.75), pre-load memory pool and filter candidates before reranking. Expected 70% reduction.",
+      "project": "AppBrain",
+      "source": "scenario_architecture",
+      "refs": [
+        "AppBrain-ProjectScope"
+      ],
+      "metadata": {
+        "topic": "project_search",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-01T15:00:00"
+    },
+    {
+      "user": "Show me the code for generating embeddings in AppBrain.",
+      "assistant": "Use ModelRouter.generate_embedding(text). Returns List[float] with 768 dimensions from nomic-embed-text. Cache results in memory pool for reuse.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-EmbeddingCode"
+      ],
+      "metadata": {
+        "topic": "embedding_generation",
+        "doc_type": "snippet"
+      },
+      "timestamp": "2025-11-01T16:00:00"
+    },
+    {
+      "user": "How do we filter candidates by memory IDs in AppBrain?",
+      "assistant": "Use list comprehension: pool_candidates = [c for c in all_candidates if get_memory_id(c) in memory_ids]. Reduces 100 to ~30 candidates.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-FilterCode"
+      ],
+      "metadata": {
+        "topic": "candidate_filtering",
+        "doc_type": "snippet"
+      },
+      "timestamp": "2025-11-01T17:00:00"
+    },
+    {
+      "user": "What is the cross-encoder reranking flow in AppBrain?",
+      "assistant": "Check L1/L2/L3 caches first. If miss, call LLM to score (query, candidate) pair. Store in all 3 caches. Use 3-parallel execution for throughput.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-RerankFlow"
+      ],
+      "metadata": {
+        "topic": "reranking",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-01T18:00:00"
+    },
+    {
+      "user": "How to warm the semantic cache in AppBrain?",
+      "assistant": "Call ProjectMemoryPool.warm_cache(reranker, project_id). Loads all project memories, generates embeddings, and populates L3 cache. Query-agnostic optimization.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-WarmCache"
+      ],
+      "metadata": {
+        "topic": "cache_warming",
+        "doc_type": "snippet"
+      },
+      "timestamp": "2025-11-01T19:00:00"
+    },
+    {
+      "user": "Show the graduated degradation workflow implementation in AppBrain.",
+      "assistant": "Step 1: search_within_pool(). Step 2: is_result_sufficient() check. Step 3: If insufficient, fallback to full search. Logs \"Pool filtering: X→Y candidates\".",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-WorkflowA"
+      ],
+      "metadata": {
+        "topic": "graduated_degradation",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-01T20:00:00"
+    },
+    {
+      "user": "How do we calculate result sufficiency in AppBrain?",
+      "assistant": "Check: len(results) >= top_k AND min_score >= 0.3. Returns True if both conditions met, False otherwise.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-Sufficiency"
+      ],
+      "metadata": {
+        "topic": "result_sufficiency",
+        "doc_type": "snippet"
+      },
+      "timestamp": "2025-11-01T21:00:00"
+    },
+    {
+      "user": "What is the memory pool loading logic in AppBrain?",
+      "assistant": "Fetch memories by project_id with is_memory_entry=True filter. Sort by created_at desc. Limit to max_memories_per_project (default 100). Generate embeddings for each.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-PoolLoading"
+      ],
+      "metadata": {
+        "topic": "memory_pool_loading",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-01T22:00:00"
+    },
+    {
+      "user": "How do we extract memory IDs from candidates in AppBrain?",
+      "assistant": "Check metadata.memory_id for chunks, or use candidate ID if is_memory_entry=True. Return empty string if neither found.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-MemoryIDExtraction"
+      ],
+      "metadata": {
+        "topic": "memory_id_extraction",
+        "doc_type": "snippet"
+      },
+      "timestamp": "2025-11-01T23:00:00"
+    },
+    {
+      "user": "Show the prefetch_project implementation in AppBrain.",
+      "assistant": "Dual strategy: (1) ProjectMemoryPool.warm_cache() for L3, (2) Execute prefetch queries for L1/L2. Logs pool_stats with memories_loaded and cache_entries_added.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-Prefetch"
+      ],
+      "metadata": {
+        "topic": "prefetch_project",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-02T00:00:00"
+    },
+    {
+      "user": "What parallel execution strategy does AppBrain use?",
+      "assistant": "Use ThreadPoolExecutor with max_workers=2 for vector+BM25 search, max_workers=3 for cross-encoder reranking. Reduces latency from 118s to 40s per query.",
+      "project": "AppBrain",
+      "source": "scenario_code",
+      "refs": [
+        "AppBrain-Parallel"
+      ],
+      "metadata": {
+        "topic": "parallel_execution",
+        "doc_type": "design"
+      },
+      "timestamp": "2025-11-02T01:00:00"
+    },
+    {
+      "user": "How do we monitor cache hit rates in AppBrain?",
+      "assistant": "Call get_reranker_metrics() MCP tool. Returns L1/L2/L3 hit rates, LLM call count, avg latency. Target: total hit rate >60%.",
+      "project": "AppBrain",
+      "source": "scenario_ops",
+      "refs": [
+        "AppBrain-CacheMetrics"
+      ],
+      "metadata": {
+        "topic": "monitoring",
+        "doc_type": "runbook"
+      },
+      "timestamp": "2025-11-02T02:00:00"
+    },
+    {
+      "user": "What performance targets for AppBrain search?",
+      "assistant": "Search latency ≤200ms (typical 80ms without reranking). LLM calls ≤20 per query. Cache hit rate ≥60%. Precision ≥84%. Zero-hit queries = 0.",
+      "project": "AppBrain",
+      "source": "scenario_ops",
+      "refs": [
+        "AppBrain-PerformanceTargets"
+      ],
+      "metadata": {
+        "topic": "performance_targets",
+        "doc_type": "specification"
+      },
+      "timestamp": "2025-11-02T03:00:00"
+    },
+    {
+      "user": "How to debug memory pool filtering in AppBrain?",
+      "assistant": "Check logs for \"Pool filtering: X→Y candidates\". If Y=0, verify project_id metadata. If Y=X, memory pool not loaded. Expected ratio ~30%.",
+      "project": "AppBrain",
+      "source": "scenario_ops",
+      "refs": [
+        "AppBrain-DebugPool"
+      ],
+      "metadata": {
+        "topic": "debugging",
+        "doc_type": "runbook"
+      },
+      "timestamp": "2025-11-02T04:00:00"
+    },
+    {
+      "user": "What triggers project memory pool loading in AppBrain?",
+      "assistant": "SessionManager.set_project_hint() with confidence >0.75 triggers prefetch_project(). This loads pool and warms L3 cache automatically.",
+      "project": "AppBrain",
+      "source": "scenario_ops",
+      "refs": [
+        "AppBrain-PoolTrigger"
+      ],
+      "metadata": {
+        "topic": "pool_loading_trigger",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-02T05:00:00"
+    },
+    {
+      "user": "How to measure memory pool effectiveness in AppBrain?",
+      "assistant": "Compare LLM calls before/after pool integration. Track candidate reduction ratio (expect 70%). Monitor L3 cache hit rate (target >40%).",
+      "project": "AppBrain",
+      "source": "scenario_ops",
+      "refs": [
+        "AppBrain-PoolEffectiveness"
+      ],
+      "metadata": {
+        "topic": "effectiveness_measurement",
+        "doc_type": "analysis"
+      },
+      "timestamp": "2025-11-02T06:00:00"
+    },
+    {
+      "user": "What are key config parameters for AppBrain memory pool?",
+      "assistant": "max_memories_per_project: 100, pool_ttl_seconds: 28800 (8h), project_prefetch_min_confidence: 0.75, semantic_similarity_threshold: 0.85.",
+      "project": "AppBrain",
+      "source": "scenario_config",
+      "refs": [
+        "AppBrain-PoolConfig"
+      ],
+      "metadata": {
+        "topic": "configuration",
+        "doc_type": "specification"
+      },
+      "timestamp": "2025-11-02T07:00:00"
+    },
+    {
+      "user": "How to tune semantic similarity threshold in AppBrain?",
+      "assistant": "Default 0.85 is conservative. Lower to 0.70-0.75 for higher hit rate (trade precision). Measure via get_reranker_metrics() after changes.",
+      "project": "AppBrain",
+      "source": "scenario_config",
+      "refs": [
+        "AppBrain-ThresholdTuning"
+      ],
+      "metadata": {
+        "topic": "threshold_tuning",
+        "doc_type": "guidance"
+      },
+      "timestamp": "2025-11-02T08:00:00"
+    },
+    {
+      "user": "What cache sizes should we use in AppBrain?",
+      "assistant": "L1/L2: 128 entries each (OrderedDict with LRU eviction). L3: unlimited (Dict per candidate_id). TTL: 28800s (8 hours) for all layers.",
+      "project": "AppBrain",
+      "source": "scenario_config",
+      "refs": [
+        "AppBrain-CacheSizes"
+      ],
+      "metadata": {
+        "topic": "cache_sizing",
+        "doc_type": "specification"
+      },
+      "timestamp": "2025-11-02T09:00:00"
+    },
+    {
+      "user": "How many parallel reranking workers for AppBrain?",
+      "assistant": "cross_encoder_max_parallel: 3 (default). Increase to 5-10 if CPU allows. Monitor queue_wait_ms via metrics. Use fallback_mode: heuristic if wait >500ms.",
+      "project": "AppBrain",
+      "source": "scenario_config",
+      "refs": [
+        "AppBrain-ParallelTuning"
+      ],
+      "metadata": {
+        "topic": "parallel_tuning",
+        "doc_type": "guidance"
+      },
+      "timestamp": "2025-11-02T10:00:00"
+    },
+    {
+      "user": "What prefetch queries should we use for AppBrain?",
+      "assistant": "Use actual user query patterns. Default: \"project status\", \"open issues\", \"risk summary\". Update based on query_runs.json analysis. Max 3 queries.",
+      "project": "AppBrain",
+      "source": "scenario_config",
+      "refs": [
+        "AppBrain-PrefetchQueries"
+      ],
+      "metadata": {
+        "topic": "prefetch_queries",
+        "doc_type": "guidance"
+      },
+      "timestamp": "2025-11-02T11:00:00"
+    },
+    {
+      "user": "How to test memory pool functionality in AppBrain?",
+      "assistant": "Unit tests: test_load_project, test_warm_cache, test_get_memory_ids. Integration: check pool_stats in prefetch_project response. Verify >0 memories_loaded.",
+      "project": "AppBrain",
+      "source": "scenario_testing",
+      "refs": [
+        "AppBrain-PoolTesting"
+      ],
+      "metadata": {
+        "topic": "testing",
+        "doc_type": "guidance"
+      },
+      "timestamp": "2025-11-02T12:00:00"
+    },
+    {
+      "user": "What regression tests validate AppBrain memory pool?",
+      "assistant": "Run mcp_replay with AppBrain-heavy scenarios. Verify: Precision ≥84%, LLM calls reduction, cache hit rate increase. Check zero_hits.json for regressions.",
+      "project": "AppBrain",
+      "source": "scenario_testing",
+      "refs": [
+        "AppBrain-RegressionTests"
+      ],
+      "metadata": {
+        "topic": "regression_testing",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-02T13:00:00"
+    },
+    {
+      "user": "How to validate cache warming in AppBrain?",
+      "assistant": "Check logs for \"[Prefetch] Warmed L3 cache\" with >0 memories_loaded. Query same project immediately after—L3 hit rate should spike.",
+      "project": "AppBrain",
+      "source": "scenario_testing",
+      "refs": [
+        "AppBrain-CacheValidation"
+      ],
+      "metadata": {
+        "topic": "cache_validation",
+        "doc_type": "process"
+      },
+      "timestamp": "2025-11-02T14:00:00"
+    },
+    {
+      "user": "What are success criteria for AppBrain memory pool?",
+      "assistant": "LLM calls ≤20 per query (vs 44 baseline). Candidate reduction 100→30 (70%). L3 cache hit rate >40%. Precision maintained ≥84%.",
+      "project": "AppBrain",
+      "source": "scenario_testing",
+      "refs": [
+        "AppBrain-SuccessCriteria"
+      ],
+      "metadata": {
+        "topic": "success_criteria",
+        "doc_type": "specification"
+      },
+      "timestamp": "2025-11-02T15:00:00"
+    },
+    {
+      "user": "How to measure graduated degradation effectiveness in AppBrain?",
+      "assistant": "Parse logs for \"Pool filtering\" and \"Sufficient results from pool\". Calculate pool-only success rate. Target: >70% queries satisfied by pool alone.",
+      "project": "AppBrain",
+      "source": "scenario_testing",
+      "refs": [
+        "AppBrain-WorkflowAMetrics"
+      ],
+      "metadata": {
+        "topic": "workflow_metrics",
+        "doc_type": "analysis"
+      },
+      "timestamp": "2025-11-02T16:00:00"
     }
   ]
 }

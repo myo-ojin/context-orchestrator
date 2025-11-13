@@ -23,6 +23,8 @@ from src.services.bookmark_manager import BookmarkManager  # Phase 15
 
 logger = logging.getLogger(__name__)
 
+SESSION_PROJECT_CONFIDENCE_THRESHOLD = 0.55
+
 
 class MCPProtocolHandler:
     """
@@ -256,6 +258,15 @@ class MCPProtocolHandler:
         elif method == 'add_command':
             return self._tool_add_command(params)
 
+        elif method == 'session_get_hint':
+            return self._tool_session_get_hint(params)
+
+        elif method == 'session_set_project':
+            return self._tool_session_set_project(params)
+
+        elif method == 'session_clear_project':
+            return self._tool_session_clear_project(params)
+
         # Tool: create_project (Phase 15)
         elif method == 'create_project':
             return self._tool_create_project(params)
@@ -287,6 +298,10 @@ class MCPProtocolHandler:
         # Tool: use_bookmark (Phase 15)
         elif method == 'use_bookmark':
             return self._tool_use_bookmark(params)
+
+        # Tool: get_reranker_metrics
+        elif method == 'get_reranker_metrics':
+            return self._tool_get_reranker_metrics(params)
 
         else:
             raise NotImplementedError(f"Unknown method: {method}")
@@ -347,7 +362,8 @@ class MCPProtocolHandler:
             params: {
                 'query': str,
                 'top_k': int (optional, default: 10),
-                'filter_metadata': dict (optional)
+                'filter_metadata': dict (optional),
+                'session_id': str (optional, use session project hint)
             }
 
         Returns:
@@ -373,14 +389,18 @@ class MCPProtocolHandler:
             raise ValueError("query parameter is required")
 
         top_k = params.get('top_k', 10)
-        filter_metadata = params.get('filter_metadata')
+        filters = dict(params.get('filter_metadata') or {})
+        if not filters:
+            filters = None
+
+        session_id = params.get('session_id')
+        filters = self._apply_session_project_filter(filters, session_id)
 
         # Search memories
-        # Map filter_metadata to service 'filters' parameter
         results = self.search_service.search(
             query=query,
             top_k=top_k,
-            filters=filter_metadata
+            filters=filters
         )
 
         logger.info(f"Searched memories: query='{query}', results={len(results)}")
@@ -388,6 +408,59 @@ class MCPProtocolHandler:
         return {
             'results': results,
             'count': len(results)
+        }
+
+    def _apply_session_project_filter(
+        self,
+        filters: Optional[Dict[str, Any]],
+        session_id: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
+        if not session_id or not self.session_manager:
+            return filters
+
+        try:
+            context = self.session_manager.get_project_context(session_id)
+        except Exception as exc:  # pragma: no cover - defensive log
+            logger.warning("Failed to resolve project hint for session %s: %s", session_id, exc)
+            return filters
+
+        if not context:
+            return filters
+
+        confidence = context.get('confidence', 0.0)
+        if confidence < SESSION_PROJECT_CONFIDENCE_THRESHOLD:
+            return filters
+
+        project_id = context.get('project_id')
+        if not project_id:
+            return filters
+
+        if filters and filters.get('project_id'):
+            return filters
+
+        merged = dict(filters) if filters else {}
+        merged['project_id'] = project_id
+        logger.info(
+            "Session %s project filter applied (project_id=%s, confidence=%.2f)",
+            session_id,
+            project_id,
+            confidence
+        )
+        return merged
+
+    @staticmethod
+    def _format_session_hint_response(
+        session_id: str,
+        context: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        context = context or {}
+        return {
+            'session_id': session_id,
+            'project_hint': context.get('project_name') or context.get('project_hint'),
+            'project_id': context.get('project_id'),
+            'confidence': context.get('confidence', 0.0),
+            'source': context.get('source'),
+            'raw_hint': context.get('project_hint'),
         }
 
     def _tool_get_memory(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -611,6 +684,71 @@ class MCPProtocolHandler:
         logger.debug(f"Added command to session: session_id={session_id}, success={success}")
 
         return {'success': success}
+
+    def _tool_session_get_hint(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.session_manager:
+            raise ValueError("SessionManager not configured")
+
+        session_id = params.get('session_id')
+        if not session_id:
+            raise ValueError("session_id parameter is required")
+
+        context = self.session_manager.get_project_context(session_id)
+        return self._format_session_hint_response(session_id, context)
+
+    def _tool_session_set_project(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.session_manager:
+            raise ValueError("SessionManager not configured")
+
+        session_id = params.get('session_id')
+        if not session_id:
+            raise ValueError("session_id parameter is required")
+
+        project_id = params.get('project_id')
+        project_name = (
+            params.get('project')
+            or params.get('project_name')
+            or params.get('project_hint')
+        )
+        project_identifier = project_id or project_name
+        if not project_identifier:
+            raise ValueError("project_id or project name is required")
+
+        canonical_identifier = project_identifier
+        if project_id and self.project_manager:
+            project = self.project_manager.get_project(project_id)
+            if not project:
+                raise ValueError(f"Project not found: {project_id}")
+            canonical_identifier = project.name
+
+        confidence = params.get('confidence', 0.99)
+        success = self.session_manager.set_project_hint(
+            session_id,
+            canonical_identifier,
+            confidence=confidence,
+            source='manual_rpc'
+        )
+        if not success:
+            raise ValueError("Failed to set project hint")
+
+        context = self.session_manager.get_project_context(session_id)
+        return self._format_session_hint_response(session_id, context)
+
+    def _tool_session_clear_project(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.session_manager:
+            raise ValueError("SessionManager not configured")
+
+        session_id = params.get('session_id')
+        if not session_id:
+            raise ValueError("session_id parameter is required")
+
+        success = self.session_manager.clear_project_hint(session_id)
+        if not success:
+            raise ValueError(f"Session not found: {session_id}")
+
+        response = self._format_session_hint_response(session_id, None)
+        response['cleared'] = True
+        return response
 
     # Phase 15: Project Management Tools
 
@@ -1013,6 +1151,14 @@ class MCPProtocolHandler:
             'filters': bookmark_data['filters'],
             'results': results
         }
+
+    def _tool_get_reranker_metrics(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Tool: get_reranker_metrics
+
+        Returns cache / latency statistics for the cross-encoder reranker.
+        """
+        return self.search_service.get_reranker_metrics()
 
     # Helper methods for JSON-RPC responses
 

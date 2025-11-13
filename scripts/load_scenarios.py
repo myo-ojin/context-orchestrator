@@ -4,12 +4,15 @@
 
 import argparse
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 
 from src.config import load_config
 from src.main import init_storage, init_models, init_processing, init_services
 from src.utils.logger import setup_root_logger
+
+logger = logging.getLogger(__name__)
 
 
 def ingest_conversation(ingestion_service, conversation, project_manager=None):
@@ -26,7 +29,33 @@ def ingest_conversation(ingestion_service, conversation, project_manager=None):
     if project_manager and conversation.get("project"):
         convo["project_id"] = ensure_project(project_manager, conversation["project"])
 
-    ingestion_service.ingest_conversation(convo)
+    memory_id = ingestion_service.ingest_conversation(convo)
+    if not memory_id:
+        raise RuntimeError("ingest_conversation did not return a memory_id")
+
+    memory = ingestion_service.get_memory(memory_id)
+    if not memory:
+        raise RuntimeError(f"Ingestion succeeded but memory {memory_id} was not found for validation")
+
+    summary = (memory.summary or "").strip()
+    if not ingestion_service.is_structured_summary(summary):
+        snippet = summary.replace("\n", " \\n ")
+        if len(snippet) > 240:
+            snippet = f"{snippet[:240].rstrip()}..."
+
+        logger.error(
+            "Structured summary validation failed (memory_id=%s, project=%s). "
+            "Generated summary snippet: %s",
+            memory_id,
+            conversation.get("project") or "<none>",
+            snippet or "<empty>",
+        )
+        raise ValueError(
+            f"Structured summary validation failed for memory {memory_id}. "
+            "Ensure every summary follows the Topic/DocType/Project/KeyActions template "
+            "and that each KeyActions line starts with '- '."
+        )
+    return memory_id
 
 
 _project_cache = {}

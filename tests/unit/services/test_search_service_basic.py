@@ -13,6 +13,9 @@ class _Router:
         # simple vector stub
         return [0.5, 0.1, 0.9]
 
+    def route(self, task_type: str, **kwargs):
+        return "{}"
+
 
 class _VectorDB:
     def __init__(self):
@@ -79,4 +82,3 @@ def test_search_passes_filters_to_vector_db():
     filters = {"k": 1}
     _ = svc.search("TypeError", top_k=3, filters=filters)
     assert vec.last_filters == filters
-

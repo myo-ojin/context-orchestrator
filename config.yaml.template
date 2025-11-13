@@ -33,6 +33,23 @@ search:
   timeout_seconds: 2       # Maximum search time
   cross_encoder_enabled: true  # Enable LLM cross-encoder reranking
   cross_encoder_top_k: 3       # How many candidates to rescore with cross-encoder
+  cross_encoder_cache_size: 256            # LRU cache entries for reranker scores
+  cross_encoder_cache_ttl_seconds: 28800   # Seconds to keep cached cross-encoder scores (8 hours)
+  cross_encoder_max_parallel: 3            # Max simultaneous reranker LLM calls
+  cross_encoder_fallback_max_wait_ms: 500  # If queue wait exceeds this, skip reranker
+  cross_encoder_fallback_mode: heuristic   # 'heuristic' or 'none'
+  project_prefetch_enabled: true           # Warm cache when project auto-resolves
+  project_prefetch_min_confidence: 0.75    # Min confidence required before prefetch
+  project_prefetch_queries:                # Seed queries for prefetch runs
+    - project status
+    - open issues
+    - risk summary
+  project_prefetch_top_k: 5                # How many results to score during prefetch
+  project_prefetch_max_queries: 3          # Limit number of seed queries per project
+  vector_candidate_count: 100  # How many vector hits to pull before merging
+  bm25_candidate_count: 30     # How many BM25 hits to pull before merging
+  query_attribute_min_confidence: 0.4  # Minimum LLM confidence to override heuristics
+  query_attribute_llm_enabled: true    # Use LLM to enrich query hints when heuristics are insufficient
 
 # ============================================================================
 # Clustering (Memory Consolidation)
@@ -85,6 +102,16 @@ router:
   long_summary_min_tokens: 500    # >= this uses cloud LLM
 
 # ============================================================================
+# Language Routing
+# ============================================================================
+languages:
+  supported_local:
+    - en
+    - ja
+    - es
+  fallback_strategy: cloud  # When unsupported language detected: "cloud" or "local"
+
+# ============================================================================
 # Advanced Settings (Optional)
 # ============================================================================
 # Reranking weights (consumer components may read these)
@@ -94,6 +121,7 @@ reranking_weights:
   refs_reliability: 0.1
   bm25_score: 0.2
   vector_similarity: 0.2
+  metadata_bonus: 1.0
 
 # MCP settings
 mcp:

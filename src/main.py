@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Context Orchestrator Main Entry Point
@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timedelta
+from dataclasses import asdict
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -47,7 +48,7 @@ from src.models.cli_llm import CLILLMClient
 from src.services.ingestion import IngestionService
 from src.services.search import SearchService
 from src.services.consolidation import ConsolidationService
-from src.services.session_manager import SessionManager
+from src.services.session_manager import SessionManager, ProjectPrefetchSettings
 from src.services.session_log_collector import SessionLogCollector
 from src.services.session_summary import SessionSummaryWorker
 from src.services.obsidian_watcher import ObsidianWatcher
@@ -55,6 +56,7 @@ from src.services.project_manager import ProjectManager  # Phase 15
 from src.services.bookmark_manager import BookmarkManager  # Phase 15
 from src.services.query_attributes import QueryAttributeExtractor
 from src.services.rerankers import CrossEncoderReranker
+from src.services.project_memory_pool import ProjectMemoryPool  # Issue #2025-11-11-03
 
 # Import MCP handler
 from src.mcp.protocol_handler import MCPProtocolHandler
@@ -209,7 +211,9 @@ def init_services(
         classifier=classifier,
         chunker=chunker,
         indexer=indexer,
-        model_router=model_router
+        model_router=model_router,
+        supported_languages=config.languages.supported_local,
+        language_fallback_strategy=config.languages.fallback_strategy
     )
 
     logger.info("Initialized IngestionService")
@@ -217,7 +221,11 @@ def init_services(
     # Initialize Phase 15: Project Management
     project_manager = None
     bookmark_manager = None
-    query_attribute_extractor = QueryAttributeExtractor()
+    query_attribute_extractor = QueryAttributeExtractor(
+        model_router=model_router,
+        min_llm_confidence=config.search.query_attribute_min_confidence,
+        llm_enabled=config.search.query_attribute_llm_enabled
+    )
     cross_encoder_reranker = None
 
     try:
@@ -250,12 +258,25 @@ def init_services(
         project_manager = None
         bookmark_manager = None
 
+    # Initialize ProjectMemoryPool (Issue #2025-11-11-03)
+    # Must be initialized before SearchService
+    project_memory_pool = ProjectMemoryPool(
+        vector_db=vector_db,
+        model_router=model_router,
+        max_memories_per_project=100,  # Can be made configurable later
+        pool_ttl_seconds=config.search.cross_encoder_cache_ttl_seconds  # Match cache TTL
+    )
+    logger.info("Initialized ProjectMemoryPool")
+
     # Initialize Search Service
     if config.search.cross_encoder_enabled:
         cross_encoder_reranker = CrossEncoderReranker(
             model_router=model_router,
             max_candidates=config.search.cross_encoder_top_k,
-            enabled=True
+            enabled=True,
+            cache_max_entries=config.search.cross_encoder_cache_size,
+            cache_ttl_seconds=config.search.cross_encoder_cache_ttl_seconds,
+            max_parallel_reranks=config.search.cross_encoder_max_parallel
         )
 
     search_service = SearchService(
@@ -263,11 +284,17 @@ def init_services(
         bm25_index=bm25_index,
         model_router=model_router,
         candidate_count=config.search.candidate_count,
+        vector_candidate_count=config.search.vector_candidate_count,
+        bm25_candidate_count=config.search.bm25_candidate_count,
         result_count=config.search.result_count,
         recency_half_life_hours=float(config.working_memory.retention_hours),
         project_manager=project_manager,
         query_attribute_extractor=query_attribute_extractor,
-        cross_encoder_reranker=cross_encoder_reranker
+        query_attribute_min_confidence=config.search.query_attribute_min_confidence,
+        query_attribute_llm_enabled=config.search.query_attribute_llm_enabled,
+        cross_encoder_reranker=cross_encoder_reranker,
+        rerank_weights=asdict(config.reranking_weights),
+        project_memory_pool=project_memory_pool
     )
 
     logger.info("Initialized SearchService")
@@ -286,15 +313,27 @@ def init_services(
 
     logger.info("Initialized ConsolidationService")
 
-    # Initialize Session Manager (optional)
-    session_manager = None
+    # Initialize Session Manager (available even without Obsidian vault)
+    session_manager = SessionManager(
+        ingestion_service=ingestion_service,
+        model_router=model_router,
+        obsidian_vault_path=config.obsidian_vault_path,
+        query_attribute_extractor=query_attribute_extractor,
+        project_manager=project_manager,
+        search_service=search_service,
+        project_prefetch_settings=ProjectPrefetchSettings(
+            enabled=config.search.project_prefetch_enabled,
+            min_confidence=config.search.project_prefetch_min_confidence,
+            top_k=config.search.project_prefetch_top_k,
+            max_queries=config.search.project_prefetch_max_queries,
+            queries=list(config.search.project_prefetch_queries or []),
+        ),
+        project_memory_pool=project_memory_pool,
+    )
     if config.obsidian_vault_path:
-        session_manager = SessionManager(
-            ingestion_service=ingestion_service,
-            model_router=model_router,
-            obsidian_vault_path=config.obsidian_vault_path
-        )
         logger.info(f"Initialized SessionManager with Obsidian vault: {config.obsidian_vault_path}")
+    else:
+        logger.info("Initialized SessionManager (no Obsidian vault configured)")
 
     # Initialize Obsidian Watcher (optional) - Requirement 1.5
     obsidian_watcher = None

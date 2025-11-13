@@ -14,8 +14,10 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch, mock_open
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
-from src.services.session_manager import SessionManager
+from src.services.session_manager import SessionManager, ProjectPrefetchSettings
+from src.services.query_attributes import QueryAttributes
 
 
 class TestSessionManager:
@@ -53,6 +55,18 @@ class TestSessionManager:
             obsidian_vault_path=str(vault_path)
         )
 
+    @pytest.fixture
+    def manager_with_project_manager(self, mock_dependencies):
+        """Create SessionManager with a mock ProjectManager"""
+        project_manager = Mock()
+        manager = SessionManager(
+            ingestion_service=mock_dependencies['ingestion_service'],
+            model_router=mock_dependencies['model_router'],
+            obsidian_vault_path=None,
+            project_manager=project_manager
+        )
+        return manager, project_manager
+
     def test_init(self, manager, mock_dependencies):
         """Test manager initialization"""
         assert manager.ingestion_service == mock_dependencies['ingestion_service']
@@ -69,6 +83,8 @@ class TestSessionManager:
         assert session_id in manager.sessions
         assert 'started_at' in manager.sessions[session_id]
         assert 'commands' in manager.sessions[session_id]
+        assert manager.sessions[session_id]['project_hint'] is None
+        assert manager.sessions[session_id]['project_hint_confidence'] == 0.0
 
     def test_start_session_with_custom_id(self, manager):
         """Test starting session with custom ID"""
@@ -96,6 +112,81 @@ class TestSessionManager:
         assert command['command'] == "python test.py"
         assert command['output'] == "All tests passed"
         assert command['exit_code'] == 0
+
+    def test_add_command_updates_project_from_metadata(self, manager):
+        session_id = manager.start_session()
+        manager.add_command(
+            session_id,
+            "deploy",
+            "ok",
+            metadata={'project': 'AppBrain'}
+        )
+        hint, confidence = manager.get_project_hint(session_id)
+        assert hint == "AppBrain"
+        assert confidence >= 0.9
+
+    def test_add_command_updates_project_from_text(self, manager):
+        session_id = manager.start_session()
+        fake_attrs = QueryAttributes(project_name="BugFixer")
+        fake_attrs.confidence = {'project_name': 0.5}
+        manager.query_attribute_extractor = Mock()
+        manager.query_attribute_extractor.extract.return_value = fake_attrs
+
+        manager.add_command(session_id, "git status", "output")
+
+        hint, confidence = manager.get_project_hint(session_id)
+        assert hint == "BugFixer"
+        assert confidence == 0.5
+
+    def test_project_prefetch_runs_once_until_cleared(self, mock_dependencies):
+        search_service = Mock()
+        project_manager = Mock()
+        project_manager.get_project.return_value = None
+        project_manager.get_project_by_name.return_value = SimpleNamespace(
+            name="AppBrain",
+            id="proj-appbrain"
+        )
+
+        manager = SessionManager(
+            ingestion_service=mock_dependencies['ingestion_service'],
+            model_router=mock_dependencies['model_router'],
+            project_manager=project_manager,
+            search_service=search_service,
+            project_prefetch_settings=ProjectPrefetchSettings(
+                enabled=True,
+                min_confidence=0.8,
+                top_k=3,
+                max_queries=2,
+                queries=["launch checklist"]
+            )
+        )
+
+        session_id = manager.start_session()
+        manager.update_project_hint(session_id, "AppBrain", 0.9, "metadata")
+        search_service.prefetch_project.assert_called_once()
+
+        # Updating with same project should not trigger until cleared.
+        manager.update_project_hint(session_id, "AppBrain", 0.95, "metadata")
+        assert search_service.prefetch_project.call_count == 1
+
+        # Clearing resets guard so new prefetch can run.
+        manager.clear_project_hint(session_id)
+        manager.update_project_hint(session_id, "AppBrain", 0.9, "metadata")
+        assert search_service.prefetch_project.call_count == 2
+
+    def test_update_project_hint_prefers_higher_confidence(self, manager):
+        session_id = manager.start_session()
+        manager.update_project_hint(session_id, "BugFixer", 0.4, "test")
+        manager.update_project_hint(session_id, "AppBrain", 0.9, "metadata")
+
+        hint, confidence = manager.get_project_hint(session_id)
+        assert hint == "AppBrain"
+        assert confidence == 0.9
+
+        # Lower confidence should not overwrite
+        manager.update_project_hint(session_id, "BugFixer", 0.5, "later")
+        hint, confidence = manager.get_project_hint(session_id)
+        assert hint == "AppBrain"
 
     def test_add_command_to_nonexistent_session(self, manager):
         """Test adding command to nonexistent session"""
@@ -274,6 +365,80 @@ class TestSessionManager:
 
         assert stats['active_sessions'] == 2
         assert stats['total_commands'] == 3
+
+    def test_get_project_context_none_without_hint(self, manager):
+        session_id = manager.start_session()
+        assert manager.get_project_context(session_id) is None
+
+    def test_get_project_context_with_resolved_project(self, manager_with_project_manager):
+        manager, project_manager = manager_with_project_manager
+        session_id = manager.start_session()
+        fake_project = SimpleNamespace(id="proj-abc", name="AppBrain")
+        project_manager.get_project.return_value = fake_project
+        manager.update_project_hint(session_id, fake_project.id, 0.8, "metadata")
+
+        context = manager.get_project_context(session_id)
+
+        assert context['project_id'] == fake_project.id
+        assert context['project_name'] == fake_project.name
+        assert context['confidence'] == 0.8
+
+    def test_set_project_hint_overrides_existing(self, manager):
+        session_id = manager.start_session()
+        manager.update_project_hint(session_id, "AppBrain", 0.9, "metadata")
+
+        manager.set_project_hint(session_id, "BugFixer", confidence=0.5)
+
+        hint, confidence = manager.get_project_hint(session_id)
+        assert hint == "BugFixer"
+        assert confidence == 0.5
+
+    def test_clear_project_hint(self, manager):
+        session_id = manager.start_session()
+        manager.update_project_hint(session_id, "AppBrain", 0.9, "metadata")
+
+        cleared = manager.clear_project_hint(session_id)
+
+        assert cleared is True
+        hint, confidence = manager.get_project_hint(session_id)
+        assert hint is None
+        assert confidence == 0.0
+
+    def test_end_session_injects_project_metadata(self, mock_dependencies, manager_with_project_manager):
+        """Session end should propagate project metadata to ingestion payload."""
+        manager, project_manager = manager_with_project_manager
+        session_id = manager.start_session()
+        manager.add_command(
+            session_id,
+            "deploy --project appbrain",
+            "ok",
+            metadata={'project': 'AppBrain'}
+        )
+
+        fake_project = MagicMock()
+        fake_project.id = "proj-123"
+        fake_project.name = "AppBrain"
+        project_manager.get_project.return_value = None
+        project_manager.get_project_by_name.return_value = fake_project
+
+        mock_dependencies['model_router'].route.return_value = "Session summary"
+        mock_dependencies['ingestion_service'].ingest_conversation.return_value = "mem-xyz"
+
+        memory_id = manager.end_session(session_id)
+
+        assert memory_id == "mem-xyz"
+        project_manager.get_project.assert_called_once_with("AppBrain")
+        project_manager.get_project_by_name.assert_called_once_with("AppBrain")
+
+        args, _ = mock_dependencies['ingestion_service'].ingest_conversation.call_args
+        payload = args[0]
+        assert payload['project_id'] == fake_project.id
+        metadata = payload['metadata']
+        assert metadata['project'] == "AppBrain"
+        assert metadata['project_id'] == fake_project.id
+        assert metadata['project_hint'] == "AppBrain"
+        assert metadata['project_hint_confidence'] >= 0.9
+        assert metadata['project_hint_source'] in ("metadata", "metadata_id")
 
     def test_multiple_commands_in_session(self, manager):
         """Test adding multiple commands to a session"""

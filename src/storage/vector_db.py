@@ -222,9 +222,16 @@ class ChromaVectorDB:
 
         try:
             where_arg = None
-            if filter_metadata and len(filter_metadata) == 1:
-                # Simple equality filter is supported directly
-                where_arg = filter_metadata
+            if filter_metadata:
+                if len(filter_metadata) == 1:
+                    # Simple equality filter is supported directly
+                    where_arg = filter_metadata
+                elif len(filter_metadata) > 1:
+                    # Multiple filters: use $and operator
+                    # Format: {"$and": [{"key1": "value1"}, {"key2": "value2"}]}
+                    where_arg = {
+                        "$and": [{k: v} for k, v in filter_metadata.items()]
+                    }
 
             results = self.collection.get(
                 where=where_arg,

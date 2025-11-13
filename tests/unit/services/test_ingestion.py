@@ -159,7 +159,14 @@ class TestIngestionService:
 
     def test_generate_summary(self, service, sample_conversation, mock_dependencies):
         """Test summary generation"""
-        expected_summary = "Short summary of the conversation"
+        expected_summary = (
+            "Topic: debugging\n"
+            "DocType: checklist\n"
+            "Project: Sample\n"
+            "KeyActions:\n"
+            "- Step one\n"
+            "- Step two"
+        )
         mock_dependencies['model_router'].route.return_value = expected_summary
 
         result = service._generate_summary(sample_conversation)

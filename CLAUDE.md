@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Important: Project Specification Directory
 
 **ALWAYS reference the `.kiro` directory for project specifications:**
-- Location: `c:\Users\81906\Documents\app\brainsystem\.kiro`
+- Location: `.kiro` (in project root directory)
 - This directory contains the canonical project requirements, design documents, and implementation roadmap
 - Before making significant changes, consult:
   - `.kiro/specs/dev-knowledge-orchestrator/requirements.md` - Full requirements specification
@@ -110,7 +110,11 @@ src/
 │   ├── session_log_collector.py    # Session logging
 │   ├── session_summary.py     # Session summarization worker
 │   ├── obsidian_watcher.py    # File system monitoring
-│   └── obsidian_parser.py     # Conversation extraction
+│   ├── obsidian_parser.py     # Conversation extraction
+│   ├── query_attributes.py    # Query attribute extraction (QAM)
+│   ├── rerankers.py           # Cross-encoder reranking
+│   ├── project_manager.py     # Project CRUD operations
+│   └── bookmark_manager.py    # Search bookmark management
 ├── models/
 │   ├── router.py              # Task → Model routing
 │   ├── local_llm.py           # Ollama client
@@ -121,10 +125,23 @@ src/
 │   └── indexer.py             # Vector + BM25 indexing
 ├── storage/
 │   ├── vector_db.py           # Chroma DB wrapper
-│   └── bm25_index.py          # BM25 search adapter
+│   ├── bm25_index.py          # BM25 search adapter
+│   ├── project_storage.py     # Project persistence
+│   └── bookmark_storage.py    # Bookmark persistence
 └── utils/
     ├── logger.py              # Logging setup
-    └── errors.py              # Custom exceptions
+    ├── errors.py              # Custom exceptions
+    └── error_handler.py       # Error handling framework
+
+scripts/
+├── setup.py                   # Setup wizard
+├── performance_profiler.py    # Performance benchmarking
+├── doctor.py                  # System diagnostics
+├── mcp_replay.py              # Scenario replay and metrics
+├── run_regression_ci.py       # Regression testing wrapper
+├── bench_qam.py               # QAM latency benchmarking
+├── train_rerank_weights.py    # Reranking weight training
+└── load_scenarios.py          # Scenario data loader
 ```
 
 ## Core Components
@@ -244,6 +261,100 @@ obsidian_vault_path: C:\Users\username\Documents\ObsidianVault
 
 When `obsidian_vault_path` is set, ObsidianWatcher starts automatically on system startup.
 
+### 8. Query Attribute Modeling (QAM)
+
+**Purpose**: Extract structured metadata (topic, type, project) from queries to improve search precision and enable intelligent filtering.
+
+**Components:**
+- `QueryAttributeExtractor` in `src/services/query_attributes.py`: Heuristic-first extraction with LLM fallback
+- Confidence thresholds control when LLM enrichment triggers
+- Supports project auto-resolution for session context
+
+**Configuration:**
+```yaml
+search:
+  query_attribute_min_confidence: 0.4
+  query_attribute_llm_enabled: true
+```
+
+**Flow:**
+1. Heuristic extraction (fast keyword/pattern matching)
+2. If confidence <0.4 or heuristics fail → LLM fallback
+3. Extracted attributes applied to SearchService filters
+4. Confidence scores logged for threshold tuning
+
+### 9. Cross-Encoder Reranking
+
+**Purpose**: Use LLM-based relevance scoring to rerank top candidates, improving precision beyond vector+BM25 hybrid search.
+
+**Components:**
+- `CrossEncoderReranker` in `src/services/rerankers.py`: LRU-cached cross-encoder with metrics tracking
+- Parallel execution with fallback to heuristic scoring under load
+- Cache statistics available via `get_reranker_metrics` MCP tool
+
+**Configuration:**
+```yaml
+search:
+  cross_encoder_enabled: true
+  cross_encoder_top_k: 3
+  cross_encoder_cache_size: 128
+  cross_encoder_cache_ttl_seconds: 900
+  cross_encoder_max_parallel: 3
+  cross_encoder_fallback_max_wait_ms: 500
+```
+
+**Performance:**
+- Cache hit rates typically >60% in replay scenarios
+- Latency: ~2.2s per uncached pair (LLM-dependent)
+- Falls back to heuristics if queue wait exceeds threshold
+
+**Metrics Tracking:**
+- `cache_hits` / `cache_misses`: Cache effectiveness
+- `avg_llm_latency_ms`: Average LLM call time
+- `pairs_scored`: Total pairs evaluated
+- `prefetch_hits`: Project-based prefetch effectiveness
+
+### 10. Project Management (Phase 15)
+
+**Purpose**: Organize memories by project/codebase for scoped searches and better context management.
+
+**Components:**
+- `ProjectManager` in `src/services/project_manager.py`: CRUD operations for projects
+- `ProjectStorage` in `src/storage/project_storage.py`: JSON-based persistence
+- Auto-project resolution in SessionManager based on conversation context
+
+**Features:**
+- **Auto-detection**: Extracts project hints from conversation metadata and query attributes
+- **Prefetching**: Warms cross-encoder cache when project is auto-resolved (confidence >0.75)
+- **Session binding**: Associates sessions with projects for contextual search
+- **Manual override**: Users can set project via MCP tools or CLI
+
+**Configuration:**
+```yaml
+search:
+  project_prefetch_enabled: true
+  project_prefetch_min_confidence: 0.75
+  project_prefetch_queries:
+    - project status
+    - open issues
+    - risk summary
+```
+
+### 11. Search Bookmarks (Phase 15)
+
+**Purpose**: Save frequently used search queries for quick access and improved workflow efficiency.
+
+**Components:**
+- `BookmarkManager` in `src/services/bookmark_manager.py`: CRUD for bookmarks
+- `BookmarkStorage` in `src/storage/bookmark_storage.py`: JSON-based persistence
+- Usage statistics tracking for recommendation
+
+**Features:**
+- Named bookmarks with descriptions
+- Tag-based organization
+- Usage frequency tracking
+- Quick execution via MCP tools
+
 ## Development Commands
 
 ### Running the System
@@ -351,6 +462,24 @@ pytest --cov=src --cov-report=html
 
 # Run with verbose output
 pytest -v
+
+# Regression testing
+python -m scripts.run_regression_ci              # Run regression check against baseline
+python -m scripts.run_regression_ci --rpc-timeout 60  # For slow cloud LLMs
+
+# Replay scenarios
+python -m scripts.mcp_replay --requests tests/scenarios/query_runs.json
+python -m scripts.mcp_replay --export-features reports/features.csv  # Export for training
+
+# Benchmark QAM
+python -m scripts.bench_qam                       # Default queries
+python -m scripts.bench_qam --query-file tests/scenarios/query_runs.json
+
+# Train reranking weights
+python -m scripts.train_rerank_weights --features reports/features.csv --config config.yaml
+
+# Load scenario data
+python -m scripts.load_scenarios --file tests/scenarios/scenario_data.json
 ```
 
 ### Performance Profiling
@@ -393,6 +522,30 @@ search_candidate_count: 50
 search_result_count: 10
 search_timeout_seconds: 2
 
+# Query Attribute Modeling (QAM)
+query_attribute_min_confidence: 0.4
+query_attribute_llm_enabled: true
+
+# Cross-Encoder Reranking
+cross_encoder_enabled: true
+cross_encoder_top_k: 3
+cross_encoder_cache_size: 128
+cross_encoder_cache_ttl_seconds: 900
+cross_encoder_max_parallel: 3
+cross_encoder_fallback_max_wait_ms: 500
+
+# Project Prefetching
+project_prefetch_enabled: true
+project_prefetch_min_confidence: 0.75
+project_prefetch_queries:
+  - project status
+  - open issues
+  - risk summary
+
+# Vector and BM25 candidate counts
+vector_candidate_count: 100
+bm25_candidate_count: 30
+
 # Clustering
 similarity_threshold: 0.9
 min_cluster_size: 2
@@ -414,6 +567,16 @@ logging:
   session_log_dir: ~/.context-orchestrator/logs
   max_log_size_mb: 10
   summary_model: qwen2.5:7b
+  level: INFO
+
+# Reranking weights (can be trained via scripts/train_rerank_weights.py)
+reranking_weights:
+  memory_strength: 0.3
+  recency: 0.2
+  refs_reliability: 0.1
+  bm25_score: 0.2
+  vector_similarity: 0.2
+  metadata_bonus: 1.0
 ```
 
 ## Key Implementation Patterns
@@ -490,6 +653,41 @@ The system uses a PowerShell wrapper function that:
 3. Sends to Context Orchestrator in background job (non-blocking)
 4. Preserves exit codes and error messages
 5. Checks `$env:CONTEXT_ORCHESTRATOR_INTERNAL` to prevent recursive recording
+
+### 5. Query Attribute Extraction
+- **Heuristic-first**: Fast keyword matching for common patterns (topic, type, project)
+- **LLM fallback**: When confidence <0.4 or heuristics fail
+- **Confidence tracking**: Logs confidence scores for tuning thresholds
+- **Language-aware**: Uses detected language for routing decisions
+- **Pattern examples**: "timeline view" → topic:timeline, "auth error" → type:incident
+
+### 6. Cross-Encoder Caching Strategy
+- **LRU cache**: (query, memory_id) pairs cached for TTL seconds
+- **Metrics tracking**: Hit rate, latency, queue depth via `get_reranker_metrics`
+- **Graceful degradation**: Falls back to heuristics under load (queue wait >500ms)
+- **Prefetch optimization**: Warms cache when project auto-resolves (confidence >0.75)
+- **Cache key**: Hash of normalized query + memory_id for collision avoidance
+
+### 7. Reranking Weight Training
+```python
+# 1. Export features from replay
+python -m scripts.mcp_replay --export-features reports/features.csv
+
+# 2. Train weights using logistic regression
+python -m scripts.train_rerank_weights --features reports/features.csv --config config.yaml
+
+# 3. Weights are written to config.reranking_weights
+# 4. SearchService reads weights dynamically from config
+```
+
+**Feature columns exported:**
+- `memory_strength`: Memory consolidation strength (0.0-1.0)
+- `recency`: Time-based recency score (0.0-1.0)
+- `refs_reliability`: Number of references (normalized)
+- `bm25_score`: BM25 keyword match score
+- `vector_similarity`: Cosine similarity (0.0-1.0)
+- `metadata_bonus`: Project/type/source match bonus
+- `is_relevant`: Ground truth label (1=relevant, 0=not relevant)
 
 ## Important Design Decisions
 
@@ -575,6 +773,49 @@ Run with: `python scripts/performance_profiler.py [--runs N] [--output PATH]`
 - **Memory usage**: ~1GB resident, ~3GB peak
 - **All performance targets**: Validated via profiler
 
+### Scenario-Based Regression Testing
+
+**Purpose**: Validate search quality across representative queries with automated baseline comparison.
+
+**Key Scripts:**
+- `scripts/mcp_replay.py`: Replays query scenarios against MCP server, measures Precision/NDCG
+- `scripts/run_regression_ci.py`: Wrapper that compares against baseline and fails on regressions
+- `scripts/bench_qam.py`: Benchmarks Query Attribute Extractor latency and accuracy
+- `scripts/train_rerank_weights.py`: Learns optimal reranking weights from feature exports
+
+**Workflow:**
+```bash
+# Export features from replay
+python -m scripts.mcp_replay --requests tests/scenarios/query_runs.json --export-features reports/features.csv
+
+# Train weights
+python -m scripts.train_rerank_weights --features reports/features.csv --config config.yaml
+
+# Run regression check
+python -m scripts.run_regression_ci
+
+# Check for zero-hit queries
+cat reports/mcp_runs/zero_hits.json
+```
+
+**Baselines:**
+- Stored in `reports/baselines/mcp_run-*.jsonl`
+- Regression thresholds: Precision/NDCG drop >0.02 fails CI
+- Zero-hit queries indicate missing dictionary/metadata entries
+
+**Metrics Tracked:**
+- **Macro Precision**: Precision averaged by query topic (target ≥0.65)
+- **Macro NDCG**: Normalized discounted cumulative gain by topic (target ≥0.85)
+- **Cross-encoder cache hit rate**: Cache effectiveness (target ≥60%)
+- **Language routing fallback frequency**: Unsupported language handling
+- **Reranker queue metrics**: Wait time, parallel execution efficiency
+- **QAM confidence**: Query attribute extraction accuracy
+
+**Scenario Files:**
+- `tests/scenarios/scenario_data.json`: Conversation data for ingestion
+- `tests/scenarios/query_runs.json`: Query scenarios with expected results
+- Multi-language support: English, Japanese, Spanish queries included
+
 ## Common Development Tasks
 
 ### Adding a new memory schema
@@ -600,6 +841,27 @@ Run with: `python scripts/performance_profiler.py [--runs N] [--output PATH]`
 2. Update configuration parameters in `config.yaml`
 3. Test with `python -m src.cli consolidate`
 4. Verify via `python -m src.cli status --verbose`
+
+### Adding a new query attribute pattern
+1. Update `QueryAttributeExtractor._extract_heuristics()` in `src/services/query_attributes.py`
+2. Add pattern matching rules and confidence scores
+3. Add test cases in `tests/unit/services/test_query_attributes.py`
+4. Benchmark with `python -m scripts.bench_qam --queries "your test query"`
+5. Validate in full replay: `python -m scripts.run_regression_ci`
+
+### Tuning cross-encoder reranker
+1. Adjust cache parameters in `config.yaml` (cache_size, ttl, max_parallel)
+2. Export features: `python -m scripts.mcp_replay --export-features reports/features.csv`
+3. Train new weights: `python -m scripts.train_rerank_weights --features reports/features.csv`
+4. Update `config.reranking_weights` with learned values
+5. Run regression test to validate improvements
+6. Monitor cache metrics via `get_reranker_metrics` MCP tool
+
+### Creating a new project
+1. Use MCP tool `create_project` or CLI: `python -m src.cli project create --name "MyProject"`
+2. Associate memories: Add `project_id` to conversation metadata during ingestion
+3. Query within project: Use `search_in_project` MCP tool
+4. Enable prefetching: Set `project_prefetch_enabled: true` in config
 
 ## Troubleshooting
 
@@ -639,13 +901,32 @@ python scripts/setup.py --repair
 3. Adjust forgetting thresholds in `config.yaml`
 4. Export and prune old memories: `python -m src.cli export --before 2024-01-01`
 
+### Regression tests failing
+1. Check baseline file exists: `ls reports/baselines/`
+2. Review metrics: `cat reports/mcp_runs/zero_hits.json`
+3. Inspect latest run: `cat reports/mcp_runs/mcp_run-*.jsonl | tail -50`
+4. Increase RPC timeout for slow LLMs: `python -m scripts.run_regression_ci --rpc-timeout 60`
+5. Update baseline if intentional: `cp reports/mcp_runs/mcp_run-*.jsonl reports/baselines/`
+
+### Cross-encoder reranker slow
+1. Check cache hit rate: Use `get_reranker_metrics` MCP tool
+2. Increase cache size: Set `cross_encoder_cache_size: 256` in config
+3. Reduce top_k: Set `cross_encoder_top_k: 2` (fewer LLM calls)
+4. Enable prefetching: Set `project_prefetch_enabled: true`
+5. Check parallel execution: Set `cross_encoder_max_parallel: 5` for more concurrency
+6. Monitor queue: Check logs for "fallback to heuristics" messages
+
 ## Performance Targets
 
-- **Search latency**: 80-200ms (typical: ~80ms)
+- **Search latency**: 80-200ms (typical: ~80ms, excluding cross-encoder reranking)
+- **Cross-encoder latency**: ~2.2s per uncached pair (LLM-dependent)
+- **Cross-encoder cache hit rate**: ≥60% (in replay scenarios)
 - **Ingestion time**: <5 seconds per conversation
+- **QAM extraction**: <100ms (heuristics), <2s (LLM fallback)
 - **Memory footprint**: 1GB resident, 3GB peak (during inference)
 - **Disk usage**: ~10MB/year (73MB/10 years)
 - **Consolidation**: Complete in <5 minutes for 10K memories
+- **Regression metrics**: Macro Precision ≥0.65, Macro NDCG ≥0.85
 
 ## Security & Privacy
 
@@ -670,9 +951,13 @@ python scripts/setup.py --repair
 ## References
 
 ### Specification Documents
-- **Requirements**: `.kiro/specs/dev-knowledge-orchestrator/requirements.md` - Full requirements (MVP: Req 1-13, Phase 2: Req 21-26)
+- **Requirements**: `.kiro/specs/dev-knowledge-orchestrator/requirements.md` - Full requirements
+  - MVP: Requirements 1-13 (Core system)
+  - Phase 2: Requirements 21-26 (Obsidian, CLI, Session logging)
+  - Phase 15: Query attributes, Cross-encoder reranking, Project management, Search bookmarks
 - **Design**: `designtt.txt` - Detailed architecture and interfaces
 - **Tasks**: `.kiro/specs/dev-knowledge-orchestrator/tasks.md` - Implementation roadmap
+- **Issues**: `.kiro/specs/dev-knowledge-orchestrator/issues.md` - Issue log and resolution history
 
 ### External Resources
 - **MCP Protocol**: Model Context Protocol specification

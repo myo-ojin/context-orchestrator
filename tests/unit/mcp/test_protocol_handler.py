@@ -13,6 +13,7 @@ Tests MCP protocol handling including:
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from io import StringIO
+from types import SimpleNamespace
 
 from src.mcp.protocol_handler import MCPProtocolHandler
 
@@ -27,12 +28,14 @@ class TestMCPProtocolHandler:
         search_service = Mock()
         consolidation_service = Mock()
         session_manager = Mock()
+        project_manager = Mock()
 
         return {
             'ingestion_service': ingestion_service,
             'search_service': search_service,
             'consolidation_service': consolidation_service,
-            'session_manager': session_manager
+            'session_manager': session_manager,
+            'project_manager': project_manager
         }
 
     @pytest.fixture
@@ -42,7 +45,8 @@ class TestMCPProtocolHandler:
             ingestion_service=mock_dependencies['ingestion_service'],
             search_service=mock_dependencies['search_service'],
             consolidation_service=mock_dependencies['consolidation_service'],
-            session_manager=mock_dependencies['session_manager']
+            session_manager=mock_dependencies['session_manager'],
+            project_manager=mock_dependencies['project_manager']
         )
 
     def test_init(self, handler, mock_dependencies):
@@ -186,7 +190,7 @@ class TestMCPProtocolHandler:
         mock_dependencies['search_service'].search.assert_called_once_with(
             query='bug fix',
             top_k=10,
-            filter_metadata=None
+            filters=None
         )
 
     def test_tool_search_memory_missing_query(self, handler):
@@ -208,8 +212,103 @@ class TestMCPProtocolHandler:
         mock_dependencies['search_service'].search.assert_called_once_with(
             query='test',
             top_k=10,
-            filter_metadata={'schema_type': 'Incident'}
+            filters={'schema_type': 'Incident'}
         )
+
+    def test_tool_search_memory_applies_session_project_hint(self, handler, mock_dependencies):
+        """Session project hint should inject project_id filter."""
+        params = {
+            'query': 'timeline',
+            'session_id': 'session-1'
+        }
+
+        mock_dependencies['session_manager'].get_project_context.return_value = {
+            'project_id': 'proj-xyz',
+            'confidence': 0.9
+        }
+        mock_dependencies['search_service'].search.return_value = []
+
+        handler._tool_search_memory(params)
+
+        mock_dependencies['search_service'].search.assert_called_once_with(
+            query='timeline',
+            top_k=10,
+            filters={'project_id': 'proj-xyz'}
+        )
+
+    def test_tool_search_memory_does_not_override_user_project_filter(self, handler, mock_dependencies):
+        params = {
+            'query': 'timeline',
+            'session_id': 'session-1',
+            'filter_metadata': {'project_id': 'user-proj'}
+        }
+        mock_dependencies['session_manager'].get_project_context.return_value = {
+            'project_id': 'proj-xyz',
+            'confidence': 0.95
+        }
+        mock_dependencies['search_service'].search.return_value = []
+
+        handler._tool_search_memory(params)
+
+        mock_dependencies['search_service'].search.assert_called_once_with(
+            query='timeline',
+            top_k=10,
+            filters={'project_id': 'user-proj'}
+        )
+
+    def test_tool_session_get_hint(self, handler, mock_dependencies):
+        params = {'session_id': 'session-123'}
+        mock_dependencies['session_manager'].get_project_context.return_value = {
+            'project_name': 'AppBrain',
+            'project_id': 'proj-1',
+            'confidence': 0.9,
+            'source': 'metadata'
+        }
+
+        result = handler._tool_session_get_hint(params)
+
+        assert result['project_hint'] == 'AppBrain'
+        assert result['project_id'] == 'proj-1'
+        mock_dependencies['session_manager'].get_project_context.assert_called_once_with('session-123')
+
+    def test_tool_session_set_project_uses_project_manager(self, handler, mock_dependencies):
+        params = {
+            'session_id': 'session-1',
+            'project_id': 'proj-777',
+            'confidence': 0.8
+        }
+        mock_dependencies['project_manager'].get_project.return_value = SimpleNamespace(
+            id='proj-777',
+            name='AppBrain'
+        )
+        mock_dependencies['session_manager'].set_project_hint.return_value = True
+        mock_dependencies['session_manager'].get_project_context.return_value = {
+            'project_name': 'AppBrain',
+            'project_id': 'proj-777',
+            'confidence': 0.8,
+            'source': 'manual_rpc'
+        }
+
+        result = handler._tool_session_set_project(params)
+
+        assert result['project_hint'] == 'AppBrain'
+        mock_dependencies['project_manager'].get_project.assert_called_once_with('proj-777')
+        mock_dependencies['session_manager'].set_project_hint.assert_called_once_with(
+            'session-1',
+            'AppBrain',
+            confidence=0.8,
+            source='manual_rpc'
+        )
+
+    def test_tool_session_clear_project(self, handler, mock_dependencies):
+        params = {'session_id': 'session-1'}
+        mock_dependencies['session_manager'].clear_project_hint.return_value = True
+
+        result = handler._tool_session_clear_project(params)
+
+        assert result['cleared'] is True
+        assert result['project_hint'] is None
+        mock_dependencies['session_manager'].clear_project_hint.assert_called_once_with('session-1')
 
     def test_tool_get_memory(self, handler, mock_dependencies):
         """Test get_memory tool"""

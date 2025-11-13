@@ -15,7 +15,8 @@ sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 def test_data_models():
     """Test Memory, Chunk, and Config data models"""
-    from models import Memory, Chunk, Config, SchemaType, MemoryType
+    from models import Memory, Chunk, SchemaType, MemoryType
+    from config import Config
     from datetime import datetime
 
     print("Testing data models...")
@@ -53,8 +54,8 @@ def test_data_models():
 
     # Test Config
     config = Config()
-    assert config.ollama_url == "http://localhost:11434"
-    assert config.embedding_model == "nomic-embed-text"
+    assert config.ollama.url == "http://localhost:11434"
+    assert config.ollama.embedding_model == "nomic-embed-text"
 
     print("[OK] Data models working correctly")
 
@@ -65,7 +66,7 @@ def test_bm25_index():
 
     print("\nTesting BM25 index...")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         index_path = Path(tmpdir) / "test_index.pkl"
 
         # Create index
@@ -107,7 +108,7 @@ def test_vector_db():
 
     print("\nTesting Chroma vector DB...")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test_chroma"
 
         # Create database
@@ -117,40 +118,46 @@ def test_vector_db():
             print("\n[skip] Skipping vector DB test (chromadb runtime unavailable)")
             return
 
-        # Add memory with dummy embedding
-        embedding = [0.1] * 384  # 384-dimensional vector (nomic-embed-text dimension)
-        metadata = {
-            "schema_type": "Incident",
-            "timestamp": "2025-01-01T00:00:00",
-            "tags": ["test"]
-        }
+        try:
+            # Add memory with dummy embedding
+            embedding = [0.1] * 384  # 384-dimensional vector (nomic-embed-text dimension)
+            metadata = {
+                "schema_type": "Incident",
+                "timestamp": "2025-01-01T00:00:00",
+                "tags": "test"
+            }
 
-        db.add(
-            id="mem-001",
-            embedding=embedding,
-            metadata=metadata,
-            document="Test memory content"
-        )
+            db.add(
+                id="mem-001",
+                embedding=embedding,
+                metadata=metadata,
+                document="Test memory content"
+            )
 
-        # Test count
-        assert db.count() == 1
+            # Test count
+            assert db.count() == 1
 
-        # Test get
-        memory = db.get("mem-001")
-        assert memory is not None
-        assert memory['id'] == "mem-001"
-        assert memory['content'] == "Test memory content"
+            # Test get
+            memory = db.get("mem-001")
+            assert memory is not None
+            assert memory['id'] == "mem-001"
+            assert memory['content'] == "Test memory content"
 
-        # Test search
-        results = db.search(embedding, top_k=1)
-        assert len(results) == 1
-        assert results[0]['id'] == "mem-001"
+            # Test search
+            results = db.search(embedding, top_k=1)
+            assert len(results) == 1
+            assert results[0]['id'] == "mem-001"
 
-        # Test delete
-        db.delete("mem-001")
-        assert db.count() == 0
+            # Test delete
+            db.delete("mem-001")
+            assert db.count() == 0
+        finally:
+            try:
+                db.client.reset()
+            except Exception:
+                pass
 
-        print("✓ Chroma vector DB working correctly")
+        print("✁EChroma vector DB working correctly")
 
 
 if __name__ == "__main__":

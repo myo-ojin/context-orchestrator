@@ -11,8 +11,8 @@ Requirements: Requirement 13 (Configuration Management)
 import os
 import yaml
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional, Dict, Any
+from dataclasses import dataclass, field, asdict
+from typing import Optional, Dict, Any, List
 import logging
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,26 @@ class SearchConfig:
     timeout_seconds: int = 2
     cross_encoder_enabled: bool = True
     cross_encoder_top_k: int = 3
+    cross_encoder_cache_size: int = 128
+    cross_encoder_cache_ttl_seconds: int = 900
+    cross_encoder_max_parallel: int = 3
+    cross_encoder_fallback_max_wait_ms: int = 500
+    cross_encoder_fallback_mode: str = "heuristic"
+    vector_candidate_count: int = 100
+    bm25_candidate_count: int = 30
+    query_attribute_min_confidence: float = 0.4
+    query_attribute_llm_enabled: bool = True
+    project_prefetch_enabled: bool = True
+    project_prefetch_min_confidence: float = 0.75
+    project_prefetch_queries: List[str] = field(
+        default_factory=lambda: [
+            "project status",
+            "open issues",
+            "risk summary",
+        ]
+    )
+    project_prefetch_top_k: int = 5
+    project_prefetch_max_queries: int = 3
 
 
 @dataclass
@@ -88,6 +108,24 @@ class RouterConfig:
 
 
 @dataclass
+class LanguageConfig:
+    """Language handling configuration"""
+    supported_local: List[str] = field(default_factory=lambda: ["en", "ja", "es"])
+    fallback_strategy: str = "cloud"  # 'cloud' or 'local'
+
+
+@dataclass
+class RerankingWeightsConfig:
+    """Weights applied during SearchService reranking."""
+    memory_strength: float = 0.3
+    recency: float = 0.2
+    refs_reliability: float = 0.1
+    bm25_score: float = 0.2
+    vector_similarity: float = 0.2
+    metadata_bonus: float = 1.0
+
+
+@dataclass
 class Config:
     """
     System configuration
@@ -115,7 +153,9 @@ class Config:
     working_memory: WorkingMemoryConfig = field(default_factory=WorkingMemoryConfig)
     consolidation: ConsolidationConfig = field(default_factory=ConsolidationConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    reranking_weights: RerankingWeightsConfig = field(default_factory=RerankingWeightsConfig)
     router: RouterConfig = field(default_factory=RouterConfig)
+    languages: LanguageConfig = field(default_factory=LanguageConfig)
 
     def __post_init__(self):
         """Expand paths after initialization"""
@@ -214,6 +254,11 @@ def _parse_config(data: Dict[str, Any]) -> Config:
     consolidation_data = data.get('consolidation', {})
     logging_data = data.get('logging', {})
     router_data = data.get('router', {})
+    language_data = data.get('languages', {})
+    reranking_data = data.get('reranking_weights', {})
+
+    default_language = LanguageConfig()
+    default_reranking = RerankingWeightsConfig()
 
     # Create config object
     config = Config(
@@ -236,6 +281,56 @@ def _parse_config(data: Dict[str, Any]) -> Config:
             timeout_seconds=search_data.get('timeout_seconds', SearchConfig.timeout_seconds),
             cross_encoder_enabled=search_data.get('cross_encoder_enabled', SearchConfig.cross_encoder_enabled),
             cross_encoder_top_k=search_data.get('cross_encoder_top_k', SearchConfig.cross_encoder_top_k),
+            cross_encoder_cache_size=search_data.get(
+                'cross_encoder_cache_size',
+                SearchConfig.cross_encoder_cache_size
+            ),
+            cross_encoder_cache_ttl_seconds=search_data.get(
+                'cross_encoder_cache_ttl_seconds',
+                SearchConfig.cross_encoder_cache_ttl_seconds
+            ),
+            cross_encoder_max_parallel=search_data.get(
+                'cross_encoder_max_parallel',
+                SearchConfig.cross_encoder_max_parallel
+            ),
+            cross_encoder_fallback_max_wait_ms=search_data.get(
+                'cross_encoder_fallback_max_wait_ms',
+                SearchConfig.cross_encoder_fallback_max_wait_ms
+            ),
+            cross_encoder_fallback_mode=search_data.get(
+                'cross_encoder_fallback_mode',
+                SearchConfig.cross_encoder_fallback_mode
+            ),
+            vector_candidate_count=search_data.get('vector_candidate_count', SearchConfig.vector_candidate_count),
+            bm25_candidate_count=search_data.get('bm25_candidate_count', SearchConfig.bm25_candidate_count),
+            query_attribute_min_confidence=search_data.get(
+                'query_attribute_min_confidence',
+                SearchConfig.query_attribute_min_confidence
+            ),
+            query_attribute_llm_enabled=search_data.get(
+                'query_attribute_llm_enabled',
+                SearchConfig.query_attribute_llm_enabled
+            ),
+            project_prefetch_enabled=search_data.get(
+                'project_prefetch_enabled',
+                SearchConfig.project_prefetch_enabled
+            ),
+            project_prefetch_min_confidence=search_data.get(
+                'project_prefetch_min_confidence',
+                SearchConfig.project_prefetch_min_confidence
+            ),
+            project_prefetch_queries=search_data.get(
+                'project_prefetch_queries',
+                ["project status", "open issues", "risk summary"]
+            ),
+            project_prefetch_top_k=search_data.get(
+                'project_prefetch_top_k',
+                SearchConfig.project_prefetch_top_k
+            ),
+            project_prefetch_max_queries=search_data.get(
+                'project_prefetch_max_queries',
+                SearchConfig.project_prefetch_max_queries
+            ),
         ),
 
         clustering=ClusteringConfig(
@@ -269,6 +364,20 @@ def _parse_config(data: Dict[str, Any]) -> Config:
         router=RouterConfig(
             short_summary_max_tokens=router_data.get('short_summary_max_tokens', RouterConfig.short_summary_max_tokens),
             long_summary_min_tokens=router_data.get('long_summary_min_tokens', RouterConfig.long_summary_min_tokens),
+        ),
+
+        languages=LanguageConfig(
+            supported_local=language_data.get('supported_local', default_language.supported_local),
+            fallback_strategy=language_data.get('fallback_strategy', default_language.fallback_strategy),
+        ),
+
+        reranking_weights=RerankingWeightsConfig(
+            memory_strength=reranking_data.get('memory_strength', default_reranking.memory_strength),
+            recency=reranking_data.get('recency', default_reranking.recency),
+            refs_reliability=reranking_data.get('refs_reliability', default_reranking.refs_reliability),
+            bm25_score=reranking_data.get('bm25_score', default_reranking.bm25_score),
+            vector_similarity=reranking_data.get('vector_similarity', default_reranking.vector_similarity),
+            metadata_bonus=reranking_data.get('metadata_bonus', default_reranking.metadata_bonus),
         )
     )
 
@@ -317,6 +426,18 @@ def save_config(config: Config, config_path: Optional[str] = None) -> None:
             'timeout_seconds': config.search.timeout_seconds,
             'cross_encoder_enabled': config.search.cross_encoder_enabled,
             'cross_encoder_top_k': config.search.cross_encoder_top_k,
+            'cross_encoder_cache_size': config.search.cross_encoder_cache_size,
+            'cross_encoder_cache_ttl_seconds': config.search.cross_encoder_cache_ttl_seconds,
+            'cross_encoder_max_parallel': config.search.cross_encoder_max_parallel,
+            'vector_candidate_count': config.search.vector_candidate_count,
+            'bm25_candidate_count': config.search.bm25_candidate_count,
+            'query_attribute_min_confidence': config.search.query_attribute_min_confidence,
+            'query_attribute_llm_enabled': config.search.query_attribute_llm_enabled,
+            'project_prefetch_enabled': config.search.project_prefetch_enabled,
+            'project_prefetch_min_confidence': config.search.project_prefetch_min_confidence,
+            'project_prefetch_queries': config.search.project_prefetch_queries,
+            'project_prefetch_top_k': config.search.project_prefetch_top_k,
+            'project_prefetch_max_queries': config.search.project_prefetch_max_queries,
         },
 
         'clustering': {
@@ -350,7 +471,21 @@ def save_config(config: Config, config_path: Optional[str] = None) -> None:
         'router': {
             'short_summary_max_tokens': config.router.short_summary_max_tokens,
             'long_summary_min_tokens': config.router.long_summary_min_tokens,
-        }
+        },
+
+        'languages': {
+            'supported_local': config.languages.supported_local,
+            'fallback_strategy': config.languages.fallback_strategy,
+        },
+
+        'reranking_weights': {
+            'memory_strength': config.reranking_weights.memory_strength,
+            'recency': config.reranking_weights.recency,
+            'refs_reliability': config.reranking_weights.refs_reliability,
+            'bm25_score': config.reranking_weights.bm25_score,
+            'vector_similarity': config.reranking_weights.vector_similarity,
+            'metadata_bonus': config.reranking_weights.metadata_bonus,
+        },
     }
 
     # Write YAML

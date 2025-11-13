@@ -94,6 +94,25 @@ python scripts/performance_profiler.py  # Run performance benchmarks
 
 See [CLAUDE.md](CLAUDE.md) for detailed CLI documentation.
 
+### Structured Summaries & Scenario Loader
+
+Every ingested conversation must produce a structured summary with the following exact layout:
+
+```
+Topic: <short topic name>
+DocType: <incident|decision|checklist|guide|...>
+Project: <project name or Unknown>
+KeyActions:
+- <Imperative Action 1>
+- <Action 2>
+```
+
+- `KeyActions` は必ず `- ` で始まる箇条書きにする。段落や番号付きリストは検証に失敗する。
+- `scripts.load_scenarios` は取り込み時にこの形式をチェックし、違反があるとメモ ID と生成サマリの抜粋を表示して中断する。
+- エラーが出た場合は該当会話かテンプレートを修正し、`python -m scripts.load_scenarios --file tests/scenarios/scenario_data.json` を再実行する。
+
+CI の `python -m scripts.run_regression_ci` も同じ検証を行うため、テンプレートを更新した際は README とシナリオ README を同期させてからテストを流してください。
+
 ## Configuration
 
 Create `~/.context-orchestrator/config.yaml`:
@@ -120,6 +139,14 @@ search:
   candidate_count: 50
   result_count: 10
   timeout_seconds: 2
+  cross_encoder_enabled: true
+  cross_encoder_top_k: 3
+  cross_encoder_cache_size: 128
+  cross_encoder_cache_ttl_seconds: 900
+  vector_candidate_count: 100
+  bm25_candidate_count: 30
+  query_attribute_min_confidence: 0.4
+  query_attribute_llm_enabled: true
 
 # Memory management
 clustering:
@@ -146,7 +173,38 @@ logging:
   max_log_size_mb: 10
   summary_model: qwen2.5:7b
   level: INFO
+
+# Language routing (local LLM handles these language codes; others fall back to cloud)
+languages:
+  supported_local:
+    - en
+    - ja
+    - es
+  fallback_strategy: cloud
 ```
+
+`languages.supported_local` に含まれない言語が検知されると、`fallback_strategy` に従ってクラウド LLM へルーティングされます。短期的に特定言語を強制したい場合は MCP サーバーを起動するシェルで環境変数 `CONTEXT_ORCHESTRATOR_LANG_OVERRIDE` を設定してください。
+
+```powershell
+$env:CONTEXT_ORCHESTRATOR_LANG_OVERRIDE = "fr"
+python -m src.main  # 以降の要約はフランス語扱いで routing
+```
+
+### Cross-Encoder Reranker Cache
+
+- `search.cross_encoder_cache_size` / `search.cross_encoder_cache_ttl_seconds` で LRU キャッシュの容量と保持期間（秒）を制御できます。
+- `python -m scripts.mcp_replay` を実行すると、キャッシュヒット率や LLM レイテンシが “Reranker Metrics” として表示され、`reports/mcp_runs/*.jsonl` にも保存されます。
+- MCP 経由で `{"jsonrpc":"2.0","id":1,"method":"get_reranker_metrics","params":{}}` を呼び出すと、現在のキャッシュ統計をオンデマンドで取得できます。
+- `--export-features <path>` を付けてリプレイすると、各検索結果の rerank 特徴量が CSV に出力され、後述の重み学習スクリプトに渡せます。
+
+### Rerank Weight Training
+
+1. `python -m scripts.mcp_replay --requests tests/scenarios/query_runs.json --export-features reports/features.csv`
+2. `python -m scripts.train_rerank_weights --features reports/features.csv --config config.yaml`
+3. `python -m scripts.run_regression_ci` を再実行して Precision/NDCG を確認し、必要に応じて `reranking_weights` や `search.cross_encoder_cache_*` を調整してください。
+
+クラウド側へのフォールバックが発生すると `Language routing fallback (lang=...)` ログにレイテンシ（ミリ秒）と成否が出力されます。`python -m scripts.run_regression_ci` や平常運用中に `logs/context_orchestrator.log` を tail しておけば、遅延や失敗回数を継続的にモニタリングできます。
+
 
 ## Troubleshooting
 
@@ -306,6 +364,21 @@ black .
 # Lint
 ruff .
 ```
+
+### Regression Replay Check
+
+Run this guard whenever retrieval, QAM, or memory code changes:
+
+```bash
+python -m scripts.run_regression_ci
+```
+
+This helper wraps `scripts.mcp_replay` against the canonical baseline (`reports/baselines/mcp_run-20251109-143546.jsonl`), saves the latest log under `reports/mcp_runs/`, and fails if either condition is met:
+
+- Macro Precision or Macro NDCG drops by more than 0.02 versus the baseline.
+- `reports/mcp_runs/zero_hits.json` records any zero-hit queries (indicates missing dictionary/metadata entries).
+
+Override `--baseline`, `--requests`, or `--output` when adding new scenarios, and commit refreshed baselines once metrics improve. For CI, activate `.venv311` then add a step such as `python -m scripts.run_regression_ci`; no extra services are required because the script launches the MCP server via `scripts.mcp_stdio`.
 
 ## Support
 

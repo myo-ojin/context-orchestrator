@@ -19,6 +19,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
 import logging
 import math
+from concurrent.futures import ThreadPoolExecutor
 
 from src.models import ModelRouter
 from src.storage.vector_db import ChromaVectorDB
@@ -26,6 +27,7 @@ from src.storage.bm25_index import BM25Index
 from src.services.project_manager import ProjectManager
 from src.services.query_attributes import QueryAttributeExtractor, QueryAttributes
 from src.services.rerankers import CrossEncoderReranker
+from src.services.project_memory_pool import ProjectMemoryPool
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +59,17 @@ class SearchService:
         bm25_index: BM25Index,
         model_router: ModelRouter,
         candidate_count: int = 50,
+        vector_candidate_count: Optional[int] = None,
+        bm25_candidate_count: Optional[int] = None,
         result_count: int = 10,
         recency_half_life_hours: Optional[float] = None,
         project_manager: Optional[ProjectManager] = None,
         query_attribute_extractor: Optional[QueryAttributeExtractor] = None,
+        query_attribute_min_confidence: float = 0.4,
+        query_attribute_llm_enabled: bool = True,
         cross_encoder_reranker: Optional[CrossEncoderReranker] = None,
+        rerank_weights: Optional[Dict[str, float]] = None,
+        project_memory_pool: Optional[ProjectMemoryPool] = None,
     ):
         """
         Initialize Search Service
@@ -82,22 +90,39 @@ class SearchService:
         self.bm25_index = bm25_index
         self.model_router = model_router
         self.candidate_count = candidate_count
+        self.vector_candidate_count = vector_candidate_count or candidate_count
+        self.bm25_candidate_count = bm25_candidate_count or candidate_count
         self.result_count = result_count
         self.recency_half_life_hours = recency_half_life_hours or 24.0
         self.project_manager = project_manager
-        self.query_attribute_extractor = query_attribute_extractor or QueryAttributeExtractor()
+        if query_attribute_extractor:
+            self.query_attribute_extractor = query_attribute_extractor
+        else:
+            self.query_attribute_extractor = QueryAttributeExtractor(
+                model_router=model_router,
+                min_llm_confidence=query_attribute_min_confidence,
+                llm_enabled=query_attribute_llm_enabled
+            )
         self.cross_encoder_reranker = cross_encoder_reranker
+        self.rerank_weights = self._prepare_rerank_weights(rerank_weights)
+        self.project_memory_pool = project_memory_pool
 
         logger.info(
-            f"Initialized SearchService (candidates={candidate_count}, results={result_count}, "
-            f"recency_half_life={self.recency_half_life_hours}h)"
+            "Initialized SearchService (vector_candidates=%d, bm25_candidates=%d, "
+            "final_results=%d, recency_half_life=%.1fh, memory_pool=%s)",
+            self.vector_candidate_count,
+            self.bm25_candidate_count,
+            result_count,
+            self.recency_half_life_hours,
+            "enabled" if project_memory_pool else "disabled"
         )
 
     def search(
         self,
         query: str,
         top_k: Optional[int] = None,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
+        prefetch: bool = False,
     ) -> List[Dict[str, Any]]:
         """
         Search memories using hybrid search
@@ -130,26 +155,31 @@ class SearchService:
             query_attributes = self._extract_query_attributes(query)
             filters = self._prepare_filters(filters, query_attributes)
 
-            logger.info(f"Searching for: '{query[:100]}...' (top_k={result_limit})")
+            log_fn = logger.debug if prefetch else logger.info
+            log_fn(f"Searching for: '{query[:100]}...' (top_k={result_limit}, prefetch={prefetch})")
             start_time = datetime.now()
 
             # Step 1: Generate query embedding
             query_embedding = self._generate_query_embedding(query)
             logger.debug("Generated query embedding")
 
-            # Step 2: Vector search
-            vector_results = self._vector_search(
-                query_embedding,
-                top_k=self.candidate_count,
-                filters=filters
-            )
-            logger.debug(f"Vector search returned {len(vector_results)} results")
+            # Step 2 & 3: Vector search (embedding) + BM25 search in parallel
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                vector_future = executor.submit(
+                    self._vector_search,
+                    query_embedding,
+                    self.vector_candidate_count,
+                    filters
+                )
+                bm25_future = executor.submit(
+                    self._bm25_search,
+                    query,
+                    self.bm25_candidate_count
+                )
+                vector_results = vector_future.result()
+                bm25_results = bm25_future.result()
 
-            # Step 3: BM25 search
-            bm25_results = self._bm25_search(
-                query,
-                top_k=self.candidate_count
-            )
+            logger.debug(f"Vector search returned {len(vector_results)} results")
             logger.debug(f"BM25 search returned {len(bm25_results)} results")
 
             # Step 4: Merge results
@@ -164,11 +194,15 @@ class SearchService:
                 filters=filters,
                 query_attributes=query_attributes
             )
-            final_results = self._apply_cross_encoder_rerank(query, final_results)
+            final_results = self._apply_cross_encoder_rerank(
+                query,
+                final_results,
+                prefetch=prefetch
+            )
 
             # Calculate search time
             elapsed = (datetime.now() - start_time).total_seconds() * 1000
-            logger.info(f"Search completed in {elapsed:.0f}ms, returned {len(final_results)} results")
+            log_fn(f"Search completed in {elapsed:.0f}ms, returned {len(final_results)} results (prefetch={prefetch})")
 
             return final_results
 
@@ -304,13 +338,20 @@ class SearchService:
         return list(merged.values())
 
     def _extract_query_attributes(self, query: str) -> Optional[QueryAttributes]:
-        if not self.query_attribute_extractor or not query:
-            return None
-        try:
-            return self.query_attribute_extractor.extract(query)
-        except Exception as exc:  # pragma: no cover - safeguard
-            logger.warning(f"Attribute extraction failed: {exc}")
-            return None
+        # DISABLED: QAM extraction causes timeout in mcp_replay due to LLM fallback
+        # 各検索クエリでLLM fallbackが発生し、28クエリ×3.3s/call で累積遅延が発生
+        # 現状のVector+BM25でPrecision 71.2%を達成しており、QAMメタデータなしでも十分機能している
+        # See: タイムアウト調査 2025-11-11
+        return None
+
+        # 以下のコードは保持（将来の再有効化に備える）
+        # if not self.query_attribute_extractor or not query:
+        #     return None
+        # try:
+        #     return self.query_attribute_extractor.extract(query)
+        # except Exception as exc:  # pragma: no cover - safeguard
+        #     logger.warning(f"Attribute extraction failed: {exc}")
+        #     return None
 
     def _prepare_filters(
         self,
@@ -354,16 +395,38 @@ class SearchService:
     def _apply_cross_encoder_rerank(
         self,
         query: str,
-        results: List[Dict[str, Any]]
+        results: List[Dict[str, Any]],
+        prefetch: bool = False
     ) -> List[Dict[str, Any]]:
         if not self.cross_encoder_reranker or not results:
             return results
         try:
-            reranked = self.cross_encoder_reranker.rerank(query, results)
+            prioritized = self._prioritize_for_cross_encoder(results)
+            reranked = self.cross_encoder_reranker.rerank(
+                query,
+                prioritized,
+                prefetch=prefetch
+            )
             return reranked if reranked else results
         except Exception as exc:
             logger.warning(f"Cross-encoder rerank failed: {exc}")
             return results
+
+    @staticmethod
+    def _prioritize_for_cross_encoder(
+        results: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        memory_entries: List[Dict[str, Any]] = []
+        others: List[Dict[str, Any]] = []
+
+        for item in results:
+            metadata = item.get('metadata', {})
+            if metadata.get('is_memory_entry'):
+                memory_entries.append(item)
+            else:
+                others.append(item)
+
+        return memory_entries + others if memory_entries else results
 
     def _rerank(
         self,
@@ -421,13 +484,14 @@ class SearchService:
             priority_score = self._memory_priority(metadata)
 
             # Combined score
+            w = self.rerank_weights
             combined_score = (
-                memory_strength * 0.3 +
-                recency_score * 0.2 +
-                refs_reliability * 0.1 +
-                normalized_bm25 * 0.2 +
-                vector_sim * 0.2 +
-                metadata_bonus
+                memory_strength * w['memory_strength'] +
+                recency_score * w['recency'] +
+                refs_reliability * w['refs_reliability'] +
+                normalized_bm25 * w['bm25_score'] +
+                vector_sim * w['vector_similarity'] +
+                metadata_bonus * w['metadata_bonus']
             )
             combined_score = max(0.0, min(1.0, combined_score))
 
@@ -440,8 +504,11 @@ class SearchService:
                 'recency': recency_score,
                 'refs_reliability': refs_reliability,
                 'bm25': normalized_bm25,
+                'bm25_score': normalized_bm25,
                 'vector': vector_sim,
-                'metadata': metadata_bonus
+                'vector_similarity': vector_sim,
+                'metadata': metadata_bonus,
+                'metadata_bonus': metadata_bonus
             }
             result['_priority'] = priority_score
 
@@ -544,6 +611,10 @@ class SearchService:
         """
         bonus = 0.0
         query_lc = (query or "").lower()
+
+        source = str(metadata.get('source', '') or '').lower()
+        if source == 'session':
+            bonus -= 0.05
 
         topic = metadata.get('topic')
         if topic:
@@ -655,7 +726,10 @@ class SearchService:
         return trimmed
 
     def _filter_memory_entries(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        filtered = [item for item in results if item.get('metadata', {}).get('is_memory_entry')]
+        filtered = [
+            item for item in results
+            if item.get('metadata', {}).get('is_memory_entry') and item.get('content')
+        ]
         return filtered if filtered else results
 
     def _should_skip_candidate(
@@ -676,6 +750,14 @@ class SearchService:
             return False
 
         existing_candidate = selected[existing_idx]
+        if (
+            existing_candidate and
+            not existing_candidate.get('content') and
+            candidate.get('content')
+        ):
+            existing_candidate['content'] = candidate['content']
+            existing_candidate['metadata'] = existing_candidate.get('metadata', {})
+
         if self._is_better_candidate(candidate, existing_candidate):
             selected[existing_idx] = candidate
             index_map[key] = existing_idx
@@ -913,10 +995,16 @@ class SearchService:
         project_id: str,
         query: str,
         top_k: Optional[int] = None,
-        additional_filters: Optional[Dict[str, Any]] = None
+        additional_filters: Optional[Dict[str, Any]] = None,
+        prefetch: bool = False,
     ) -> List[Dict[str, Any]]:
         """
-        Search memories within a specific project
+        Search memories within a specific project using graduated degradation workflow.
+
+        Workflow A (Graduated Degradation):
+        1. Try memory pool search (if pool loaded)
+        2. If results sufficient → return
+        3. If results insufficient → fallback to full search
 
         Args:
             project_id: Project ID to filter by
@@ -924,6 +1012,7 @@ class SearchService:
             top_k: Number of results to return (overrides default)
             additional_filters: Optional additional metadata filters
                 (e.g., {'schema_type': 'Incident'})
+            prefetch: Prefetch flag (for cache warming)
 
         Returns:
             List of search result dicts, sorted by relevance (same as search())
@@ -938,26 +1027,172 @@ class SearchService:
             >>> for result in results:
             ...     print(f"{result['score']:.2f}: {result['content'][:100]}")
 
-        Requirements: Phase 15 - Project Management
+        Requirements: Issue #2025-11-11-03 - Workflow A (Graduated Degradation)
         """
         try:
-            logger.info(f"Searching in project {project_id}: '{query[:100]}...'")
+            log_fn = logger.debug if prefetch else logger.info
+            log_fn(
+                "[Workflow A] Searching in project %s: '%s...' (prefetch=%s)",
+                project_id,
+                query[:100],
+                prefetch
+            )
 
-            # Build filters with project_id
+            start_time = datetime.now()
+            final_top_k = top_k or self.result_count
+
+            # Step 1: Get project memory pool
+            memory_ids = set()
+            if self.project_memory_pool:
+                memory_ids = self.project_memory_pool.get_memory_ids(project_id)
+                log_fn("[Workflow A] Memory pool size: %d memories", len(memory_ids))
+
+            # Step 2a: Search within memory pool
+            pool_results = []
+            if memory_ids:
+                pool_results = self._search_within_pool(
+                    query=query,
+                    memory_ids=memory_ids,
+                    top_k=final_top_k,
+                    additional_filters=additional_filters,
+                    prefetch=prefetch
+                )
+                log_fn("[Workflow A] Pool search returned %d results", len(pool_results))
+
+            # Step 3: Check if results are sufficient
+            if self._is_result_sufficient(pool_results, final_top_k):
+                elapsed = (datetime.now() - start_time).total_seconds() * 1000
+                log_fn(
+                    "[Workflow A] Sufficient results from pool in %.0fms",
+                    elapsed
+                )
+                return pool_results
+
+            # Step 2b: Fallback to full search
+            log_fn(
+                "[Workflow A] Insufficient results (%d), falling back to full search",
+                len(pool_results)
+            )
+
             filters = {'project_id': project_id}
-
             if additional_filters:
                 filters.update(additional_filters)
 
-            # Use standard search with project filter
-            results = self.search(query=query, top_k=top_k, filters=filters)
+            full_results = self.search(
+                query=query,
+                top_k=final_top_k,
+                filters=filters,
+                prefetch=prefetch
+            )
 
-            logger.info(f"Project search returned {len(results)} results")
-            return results
+            elapsed = (datetime.now() - start_time).total_seconds() * 1000
+            log_fn(
+                "[Workflow A] Full search completed in %.0fms, returned %d results",
+                elapsed,
+                len(full_results)
+            )
+
+            return full_results
 
         except Exception as e:
             logger.error(f"Project search failed: {e}", exc_info=True)
             return []
+
+    def prefetch_project(
+        self,
+        project_id: str,
+        queries: List[str],
+        top_k: Optional[int] = None,
+        project_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Warm up search/reranker caches for a project.
+
+        Workflow:
+        1. Load project memory pool and warm L3 semantic cache (query-agnostic)
+        2. Execute prefetch queries for L1/L2 cache warming (query-specific)
+
+        This dual strategy ensures both query-agnostic (memory pool) and
+        query-specific (prefetch queries) cache warming.
+        """
+        stats = {
+            'project_id': project_id,
+            'project_name': project_name,
+            'queries_requested': len(queries or []),
+            'queries_executed': 0,
+            'total_results': 0,
+            'reranker_delta': {},
+            'pool_stats': {},
+        }
+        if not project_id:
+            return stats
+
+        # Step 1: Warm L3 semantic cache with memory pool (query-agnostic)
+        if self.project_memory_pool and self.cross_encoder_reranker:
+            try:
+                pool_stats = self.project_memory_pool.warm_cache(
+                    reranker=self.cross_encoder_reranker,
+                    project_id=project_id
+                )
+                stats['pool_stats'] = pool_stats
+                logger.info(
+                    "[Prefetch] Warmed L3 cache for project %s: %d memories, %d cache entries in %.0fms",
+                    project_id,
+                    pool_stats.get('memories_loaded', 0),
+                    pool_stats.get('cache_entries_added', 0),
+                    pool_stats.get('elapsed_ms', 0)
+                )
+            except Exception as exc:  # pragma: no cover
+                logger.warning(
+                    "[Prefetch] Failed to warm cache for project %s: %s",
+                    project_id,
+                    exc
+                )
+                stats['pool_stats'] = {'error': str(exc)}
+
+        # Step 2: Execute prefetch queries for L1/L2 cache warming (query-specific)
+        if not queries:
+            return stats
+
+        before_metrics = self.get_reranker_metrics().get('metrics', {}) if self.cross_encoder_reranker else {}
+
+        for query in queries:
+            trimmed = (query or "").strip()
+            if not trimmed:
+                continue
+            stats['queries_executed'] += 1
+            results = self.search_in_project(
+                project_id=project_id,
+                query=trimmed,
+                top_k=top_k,
+                prefetch=True
+            )
+            stats['total_results'] += len(results)
+
+        if self.cross_encoder_reranker:
+            after_metrics = self.cross_encoder_reranker.get_metrics()
+            stats['reranker_delta'] = {
+                key: after_metrics.get(key, 0) - before_metrics.get(key, 0)
+                for key in (
+                    'cache_hits',
+                    'cache_misses',
+                    'prefetch_cache_hits',
+                    'prefetch_cache_misses',
+                    'prefetch_requests',
+                    'pairs_scored',
+                )
+            }
+
+        logger.info(
+            "[Prefetch] Completed for project %s (%s): %d/%d queries executed, pool=%d memories, cache hits +%s",
+            project_id,
+            project_name or project_id,
+            stats['queries_executed'],
+            stats['queries_requested'],
+            stats['pool_stats'].get('memories_loaded', 0),
+            stats['reranker_delta'].get('cache_hits', 0)
+        )
+        return stats
 
     def list_project_memories(
         self,
@@ -995,3 +1230,191 @@ class SearchService:
         except Exception as e:
             logger.error(f"Failed to list project memories: {e}")
             return []
+
+    def get_reranker_metrics(self) -> Dict[str, Any]:
+        """
+        Return cross-encoder reranker metrics (cache hit rate, latency, etc.).
+        """
+        if not self.cross_encoder_reranker:
+            return {'enabled': False}
+        return {
+            'enabled': self.cross_encoder_reranker.enabled,
+            'metrics': self.cross_encoder_reranker.get_metrics()
+        }
+
+    @staticmethod
+    def _prepare_rerank_weights(
+        weights: Optional[Dict[str, float]]
+    ) -> Dict[str, float]:
+        defaults = {
+            'memory_strength': 0.3,
+            'recency': 0.2,
+            'refs_reliability': 0.1,
+            'bm25_score': 0.2,
+            'vector_similarity': 0.2,
+            'metadata_bonus': 1.0,
+        }
+        if not weights:
+            return defaults
+        merged = defaults.copy()
+        for key, value in weights.items():
+            if key not in merged:
+                continue
+            try:
+                merged[key] = float(value)
+            except (TypeError, ValueError):
+                continue
+        return merged
+
+    def _get_memory_id_from_candidate(self, candidate: Dict[str, Any]) -> str:
+        """
+        Extract memory ID from a search candidate.
+
+        Candidates can be either chunks or memory entries:
+        - Chunks: Have metadata.memory_id pointing to parent memory
+        - Memory entries: Have is_memory_entry=True and ID is the memory ID (with -metadata suffix)
+
+        Args:
+            candidate: Search candidate dict
+
+        Returns:
+            Memory ID (empty string if not found)
+
+        Requirements: Issue #2025-11-11-03 - Workflow A candidate filtering
+        """
+        # Check if it's a chunk with memory_id
+        memory_id = candidate.get('metadata', {}).get('memory_id')
+        if memory_id:
+            return memory_id
+
+        # Check if it's a memory entry itself
+        if candidate.get('metadata', {}).get('is_memory_entry'):
+            candidate_id = candidate.get('id', '')
+            # Memory entries have "-metadata" suffix, strip it for comparison
+            if candidate_id.endswith('-metadata'):
+                return candidate_id[:-9]  # Remove "-metadata" suffix
+            return candidate_id
+
+        return ''
+
+    def _is_result_sufficient(
+        self,
+        results: List[Dict[str, Any]],
+        top_k: int,
+        min_score_threshold: float = 0.3
+    ) -> bool:
+        """
+        Determine if search results are sufficient.
+
+        Criteria:
+        1. Result count >= top_k
+        2. Minimum score >= threshold
+
+        Args:
+            results: Search results list
+            top_k: Expected number of results
+            min_score_threshold: Minimum acceptable score
+
+        Returns:
+            True if sufficient, False otherwise
+
+        Requirements: Issue #2025-11-11-03 - Workflow A result sufficiency check
+        """
+        if len(results) < top_k:
+            return False
+
+        # Check minimum score
+        if results:
+            min_score = min(r.get('score', 0.0) for r in results)
+            if min_score < min_score_threshold:
+                logger.debug(
+                    "Results insufficient: min_score=%.3f < %.3f",
+                    min_score,
+                    min_score_threshold
+                )
+                return False
+
+        return True
+
+    def _search_within_pool(
+        self,
+        query: str,
+        memory_ids: set,
+        top_k: int,
+        additional_filters: Optional[Dict[str, Any]],
+        prefetch: bool
+    ) -> List[Dict[str, Any]]:
+        """
+        Search within a project memory pool.
+
+        Workflow:
+        1. Generate query embedding
+        2. Run hybrid search (vector + BM25) to get candidates
+        3. Filter candidates by memory_ids
+        4. Rerank filtered candidates with cross-encoder
+
+        Args:
+            query: Search query
+            memory_ids: Set of memory IDs to filter by
+            top_k: Number of results to return
+            additional_filters: Optional metadata filters
+            prefetch: Prefetch flag
+
+        Returns:
+            Reranked results list
+
+        Requirements: Issue #2025-11-11-03 - Workflow A pool search
+        """
+        log_fn = logger.debug if prefetch else logger.info
+
+        # Step 1: Generate query embedding
+        query_embedding = self._generate_query_embedding(query)
+
+        # Step 2: Hybrid search (parallel)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            vector_future = executor.submit(
+                self._vector_search,
+                query_embedding,
+                self.vector_candidate_count,
+                additional_filters
+            )
+            bm25_future = executor.submit(
+                self._bm25_search,
+                query,
+                self.bm25_candidate_count
+            )
+
+            vector_results = vector_future.result()
+            bm25_results = bm25_future.result()
+
+        # Step 3: Merge candidates
+        all_candidates = self._merge_results(vector_results, bm25_results)
+
+        # Step 4: Filter by memory pool
+        pool_candidates = [
+            c for c in all_candidates
+            if self._get_memory_id_from_candidate(c) in memory_ids
+        ]
+
+        log_fn(
+            "Pool filtering: %d → %d candidates",
+            len(all_candidates),
+            len(pool_candidates)
+        )
+
+        # Step 5: Rerank (rule-based)
+        reranked = self._rerank(
+            candidates=pool_candidates,
+            query=query,
+            top_k=top_k,
+            filters=additional_filters
+        )
+
+        # Step 6: Cross-encoder rerank
+        reranked = self._apply_cross_encoder_rerank(
+            query=query,
+            results=reranked,
+            prefetch=prefetch
+        )
+
+        return reranked
