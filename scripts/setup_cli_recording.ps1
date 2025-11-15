@@ -38,6 +38,22 @@ function New-SessionId {
     return "session-$(Get-Date -Format 'yyyyMMdd-HHmmss')-$([guid]::NewGuid().ToString().Substring(0,8))"
 }
 
+# Resolve the real CLI shim instead of assuming an .exe is present
+function Resolve-CommandShim {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $command = Get-Command $Name -CommandType Application,ExternalScript -ErrorAction SilentlyContinue | Select-Object -First 1
+
+    if (-not $command) {
+        throw "Context Orchestrator CLI recording wrapper could not locate '$Name'. Ensure it is installed and on PATH."
+    }
+
+    return $command.Source
+}
+
 # Send command to Context Orchestrator (async)
 function Send-ToContextOrchestrator {
     param(
@@ -89,21 +105,23 @@ function Send-ToContextOrchestrator {
 
 # Wrapper for claude command
 function claude {
+    $realClaude = Resolve-CommandShim -Name "claude"
+
     # Check if internal call
     if (Test-IsInternalCall) {
         # Call real claude
-        & claude.exe @args
+        & $realClaude @args
         return
     }
 
     # Generate session ID
-    $sessionId = New-SessionId()
+    $sessionId = New-SessionId
 
     # Capture command
     $command = "claude $($args -join ' ')"
 
     # Call real claude and capture output
-    $output = & claude.exe @args 2>&1 | Tee-Object -Variable capturedOutput
+    $output = & $realClaude @args 2>&1 | Tee-Object -Variable capturedOutput
 
     # Get exit code
     $exitCode = $LASTEXITCODE
@@ -117,21 +135,23 @@ function claude {
 
 # Wrapper for codex command
 function codex {
+    $realCodex = Resolve-CommandShim -Name "codex"
+
     # Check if internal call
     if (Test-IsInternalCall) {
         # Call real codex
-        & codex.exe @args
+        & $realCodex @args
         return
     }
 
     # Generate session ID
-    $sessionId = New-SessionId()
+    $sessionId = New-SessionId
 
     # Capture command
     $command = "codex $($args -join ' ')"
 
     # Call real codex and capture output
-    $output = & codex.exe @args 2>&1 | Tee-Object -Variable capturedOutput
+    $output = & $realCodex @args 2>&1 | Tee-Object -Variable capturedOutput
 
     # Get exit code
     $exitCode = $LASTEXITCODE
@@ -167,7 +187,7 @@ function Install-Wrapper {
     # Append wrapper functions
     Add-Content -Path $PROFILE -Value "`n$WrapperFunctions"
 
-    Write-Host "✓ Wrapper installed to: $PROFILE" -ForegroundColor Green
+    Write-Host "✁EWrapper installed to: $PROFILE" -ForegroundColor Green
     Write-Host ""
     Write-Host "Please restart PowerShell or run: . `$PROFILE" -ForegroundColor Yellow
 }
@@ -196,7 +216,7 @@ function Uninstall-Wrapper {
     # Write back
     Set-Content -Path $PROFILE -Value $newContent
 
-    Write-Host "✓ Wrapper uninstalled from: $PROFILE" -ForegroundColor Green
+    Write-Host "✁EWrapper uninstalled from: $PROFILE" -ForegroundColor Green
     Write-Host ""
     Write-Host "Please restart PowerShell" -ForegroundColor Yellow
 }
