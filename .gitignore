@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Logs
+*.log
+logs/
+
+# Context Orchestrator specific
+config.yaml
+chroma_db/
+bm25_index/
+.context-orchestrator/
+reports/*.json
+reports/*.jsonl
+reports/*.csv
+!reports/.gitignore
+!reports/baselines/
+
+# Development artifacts (exclude from OSS)
+.kiro/
+.claude/
+docs/
+progress/
+tmp_*.py
+tmp_*.txt
+tmp_*.json
+nul
+
+# OS
+.DS_Store
+Thumbs.db
+*.bak
+*~

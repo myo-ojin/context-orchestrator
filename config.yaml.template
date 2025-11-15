@@ -1,0 +1,129 @@
+# Context Orchestrator Configuration Template
+# Copy this file to ~/.context-orchestrator/config.yaml and customize
+
+# ============================================================================
+# Paths
+# ============================================================================
+data_dir: ~/.context-orchestrator
+obsidian_vault_path: null  # Optional: Path to Obsidian vault (e.g., C:\Users\...\ObsidianVault)
+
+# ============================================================================
+# Ollama Settings (Local LLM)
+# NOTE: src.config expects nested keys under `ollama`
+# ============================================================================
+ollama:
+  url: http://localhost:11434
+  embedding_model: nomic-embed-text  # 137M model for embeddings
+  inference_model: qwen2.5:7b        # 7B model for classification and short summaries
+
+# ============================================================================
+# CLI LLM (Cloud LLM for heavy tasks)
+# NOTE: src.config expects nested keys under `cli`
+# ============================================================================
+cli:
+  command: claude  # Options: "claude", "codex"
+
+# ============================================================================
+# Search Parameters
+# NOTE: src.config expects nested keys under `search`
+# ============================================================================
+search:
+  candidate_count: 50      # Number of candidates from hybrid search
+  result_count: 10         # Final number of results after reranking
+  timeout_seconds: 2       # Maximum search time
+  cross_encoder_enabled: true  # Enable LLM cross-encoder reranking
+  cross_encoder_top_k: 3       # How many candidates to rescore with cross-encoder
+  cross_encoder_cache_size: 256            # LRU cache entries for reranker scores
+  cross_encoder_cache_ttl_seconds: 28800   # Seconds to keep cached cross-encoder scores (8 hours)
+  cross_encoder_max_parallel: 3            # Max simultaneous reranker LLM calls
+  cross_encoder_fallback_max_wait_ms: 500  # If queue wait exceeds this, skip reranker
+  cross_encoder_fallback_mode: heuristic   # 'heuristic' or 'none'
+  project_prefetch_enabled: true           # Warm cache when project auto-resolves
+  project_prefetch_min_confidence: 0.75    # Min confidence required before prefetch
+  project_prefetch_queries:                # Seed queries for prefetch runs
+    - project status
+    - open issues
+    - risk summary
+  project_prefetch_top_k: 5                # How many results to score during prefetch
+  project_prefetch_max_queries: 3          # Limit number of seed queries per project
+  vector_candidate_count: 100  # How many vector hits to pull before merging (Phase 3)
+  bm25_candidate_count: 50     # How many BM25 hits to pull before merging (Phase 3)
+  query_attribute_min_confidence: 0.4  # Minimum LLM confidence to override heuristics
+  query_attribute_llm_enabled: true    # Use LLM to enrich query hints when heuristics are insufficient
+
+# ============================================================================
+# Clustering (Memory Consolidation)
+# NOTE: src.config expects nested keys under `clustering`
+# ============================================================================
+clustering:
+  similarity_threshold: 0.9  # Cosine similarity threshold for clustering (0.0-1.0)
+  min_cluster_size: 2        # Minimum number of memories to form a cluster
+
+# ============================================================================
+# Forgetting (Memory Management)
+# NOTE: src.config expects nested keys under `forgetting`
+# ============================================================================
+forgetting:
+  age_threshold_days: 30     # Delete/compress memories older than this
+  importance_threshold: 0.3  # Delete memories with importance score below this (0.0-1.0)
+  compression_enabled: true  # Enable memory compression
+
+# ============================================================================
+# Working Memory
+# NOTE: src.config expects nested keys under `working_memory`
+# ============================================================================
+working_memory:
+  retention_hours: 8   # Hours to retain working memory before migration
+  auto_consolidate: true  # Automatically consolidate on completion
+
+# ============================================================================
+# Consolidation Schedule
+# NOTE: src.config expects nested keys under `consolidation`
+# ============================================================================
+consolidation:
+  schedule: "0 3 * * *"   # Cron format: 3:00 AM daily
+  auto_enabled: true       # Enable automatic nightly consolidation
+
+# ============================================================================
+# Session Logging (Requirement 26)
+# NOTE: src.config expects nested keys under `logging`
+# ============================================================================
+logging:
+  session_log_dir: ~/.context-orchestrator/logs  # Directory for session logs
+  max_log_size_mb: 10                            # Max log file size before rotation
+  summary_model: qwen2.5:7b                      # Model for session summarization
+  level: INFO
+
+# ============================================================================
+# Router (Model Routing Thresholds)
+# ============================================================================
+router:
+  short_summary_max_tokens: 100   # <= this uses local LLM
+  long_summary_min_tokens: 500    # >= this uses cloud LLM
+
+# ============================================================================
+# Language Routing
+# ============================================================================
+languages:
+  supported_local:
+    - en
+    - ja
+    - es
+  fallback_strategy: cloud  # When unsupported language detected: "cloud" or "local"
+
+# ============================================================================
+# Advanced Settings (Optional)
+# ============================================================================
+# Reranking weights (consumer components may read these)
+reranking_weights:
+  memory_strength: 0.3
+  recency: 0.2
+  refs_reliability: 0.1
+  bm25_score: 0.2
+  vector_similarity: 0.2
+  metadata_bonus: 1.0
+
+# MCP settings
+mcp:
+  max_request_size_mb: 10   # Maximum MCP request size
+  timeout_seconds: 30       # MCP request timeout

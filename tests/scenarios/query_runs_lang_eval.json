@@ -1,0 +1,78 @@
+[
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "search_memory",
+      "params": {"query": "timeline view orchestrator", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["timeline", "release"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "search_memory",
+      "params": {"query": "TypeError chunker fix", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["chunker"],
+      "severity": ["high"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "method": "search_memory",
+      "params": {"query": "stale embeddings doctor report", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["health", "report"],
+      "ideal_hits": 2
+    }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 9,
+      "method": "search_memory",
+      "params": {"query": "タイムラインを再同期する手順は？", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["timeline"],
+      "language": ["ja"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 12,
+      "method": "search_memory",
+      "params": {"query": "BugFixer で TypeError を再発防止する手順", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["chunker"],
+      "language": ["ja"],
+      "ideal_hits": 1
+    }
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 13,
+      "method": "search_memory",
+      "params": {"query": "PhaseSync ガバナンス例外 承認 チェックリスト", "top_k": 3}
+    },
+    "relevance": {
+      "topic": ["governance"],
+      "language": ["ja"],
+      "ideal_hits": 1
+    }
+  }
+]
