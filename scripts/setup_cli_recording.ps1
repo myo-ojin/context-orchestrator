@@ -97,7 +97,7 @@ function claude {
     }
 
     # Generate session ID
-    $sessionId = New-SessionId()
+    $sessionId = New-SessionId
 
     # Capture command
     $command = "claude $($args -join ' ')"
@@ -125,7 +125,7 @@ function codex {
     }
 
     # Generate session ID
-    $sessionId = New-SessionId()
+    $sessionId = New-SessionId
 
     # Capture command
     $command = "codex $($args -join ' ')"
