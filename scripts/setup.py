@@ -193,26 +193,12 @@ class SetupWizard:
     def configure_cli_command(self):
         """Configure CLI command"""
         print()
-        print("Step 4: Configuring CLI LLM...")
+        print("Step 4: Configure CLI command")
         print()
-
-        print("Which CLI LLM do you use?")
-        print("  1. Claude (claude)")
-        print("  2. Codex (codex)")
-        print("  3. Other")
-
-        choice = input("Choice [1]: ").strip()
-
-        if choice == '2':
-            self.config.cli.command = 'codex'
-        elif choice == '3':
-            custom_command = input("Custom CLI command: ").strip()
-            if custom_command:
-                self.config.cli.command = custom_command
-        else:
-            self.config.cli.command = 'claude'
-
-        print(f"✓ CLI command: {self.config.cli.command}")
+        print("PowerShell wrappers now record both claude and codex automatically.")
+        print("Cloud-side CLI calls will default to claude (edit config.yaml later if needed).")
+        self.config.cli.command = 'claude'
+        print(f"✁ECLI command defaulted to: {self.config.cli.command}")
 
     def save_configuration(self):
         """Save configuration"""
@@ -231,6 +217,50 @@ class SetupWizard:
             print(f"✗ Failed to save config: {e}")
             return False
 
+
+    def install_cli_wrapper(self) -> bool:
+        """Install PowerShell CLI recording wrapper"""
+        print()
+        print("Step 6: Installing CLI recording wrapper...")
+        print()
+
+        script_path = Path(__file__).parent / 'setup_cli_recording.ps1'
+        if not script_path.exists():
+            print(f"✁EWrapper script not found: {script_path}")
+            return False
+
+        if os.name != 'nt':
+            print("⚠ PowerShell wrapper installation skipped (non-Windows host).")
+            print("   Run the script manually on Windows to capture CLI sessions.")
+            return True
+
+        try:
+            result = subprocess.run(
+                [
+                    'powershell',
+                    '-NoLogo',
+                    '-ExecutionPolicy',
+                    'Bypass',
+                    '-File',
+                    str(script_path),
+                    '-Install'
+                ],
+                check=False
+            )
+            if result.returncode == 0:
+                print("✁ECLI recording wrapper installed.")
+                return True
+
+            print(f"✁ECLI recording wrapper exited with code {result.returncode}. Re-run the script above if needed.")
+            return False
+
+        except FileNotFoundError:
+            print("✁EPowerShell executable not found. Install PowerShell 7+ or run the wrapper manually later.")
+            return False
+        except Exception as exc:
+            print(f"✁EFailed to run wrapper installer: {exc}")
+            return False
+
     def print_next_steps(self):
         """Print next steps"""
         print()
@@ -246,8 +276,8 @@ class SetupWizard:
         print("2. Start Context Orchestrator:")
         print("   python -m src.main")
         print()
-        print("3. (Optional) Setup PowerShell wrapper:")
-        print("   powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1")
+        print("3. Re-run the CLI wrapper installer anytime you reset your PowerShell profile:")
+        print("   powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install")
         print()
 
     def run(self) -> bool:
@@ -276,6 +306,10 @@ class SetupWizard:
         # Save configuration
         if not self.save_configuration():
             return False
+
+        wrapper_ok = self.install_cli_wrapper()
+        if not wrapper_ok:
+            print("⚠ CLI recording wrapper installation encountered an issue. Re-run the script above to retry.")
 
         # Print next steps
         self.print_next_steps()
