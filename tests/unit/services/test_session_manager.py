@@ -67,6 +67,12 @@ class TestSessionManager:
         )
         return manager, project_manager
 
+    @pytest.fixture
+    def log_collector(self):
+        collector = Mock()
+        collector.log_dir = Path("/tmp")
+        return collector
+
     def test_init(self, manager, mock_dependencies):
         """Test manager initialization"""
         assert manager.ingestion_service == mock_dependencies['ingestion_service']
@@ -94,6 +100,18 @@ class TestSessionManager:
         assert session_id == custom_id
         assert custom_id in manager.sessions
 
+    def test_start_session_notifies_log_collector(self, mock_dependencies, log_collector):
+        manager = SessionManager(
+            ingestion_service=mock_dependencies['ingestion_service'],
+            model_router=mock_dependencies['model_router'],
+            session_log_collector=log_collector
+        )
+
+        session_id = manager.start_session("session-log-test")
+
+        log_collector.start_session.assert_called_once_with("session-log-test")
+        assert session_id == "session-log-test"
+
     def test_add_command(self, manager):
         """Test adding command to session"""
         session_id = manager.start_session()
@@ -112,6 +130,27 @@ class TestSessionManager:
         assert command['command'] == "python test.py"
         assert command['output'] == "All tests passed"
         assert command['exit_code'] == 0
+
+    def test_add_command_appends_log_event(self, mock_dependencies, log_collector):
+        manager = SessionManager(
+            ingestion_service=mock_dependencies['ingestion_service'],
+            model_router=mock_dependencies['model_router'],
+            session_log_collector=log_collector
+        )
+
+        session_id = manager.start_session("session-log")
+        manager.add_command(
+            session_id,
+            "echo test",
+            "test",
+            exit_code=0,
+            metadata={'cwd': '/tmp'}
+        )
+
+        log_collector.append_event.assert_called_once()
+        args, kwargs = log_collector.append_event.call_args
+        assert args[0] == "session-log"
+        assert args[1] == "command"
 
     def test_add_command_updates_project_from_metadata(self, manager):
         session_id = manager.start_session()
@@ -232,6 +271,22 @@ class TestSessionManager:
 
         # Verify ingestion was called
         mock_dependencies['ingestion_service'].ingest_conversation.assert_called_once()
+
+    def test_end_session_closes_log(self, mock_dependencies, log_collector):
+        manager = SessionManager(
+            ingestion_service=mock_dependencies['ingestion_service'],
+            model_router=mock_dependencies['model_router'],
+            session_log_collector=log_collector
+        )
+        mock_dependencies['ingestion_service'].ingest_conversation.return_value = "mem-closed"
+        mock_dependencies['model_router'].route.return_value = "summary"
+
+        session_id = manager.start_session("session-close")
+        manager.add_command(session_id, "echo ok", "ok", exit_code=0)
+
+        manager.end_session(session_id)
+
+        log_collector.close_session.assert_called_once_with("session-close")
 
     def test_end_session_nonexistent(self, manager):
         """Test ending nonexistent session"""
