@@ -67,6 +67,13 @@ class TestSessionManager:
         )
         return manager, project_manager
 
+    @pytest.fixture
+    def log_collector(self):
+        """Mock SessionLogCollector"""
+        collector = Mock()
+        collector.log_dir = Path("/tmp")
+        return collector
+
     def test_init(self, manager, mock_dependencies):
         """Test manager initialization"""
         assert manager.ingestion_service == mock_dependencies['ingestion_service']
@@ -94,6 +101,18 @@ class TestSessionManager:
         assert session_id == custom_id
         assert custom_id in manager.sessions
 
+    def test_start_session_notifies_log_collector(self, mock_dependencies, log_collector):
+        manager = SessionManager(
+            ingestion_service=mock_dependencies['ingestion_service'],
+            model_router=mock_dependencies['model_router'],
+            session_log_collector=log_collector
+        )
+
+        session_id = manager.start_session("session-log-test")
+
+        log_collector.start_session.assert_called_once_with("session-log-test")
+        assert session_id == "session-log-test"
+
     def test_add_command(self, manager):
         """Test adding command to session"""
         session_id = manager.start_session()
@@ -113,19 +132,40 @@ class TestSessionManager:
         assert command['output'] == "All tests passed"
         assert command['exit_code'] == 0
 
+    def test_add_command_appends_log_event(self, mock_dependencies, log_collector):
+        manager = SessionManager(
+            ingestion_service=mock_dependencies['ingestion_service'],
+            model_router=mock_dependencies['model_router'],
+            session_log_collector=log_collector
+        )
+
+        session_id = manager.start_session("session-log")
+        manager.add_command(
+            session_id,
+            "echo test",
+            "test",
+            exit_code=0,
+            metadata={'cwd': '/tmp'}
+        )
+
+        log_collector.append_event.assert_called_once()
+        args, kwargs = log_collector.append_event.call_args
+        assert args[0] == "session-log"
+        assert args[1] == "command"
+
     def test_add_command_updates_project_from_metadata(self, manager):
         session_id = manager.start_session()
         manager.add_command(
             session_id,
             "deploy",
             "ok",
-            metadata={'project': 'AppBrain'}
+            metadata={'project': 'OrchestratorX'}
         )
         hint, confidence = manager.get_project_hint(session_id)
-        assert hint == "AppBrain"
+        assert hint == "OrchestratorX"
         assert confidence >= 0.9
 
-    def test_add_command_updates_project_from_text(self, manager):
+    def test_add_command_does_not_update_project_from_text_when_disabled(self, manager):
         session_id = manager.start_session()
         fake_attrs = QueryAttributes(project_name="BugFixer")
         fake_attrs.confidence = {'project_name': 0.5}
@@ -135,15 +175,15 @@ class TestSessionManager:
         manager.add_command(session_id, "git status", "output")
 
         hint, confidence = manager.get_project_hint(session_id)
-        assert hint == "BugFixer"
-        assert confidence == 0.5
+        assert hint is None
+        assert confidence == 0.0
 
     def test_project_prefetch_runs_once_until_cleared(self, mock_dependencies):
         search_service = Mock()
         project_manager = Mock()
         project_manager.get_project.return_value = None
         project_manager.get_project_by_name.return_value = SimpleNamespace(
-            name="AppBrain",
+            name="OrchestratorX",
             id="proj-appbrain"
         )
 
@@ -162,31 +202,31 @@ class TestSessionManager:
         )
 
         session_id = manager.start_session()
-        manager.update_project_hint(session_id, "AppBrain", 0.9, "metadata")
+        manager.update_project_hint(session_id, "OrchestratorX", 0.9, "metadata")
         search_service.prefetch_project.assert_called_once()
 
         # Updating with same project should not trigger until cleared.
-        manager.update_project_hint(session_id, "AppBrain", 0.95, "metadata")
+        manager.update_project_hint(session_id, "OrchestratorX", 0.95, "metadata")
         assert search_service.prefetch_project.call_count == 1
 
         # Clearing resets guard so new prefetch can run.
         manager.clear_project_hint(session_id)
-        manager.update_project_hint(session_id, "AppBrain", 0.9, "metadata")
+        manager.update_project_hint(session_id, "OrchestratorX", 0.9, "metadata")
         assert search_service.prefetch_project.call_count == 2
 
     def test_update_project_hint_prefers_higher_confidence(self, manager):
         session_id = manager.start_session()
         manager.update_project_hint(session_id, "BugFixer", 0.4, "test")
-        manager.update_project_hint(session_id, "AppBrain", 0.9, "metadata")
+        manager.update_project_hint(session_id, "OrchestratorX", 0.9, "metadata")
 
         hint, confidence = manager.get_project_hint(session_id)
-        assert hint == "AppBrain"
+        assert hint == "OrchestratorX"
         assert confidence == 0.9
 
         # Lower confidence should not overwrite
         manager.update_project_hint(session_id, "BugFixer", 0.5, "later")
         hint, confidence = manager.get_project_hint(session_id)
-        assert hint == "AppBrain"
+        assert hint == "OrchestratorX"
 
     def test_add_command_to_nonexistent_session(self, manager):
         """Test adding command to nonexistent session"""
@@ -232,6 +272,22 @@ class TestSessionManager:
 
         # Verify ingestion was called
         mock_dependencies['ingestion_service'].ingest_conversation.assert_called_once()
+
+    def test_end_session_closes_log(self, mock_dependencies, log_collector):
+        manager = SessionManager(
+            ingestion_service=mock_dependencies['ingestion_service'],
+            model_router=mock_dependencies['model_router'],
+            session_log_collector=log_collector
+        )
+        mock_dependencies['ingestion_service'].ingest_conversation.return_value = "mem-closed"
+        mock_dependencies['model_router'].route.return_value = "summary"
+
+        session_id = manager.start_session("session-close")
+        manager.add_command(session_id, "echo ok", "ok", exit_code=0)
+
+        manager.end_session(session_id)
+
+        log_collector.close_session.assert_called_once_with("session-close")
 
     def test_end_session_nonexistent(self, manager):
         """Test ending nonexistent session"""
@@ -373,7 +429,7 @@ class TestSessionManager:
     def test_get_project_context_with_resolved_project(self, manager_with_project_manager):
         manager, project_manager = manager_with_project_manager
         session_id = manager.start_session()
-        fake_project = SimpleNamespace(id="proj-abc", name="AppBrain")
+        fake_project = SimpleNamespace(id="proj-abc", name="OrchestratorX")
         project_manager.get_project.return_value = fake_project
         manager.update_project_hint(session_id, fake_project.id, 0.8, "metadata")
 
@@ -385,7 +441,7 @@ class TestSessionManager:
 
     def test_set_project_hint_overrides_existing(self, manager):
         session_id = manager.start_session()
-        manager.update_project_hint(session_id, "AppBrain", 0.9, "metadata")
+        manager.update_project_hint(session_id, "OrchestratorX", 0.9, "metadata")
 
         manager.set_project_hint(session_id, "BugFixer", confidence=0.5)
 
@@ -395,7 +451,7 @@ class TestSessionManager:
 
     def test_clear_project_hint(self, manager):
         session_id = manager.start_session()
-        manager.update_project_hint(session_id, "AppBrain", 0.9, "metadata")
+        manager.update_project_hint(session_id, "OrchestratorX", 0.9, "metadata")
 
         cleared = manager.clear_project_hint(session_id)
 
@@ -412,12 +468,12 @@ class TestSessionManager:
             session_id,
             "deploy --project appbrain",
             "ok",
-            metadata={'project': 'AppBrain'}
+            metadata={'project': 'OrchestratorX'}
         )
 
         fake_project = MagicMock()
         fake_project.id = "proj-123"
-        fake_project.name = "AppBrain"
+        fake_project.name = "OrchestratorX"
         project_manager.get_project.return_value = None
         project_manager.get_project_by_name.return_value = fake_project
 
@@ -427,16 +483,16 @@ class TestSessionManager:
         memory_id = manager.end_session(session_id)
 
         assert memory_id == "mem-xyz"
-        project_manager.get_project.assert_called_once_with("AppBrain")
-        project_manager.get_project_by_name.assert_called_once_with("AppBrain")
+        project_manager.get_project.assert_called_once_with("OrchestratorX")
+        project_manager.get_project_by_name.assert_called_once_with("OrchestratorX")
 
         args, _ = mock_dependencies['ingestion_service'].ingest_conversation.call_args
         payload = args[0]
         assert payload['project_id'] == fake_project.id
         metadata = payload['metadata']
-        assert metadata['project'] == "AppBrain"
+        assert metadata['project'] == "OrchestratorX"
         assert metadata['project_id'] == fake_project.id
-        assert metadata['project_hint'] == "AppBrain"
+        assert metadata['project_hint'] == "OrchestratorX"
         assert metadata['project_hint_confidence'] >= 0.9
         assert metadata['project_hint_source'] in ("metadata", "metadata_id")
 

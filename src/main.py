@@ -313,6 +313,13 @@ def init_services(
 
     logger.info("Initialized ConsolidationService")
 
+    # Initialize Session Log Collector
+    session_log_collector = SessionLogCollector(
+        log_dir=config.logging.session_log_dir,
+        max_log_size_mb=config.logging.max_log_size_mb
+    )
+    logger.info(f"Session logs directory: {session_log_collector.log_dir}")
+
     # Initialize Session Manager (available even without Obsidian vault)
     session_manager = SessionManager(
         ingestion_service=ingestion_service,
@@ -329,6 +336,7 @@ def init_services(
             queries=list(config.search.project_prefetch_queries or []),
         ),
         project_memory_pool=project_memory_pool,
+        session_log_collector=session_log_collector,
     )
     if config.obsidian_vault_path:
         logger.info(f"Initialized SessionManager with Obsidian vault: {config.obsidian_vault_path}")

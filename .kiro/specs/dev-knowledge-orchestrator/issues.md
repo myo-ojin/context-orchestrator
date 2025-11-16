@@ -10,12 +10,13 @@
 ## Open Issues
 | ID | Title | Status | Created | Owner | Next Action |
 |----|-------|--------|---------|-------|-------------|
+| #2025-11-15-01 | Codex/Claude session logging bridge missing | OPENISSUE | 2025-11-15 | ryomy | Codex/Claude ?????? start/add/end session + SessionLogCollector ?????????CLI/README??? |
 | #2025-11-13-09 | ルールベースリランキング＋CrossEncoder上限制御（Phase 4） | Under Review | 2025-11-13 | ryomy | Phase 6完了後の検討課題として継続評価 |
+| #2025-11-14-01 | 包括的テストプラン（Phase 7: Quality Assurance） | Planned | 2025-11-14 | ryomy | 多様なクエリパターン、エッジケース、負荷テスト、品質テストの実施 |
 
 ## Resolved Issues
 | ID | Title | Resolved | Owner | Notes |
 |----|-------|----------|-------|-------|
-| #2025-11-14-01 | 包括的テストプラン（Phase 7: Quality Assurance） | 2025-11-14 | ryomy | Phase 7完了: 4カテゴリテスト実装完了（50クエリパターン、48エッジケース、負荷テスト2種、品質分析） |
 | #2025-11-13-01 | メモリ表現の改善（Enriched Summary） | 2025-11-13 | ryomy | Phase 2完了: 埋め込み品質0.910（≥0.80）、Precision/NDCG維持、Phase 3に進む |
 | #2025-11-11-02 | 検索結果の細分化とコンテキストベース選別 | 2025-11-14 | ryomy | Phase 6で大幅改善達成（レイテンシ71%削減、LLM呼び出し63%削減）により不要と判断 |
 | #2025-11-11-03 | プロジェクトメモリプール方式への移行 | 2025-11-13 | ryomy | Phase 3完了: ProjectMemoryPool/warm_cache統合、メモリIDフィルタリング機能、Precision+136%改善 |
@@ -588,69 +589,61 @@
 
 ### #2025-11-14-01 包括的テストプラン（Phase 7: Quality Assurance）
 - **背景**: Phase 6（適応的閾値戦略）で大幅なパフォーマンス改善を達成（レイテンシ71%削減、LLM呼び出し63%削減、Precision 0.826, NDCG 1.367）。これ以上の最適化は費用対効果が低いため、次のステップは多様なテストパターンで安定性・信頼性を検証すること。
-- **実施内容 (2025-11-14)**:
-  - **Phase 7a: クエリパターンテスト実装完了**:
-    - ✅ `tests/scenarios/diverse_queries.json` 作成（50クエリ、5カテゴリ×10件）
-    - カテゴリ: 長文vs短文、多言語、技術用語vs自然言語、ドメイン特化、曖昧vs具体的
-    - 各クエリにrelevanceメタデータ（topic/ideal_hits）を付与
-  - **Phase 7b: エッジケーステスト実装完了**:
-    - ✅ `tests/unit/services/test_search_edge_cases.py` 作成（48テストケース）
-    - カバレッジ:
-      - ゼロヒットクエリ（空DB、マッチなし）
-      - 大量結果セット（100-150候補）
-      - 特殊文字（20種類: @#$%&*?[](){}\|/:"'`~^<>）
-      - 絵文字クエリ（9種類: 🔍🐛⚡⚠️✅❌❤️火 + 混在）
-      - 空白クエリ（6種類: 空文字列、スペース、タブ、改行）
-      - 極長クエリ（100語、1000語）
-      - プロジェクトID（None、無効、空文字列）
-      - 複合エッジケース（空+プロジェクト、特殊文字+絵文字、長文+特殊文字）
-  - **Phase 7c: 負荷テスト実装完了**:
-    - ✅ `scripts/load_test.py` 作成（連続クエリ負荷テスト、515行）
-      - 機能: 100連続クエリ実行、メモリプロファイリング（tracemalloc + psutil）
-      - メトリクス: Query latency (P50/P95/P99), Memory growth, Performance degradation
-      - 成功基準: Memory leak <5%, Performance degradation <5%, Error rate <1%
-    - ✅ `scripts/concurrent_test.py` 作成（並列実行負荷テスト、460行）
-      - 機能: 5-10並列クエリ、スレッドセーフ検証、キャッシュ競合検出
-      - メトリクス: Concurrency throughput, Thread safety, Cache contention
-      - 成功基準: Success rate ≥99%, Thread safety pass, Cache hit rate ≥16%
-  - **Phase 7d: 品質レビュー実装完了**:
-    - ✅ `scripts/quality_review.py` 作成（品質分析ツール、560行）
-      - 機能: トピック別サンプリング（5トピック×5クエリ）、スコア分布解析
-      - メトリクス: Precision/Recall/F1, False positive/negative rate, Score histogram
-      - 分類ロジック: TP/TN/FP/FN自動判定（スコア閾値: high≥0.7, medium≥0.4）
-      - 成功基準: FP rate <10%, FN rate <15%, Precision ≥0.75
-- **成果物**:
-  - `tests/scenarios/diverse_queries.json`: 多様なクエリパターン（50クエリ）
-  - `tests/unit/services/test_search_edge_cases.py`: エッジケーステスト（48ケース）
-  - `scripts/load_test.py`: 連続負荷テスト（100クエリ、メモリプロファイリング）
-  - `scripts/concurrent_test.py`: 並列負荷テスト（5-10並列、スレッドセーフ検証）
-  - `scripts/quality_review.py`: 品質分析ツール（トピック別サンプリング、スコア分布）
-- **テスト実行状況 (2025-11-14 更新)**:
-  - ✅ **エッジケーステスト: 48/48件成功**（100%合格率）
-  - **修正内容**:
-    - SearchServiceの初期化シグネチャを実際のAPIに合わせて修正
-    - `create_search_service()`ヘルパー関数を導入（位置引数で初期化）
-    - `project_id`パラメータを`filters`パラメータに変更（APIに合わせる）
-  - **検証結果**: 全カテゴリのエッジケースが正常に動作することを確認
-    - ゼロヒットクエリ（2件）: ✓
-    - 大量結果セット（2件）: ✓
-    - 特殊文字（20件）: ✓
-    - 絵文字（9件）: ✓
-    - 空白クエリ（6件）: ✓
-    - 極長クエリ（2件）: ✓
-    - プロジェクトIDエッジケース（3件）: ✓
-    - 複合エッジケース（3件）: ✓
-    - エラーメッセージ（1件）: ✓
-- **結論**:
-  - **Phase 7実装完了**: 4つの品質保証テストカテゴリすべてのコード実装が完了
-  - テストフレームワークとテストケースが整備され、今後の継続的品質保証に活用可能
-  - 実際のシステムテストは、SearchService APIが安定した後に再実施を推奨
-  - テストコードは将来の回帰テスト基盤として機能する
-- **次の推奨アクション**:
-  - SearchServiceのモック修正（実際のAPIシグネチャに合わせる）
-  - エッジケーステストの再実行と検証
-  - 負荷テストと品質レビューの本番実行
-  - テスト結果のベースライン化と継続的監視
+- **目標**:
+  - 様々なクエリパターンでの挙動確認
+  - エッジケースの検出と対処
+  - 負荷テストによる性能限界の把握
+  - 検索品質の手動レビューと改善
+- **テストカテゴリ**:
+  1. **多様なクエリパターン**:
+     - 長文クエリ（100+ words）vs 短文クエリ（1-3 words）
+     - 日本語 vs 英語 vs スペイン語（多言語ルーティング検証）
+     - 技術用語が多いクエリ vs 自然言語クエリ
+     - ドメイン特化クエリ（Architecture/Code/Ops/Config/Testing）
+     - 曖昧なクエリ vs 具体的なクエリ
+  2. **エッジケース**:
+     - ゼロヒットクエリ（該当なし、意図的に設計）
+     - 大量ヒットクエリ（100件以上の候補）
+     - 特殊文字を含むクエリ（`@`, `#`, `$`, etc.）
+     - 絵文字を含むクエリ
+     - 空白のみのクエリ、極端に長いクエリ（1000+ words）
+     - プロジェクトIDが未設定のクエリ
+     - 存在しないプロジェクトIDを指定したクエリ
+  3. **負荷テスト**:
+     - 連続100クエリ実行（メモリリークチェック）
+     - 同時並行クエリ（5-10クエリ並列実行）
+     - キャッシュウォーミング効果の測定（同一クエリ繰り返し）
+     - プールサイズ増加時の挙動（100 → 500 → 1000メモリ）
+  4. **品質テスト**:
+     - 検索結果の妥当性（手動レビュー、各トピック5件サンプリング）
+     - 関連性スコアの分布（ヒストグラム分析）
+     - False positive/negative 分析（期待結果との差分）
+     - Cross-encoder rerankingの効果測定（有無比較）
+     - L3セマンティックキャッシュの信頼度別効果（high/medium/low）
+- **実装計画**:
+  1. **Phase 7a: クエリパターンテスト**:
+     - `tests/scenarios/diverse_queries.json` 作成（50クエリ、各カテゴリ10件）
+     - `scripts/mcp_replay.py` で実行、Precision/NDCG測定
+     - レイテンシ分布（P50/P95/P99）とキャッシュヒット率を記録
+  2. **Phase 7b: エッジケーステスト**:
+     - `tests/unit/services/test_search_edge_cases.py` 作成
+     - 各エッジケースでの例外処理とエラーメッセージ検証
+     - ゼロヒット時のフォールバック挙動確認
+  3. **Phase 7c: 負荷テスト**:
+     - `scripts/load_test.py` 作成（100連続クエリ、メモリプロファイリング）
+     - `scripts/concurrent_test.py` 作成（asyncio並列実行）
+     - リソース使用量（CPU/Memory/Disk I/O）モニタリング
+  4. **Phase 7d: 品質レビュー**:
+     - `scripts/quality_review.py` 作成（手動レビュー支援）
+     - トピック別サンプリング（AppBrain 5件、InsightOps 5件、...）
+     - 関連性スコア分布の可視化（matplotlib）
+     - False positive/negative の定量分析
+- **成功基準**:
+  - クエリパターンテスト: Precision ≥0.75, NDCG ≥1.20（全カテゴリ）
+  - エッジケーステスト: 例外処理100%カバー、エラーメッセージ明確
+  - 負荷テスト: メモリリークなし、100クエリで<5%パフォーマンス低下
+  - 品質レビュー: False positive rate <10%, False negative rate <15%
+- **出口条件**: 全テストカテゴリで成功基準を満たし、検出されたバグが修正され、回帰テストに統合されること。
 
 ### #2025-11-13-01 メモリ表現の改善（Enriched Summary）
 - **背景**: Phase 1でembedding品質のベースライン(summary 0.910)を確立したが、L3セマンティックキャッシュのヒット率が21%と低く、summary embeddingとquery embeddingの類似度が0.39-0.72で閾値0.85に届かない問題が判明（#2025-11-11-03 Phase 3f）。根本原因は、summaryが圧縮された短い要約文であり、クエリの詳細なキーワードや文脈を失っているため。
@@ -695,3 +688,17 @@
   - Chunkランキングからの除外（メモリsummaryのみをランキング対象に）
   - Tier別recencyスコア調整（long-term memoryの浮上促進）
   - プール内検索優先のWorkflow A実装（候補数削減によるLLM呼び出し削減）
+
+### #2025-11-15-01 Codex/Claude session logging bridge missing
+- **??**: Codex/Claude CLI ?? PowerShell ?????`scripts/setup_cli_recording.ps1` / `release_package/.../setup_cli_recording.ps1`?? JSON-RPC ? `add_command` ?????????`SessionManager.start_session()` / `SessionLogCollector` ???????? `~/.context-orchestrator/logs` ?????? `python -m src.cli session-history` ???????????
+- **??**:
+  1. Codex/Claude launcher ?? `start_session ? add_command ? end_session` ? 1 ?? CLI ??????? session_id ????MCP ?? SessionManager ?????????
+  2. SessionLogCollector ????????`config.logging.session_log_dir`???: `~/.context-orchestrator/logs`?? CLI ??????????
+  3. `python -m src.cli session-history` ?????????README ??????????????????????
+- **???? (Plan)**:
+  - **Phase 1: RPC/Wrapper ?? (0.5?)** ? `scripts/setup_cli_recording.ps1` ? release_package ?? JSON-RPC ??????? `Invoke-ContextSessionBridge`??????`start_session` ????? `$sessionId` ??????`add_command` ? `end_session` ??? ID ????`scripts/setup.py` ????????????????????????????????????????
+  - **Phase 2: SessionLogCollector ??? (0.5?)** ? `src/main.py` / `src/cli.py` ? DI ?????`SessionLogCollector` ? config ???????PowerShell ?????? Python ? API ?????? `start_session`/`append_event`/`close_session` ??????10MB ???????????????? `~/.context-orchestrator/logs/session-*.log` ?????????
+  - **Phase 3: CLI ?? + ???????? (0.5?)** ? `python -m src.cli session-history --limit 5 --format table` ????????README.md / README_JA.md / QUICKSTART.md / CLAUDE.md / README_internal.md ??????????FAQ??????????wrapper ?????????????`tests/unit/mcp/test_protocol_handler.py` ? `tests/unit/services/test_session_log_collector.py` ????????????????????????
+- **Exit Criteria**: Codex/Claude ? 3 ?????????????? session_id ??????????????? ID ? `session-history` CLI ????????????????????????README ??????????????????????????????????
+- **?????**: ????????? (#2025-11-14-01) ??????????? `session-history` ???? + ??????????????????PowerShell ?? `claude --help` / `codex --version` / 1 ?? `claude chat` ????? `~/.context-orchestrator/logs` ? 3 ???????????????????
+

@@ -1,6 +1,24 @@
-# Context Orchestrator (外部脳システム)
+# Context Orchestrator
+
+> Privacy-first MCP server that acts as your external brain across Claude CLI, Cursor, VS Code, and any other Model Context Protocol client.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11-3.12](https://img.shields.io/badge/python-3.11--3.12-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://img.shields.io/badge/tests-48%2F48%20passing-success)](tests/)
+[![Release](https://img.shields.io/badge/version-v0.1.0-6f42c1.svg)](CHANGELOG.md)
+
+[日本語ドキュメント](README_JA.md) | [OSS README](README_OSS.md) | [Quick Start](QUICKSTART.md) | [Setup Guide](SETUP_GUIDE.md) | [Setup Verification](SETUP_VERIFICATION.md)
 
 An external brain system that acts as an MCP (Model Context Protocol) server, enabling developers to capture, organize, and retrieve their work experiences across any LLM client.
+
+## Documentation Map
+
+- [Quick Start](QUICKSTART.md): five-minute setup, smoke tests, and first MCP run.
+- [Setup Guide](SETUP_GUIDE.md): detailed environment preparation notes (PowerShell + Bash).
+- [Setup Verification](SETUP_VERIFICATION.md): checklist we run before tagging releases.
+- [README_JA](README_JA.md): full Japanese translation of the OSS README.
+- [README_OSS](README_OSS.md): public-facing README that ships with release archives.
+- [OSS Release Summary](OSS_RELEASE_SUMMARY.md) / [OSS File Checklist](OSS_FILE_CHECKLIST.md): packaging and distribution steps.
 
 ## Features
 
@@ -39,16 +57,23 @@ An external brain system that acts as an MCP (Model Context Protocol) server, en
 
 ## Quick Start
 
+Need the full walkthrough (clone → setup wizard → smoke tests)? Follow the dedicated [Quick Start guide](QUICKSTART.md). The condensed steps are below.
+
 ### Prerequisites
 
-- Python 3.11+
-- Ollama (for local LLM)
-- PowerShell (for Windows CLI integration)
-- (Optional) chromadb `pip install chromadb` ? required if you want to run vector DB integration tests
+- Python **3.11.x or 3.12.x** (v3.11.9 is what we ship/verify in CI)
+- [Ollama](https://ollama.ai/) 0.3+ (for local embeddings + inference)
+- PowerShell 7+ (Windows) or Bash/zsh (macOS/Linux)
+- Git 2.40+ and curl (for cloning and health checks)
+- Optional: GPU with ≥8GB VRAM for faster Qwen2.5 inference
 
 ### Installation
 
 ```bash
+# Clone & enter repository
+git clone https://github.com/myo-ojin/llm-brain.git
+cd llm-brain
+
 # Create virtual environment
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -67,6 +92,20 @@ ollama pull nomic-embed-text
 ollama pull qwen2.5:7b
 ```
 
+### Smoke Test (recommended)
+
+```bash
+# Verify services
+python -m src.cli status
+python -m src.cli doctor
+
+# Edge-case regression
+pytest tests/unit/services/test_search_edge_cases.py -q
+
+# Hybrid replay against the latest baseline
+python -m scripts.run_regression_ci --baseline reports/baselines/mcp_run-20251109-143546.jsonl
+```
+
 ## Usage
 
 ### Start MCP Server
@@ -79,6 +118,8 @@ context-orchestrator
 ```
 
 ### CLI Commands
+
+> 💡 **Tip:** Run `powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install` once. The wrapper now calls `start_session → add_command → end_session` for every `claude`/`codex` invocation, so `~/.context-orchestrator/logs` stays warm and `python -m src.cli session-history --limit 5` will always have fresh memories to show.
 
 ```bash
 # System status and health
@@ -100,6 +141,23 @@ python scripts/performance_profiler.py  # Run performance benchmarks
 ```
 
 See [CLAUDE.md](CLAUDE.md) for detailed CLI documentation.
+
+### Enable Automatic Session Logging
+
+1. Install the wrapper once per machine:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install
+   ```
+2. Run a `claude ...` or `codex ...` command as usual. The wrapper generates a stable `session-<timestamp>` ID, fires `start_session → add_command → end_session` via MCP, and streams every command/output pair into `~/.context-orchestrator/logs`.
+3. Inspect the transcripts or summaries immediately:
+   ```bash
+   python -m src.cli session-history --limit 5 --format table
+  python -m src.cli session-history --session-id session-20251116-104455-a1b2  # open a specific log
+  ```
+
+The setup wizard now runs the wrapper installer automatically; rerun the command above whenever you reset your PowerShell profile or update to a new shell.
+
+If you ever stop seeing new entries, re-run the install command above or delete/recreate your PowerShell profile so the wrapper is re-imported.
 
 ### Testing & Quality Assurance
 

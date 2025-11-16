@@ -54,82 +54,132 @@ function Resolve-CommandShim {
     return $command.Source
 }
 
-# Send command to Context Orchestrator (async)
-function Send-ToContextOrchestrator {
+# Invoke Context Orchestrator (sync/async)
+function Invoke-ContextSessionRpc {
     param(
-        [string]$SessionId,
-        [string]$Command,
-        [string]$Output,
-        [int]$ExitCode
+        [Parameter(Mandatory = $true)]
+        [string]$Method,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Params,
+        [switch]$Async
     )
 
-    # Skip if internal call
     if (Test-IsInternalCall) {
-        return
+        return $null
     }
 
-    # Build JSON payload
     $payload = @{
         jsonrpc = "2.0"
-        id = 1
-        method = "add_command"
-        params = @{
-            session_id = $SessionId
-            command = $Command
-            output = $Output
-            exit_code = $ExitCode
-        }
+        id = (Get-Random -Minimum 1000 -Maximum 999999)
+        method = $Method
+        params = $Params
     } | ConvertTo-Json -Compress
 
-    # Send to Context Orchestrator in background job
-    Start-Job -ScriptBlock {
+    $scriptBlock = {
         param($payload)
 
         try {
-            # Find Python
             $python = Get-Command python -ErrorAction SilentlyContinue
+            if (-not $python) {
+                return $null
+            }
 
-            if ($python) {
-                # Set internal flag to prevent recursion
-                $env:CONTEXT_ORCHESTRATOR_INTERNAL = "1"
-
-                # Send to Context Orchestrator
-                $payload | & $python.Source -m src.main 2>&1 | Out-Null
+            $previous = $env:CONTEXT_ORCHESTRATOR_INTERNAL
+            $env:CONTEXT_ORCHESTRATOR_INTERNAL = "1"
+            try {
+                $output = $payload | & $python.Source -m src.main 2>&1
+                return $output
+            }
+            finally {
+                $env:CONTEXT_ORCHESTRATOR_INTERNAL = $previous
             }
         }
         catch {
-            # Silently fail (don't interrupt user workflow)
+            return $null
         }
-    } -ArgumentList $payload | Out-Null
+    }
+
+    if ($Async) {
+        Start-Job -ScriptBlock $scriptBlock -ArgumentList $payload | Out-Null
+        return $true
+    }
+
+    $output = & $scriptBlock $payload
+    if (-not $output) {
+        return $null
+    }
+
+    $jsonLine = $output | Select-Object -Last 1
+    if (-not $jsonLine) {
+        return $null
+    }
+
+    try {
+        return $jsonLine | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        return $null
+    }
 }
+
+# Wrapper version (kept in profile for telemetry)
+$ContextOrchestratorWrapperVersion = "2025.11.16"
 
 # Wrapper for claude command
 function claude {
     $realClaude = Resolve-CommandShim -Name "claude"
 
-    # Check if internal call
     if (Test-IsInternalCall) {
-        # Call real claude
         & $realClaude @args
         return
     }
 
-    # Generate session ID
+    $commandArgs = ($args -join ' ')
+    $command = ("claude $commandArgs").Trim()
     $sessionId = New-SessionId
+    $sessionActive = $false
 
-    # Capture command
-    $command = "claude $($args -join ' ')"
+    $startResponse = Invoke-ContextSessionRpc -Method "start_session" -Params @{
+        session_id = $sessionId
+    }
 
-    # Call real claude and capture output
+    if ($startResponse -and $startResponse.result -and $startResponse.result.session_id) {
+        $sessionId = $startResponse.result.session_id
+        $sessionActive = $true
+    }
+
+    $startedAt = Get-Date
     $output = & $realClaude @args 2>&1 | Tee-Object -Variable capturedOutput
-
-    # Get exit code
     $exitCode = $LASTEXITCODE
+    $finishedAt = Get-Date
 
-    # Send to Context Orchestrator
-    Send-ToContextOrchestrator -SessionId $sessionId -Command $command -Output ($capturedOutput -join "`n") -ExitCode $exitCode
+    if ($sessionActive) {
+        $metadata = @{
+            client = "claude"
+            binary = "claude"
+            cwd = (Get-Location).Path
+            shell = $PSVersionTable.PSEdition
+            args = $commandArgs
+            started_at = $startedAt.ToString("o")
+            finished_at = $finishedAt.ToString("o")
+            duration_seconds = [math]::Round(($finishedAt - $startedAt).TotalSeconds, 2)
+            wrapper_version = $ContextOrchestratorWrapperVersion
+            host = $env:COMPUTERNAME
+        }
 
-    # Return exit code
+        Invoke-ContextSessionRpc -Method "add_command" -Params @{
+            session_id = $sessionId
+            command = $command
+            output = ($capturedOutput -join "`n")
+            exit_code = $exitCode
+            metadata = $metadata
+        } | Out-Null
+
+        Invoke-ContextSessionRpc -Method "end_session" -Params @{
+            session_id = $sessionId
+        } -Async | Out-Null
+    }
+
     return $exitCode
 }
 
@@ -137,29 +187,57 @@ function claude {
 function codex {
     $realCodex = Resolve-CommandShim -Name "codex"
 
-    # Check if internal call
     if (Test-IsInternalCall) {
-        # Call real codex
         & $realCodex @args
         return
     }
 
-    # Generate session ID
+    $commandArgs = ($args -join ' ')
+    $command = ("codex $commandArgs").Trim()
     $sessionId = New-SessionId
+    $sessionActive = $false
 
-    # Capture command
-    $command = "codex $($args -join ' ')"
+    $startResponse = Invoke-ContextSessionRpc -Method "start_session" -Params @{
+        session_id = $sessionId
+    }
 
-    # Call real codex and capture output
+    if ($startResponse -and $startResponse.result -and $startResponse.result.session_id) {
+        $sessionId = $startResponse.result.session_id
+        $sessionActive = $true
+    }
+
+    $startedAt = Get-Date
     $output = & $realCodex @args 2>&1 | Tee-Object -Variable capturedOutput
-
-    # Get exit code
     $exitCode = $LASTEXITCODE
+    $finishedAt = Get-Date
 
-    # Send to Context Orchestrator
-    Send-ToContextOrchestrator -SessionId $sessionId -Command $command -Output ($capturedOutput -join "`n") -ExitCode $exitCode
+    if ($sessionActive) {
+        $metadata = @{
+            client = "codex"
+            binary = "codex"
+            cwd = (Get-Location).Path
+            shell = $PSVersionTable.PSEdition
+            args = $commandArgs
+            started_at = $startedAt.ToString("o")
+            finished_at = $finishedAt.ToString("o")
+            duration_seconds = [math]::Round(($finishedAt - $startedAt).TotalSeconds, 2)
+            wrapper_version = $ContextOrchestratorWrapperVersion
+            host = $env:COMPUTERNAME
+        }
 
-    # Return exit code
+        Invoke-ContextSessionRpc -Method "add_command" -Params @{
+            session_id = $sessionId
+            command = $command
+            output = ($capturedOutput -join "`n")
+            exit_code = $exitCode
+            metadata = $metadata
+        } | Out-Null
+
+        Invoke-ContextSessionRpc -Method "end_session" -Params @{
+            session_id = $sessionId
+        } -Async | Out-Null
+    }
+
     return $exitCode
 }
 
