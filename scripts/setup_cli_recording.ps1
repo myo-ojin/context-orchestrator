@@ -149,7 +149,7 @@ function claude {
     }
 
     $startedAt = Get-Date
-    $output = & $realClaude @args 2>&1 | Tee-Object -Variable capturedOutput
+    $null = & $realClaude @args 2>&1 | Tee-Object -Variable capturedOutput
     $exitCode = $LASTEXITCODE
     $finishedAt = Get-Date
 
@@ -207,7 +207,7 @@ function codex {
     }
 
     $startedAt = Get-Date
-    $output = & $realCodex @args 2>&1 | Tee-Object -Variable capturedOutput
+    $null = & $realCodex @args 2>&1 | Tee-Object -Variable capturedOutput
     $exitCode = $LASTEXITCODE
     $finishedAt = Get-Date
 
