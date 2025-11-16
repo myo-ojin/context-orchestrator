@@ -145,7 +145,9 @@ python -m src.cli search --query "deploy checklist"
 
 - Read the main [README](../README.md) for feature deep-dives.
 - Need Japanese docs? See [README_JA](../README_JA.md).
-- Enable CLI session capture now: `powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install` so future work auto-ingests and shows up in `python -m src.cli session-history`.
+- Enable CLI session capture now: `powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install`. The wrapper fires `start_session → add_command → end_session` for every `claude`/`codex` command, writes logs to `~/.context-orchestrator/logs`, and lets `python -m src.cli session-history --limit 5` surface those transcripts instantly.
+
+  The setup wizard executes this installer automatically; rerun the command above whenever you reset your PowerShell profile.
 - Planning an OSS drop? Follow [OSS_RELEASE_SUMMARY.md](../OSS_RELEASE_SUMMARY.md) and the new packaging checklist.
 - Keep `QUICKSTART.md` up to date whenever setup or dependency steps change窶排elease tagging requires it.
 

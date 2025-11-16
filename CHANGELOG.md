@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- PowerShell CLI recording wrapper now calls MCP `start_session → add_command → end_session` and feeds SessionLogCollector, enabling immediate `python -m src.cli session-history` results and live logs under `~/.context-orchestrator/logs`. README/Quick Start docs were updated to describe the workflow.
+
 ## [0.1.0] - 2025-11-14
 
 ### Added

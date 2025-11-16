@@ -38,108 +38,206 @@ function New-SessionId {
     return "session-$(Get-Date -Format 'yyyyMMdd-HHmmss')-$([guid]::NewGuid().ToString().Substring(0,8))"
 }
 
-# Send command to Context Orchestrator (async)
-function Send-ToContextOrchestrator {
+# Resolve the real CLI shim instead of assuming an .exe is present
+function Resolve-CommandShim {
     param(
-        [string]$SessionId,
-        [string]$Command,
-        [string]$Output,
-        [int]$ExitCode
+        [Parameter(Mandatory = $true)]
+        [string]$Name
     )
 
-    # Skip if internal call
-    if (Test-IsInternalCall) {
-        return
+    $command = Get-Command $Name -CommandType Application,ExternalScript -ErrorAction SilentlyContinue | Select-Object -First 1
+
+    if (-not $command) {
+        throw "Context Orchestrator CLI recording wrapper could not locate '$Name'. Ensure it is installed and on PATH."
     }
 
-    # Build JSON payload
+    return $command.Source
+}
+
+# Invoke Context Orchestrator (sync/async)
+function Invoke-ContextSessionRpc {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Method,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Params,
+        [switch]$Async
+    )
+
+    if (Test-IsInternalCall) {
+        return $null
+    }
+
     $payload = @{
         jsonrpc = "2.0"
-        id = 1
-        method = "add_command"
-        params = @{
-            session_id = $SessionId
-            command = $Command
-            output = $Output
-            exit_code = $ExitCode
-        }
+        id = (Get-Random -Minimum 1000 -Maximum 999999)
+        method = $Method
+        params = $Params
     } | ConvertTo-Json -Compress
 
-    # Send to Context Orchestrator in background job
-    Start-Job -ScriptBlock {
+    $scriptBlock = {
         param($payload)
 
         try {
-            # Find Python
             $python = Get-Command python -ErrorAction SilentlyContinue
+            if (-not $python) {
+                return $null
+            }
 
-            if ($python) {
-                # Set internal flag to prevent recursion
-                $env:CONTEXT_ORCHESTRATOR_INTERNAL = "1"
-
-                # Send to Context Orchestrator
-                $payload | & $python.Source -m src.main 2>&1 | Out-Null
+            $previous = $env:CONTEXT_ORCHESTRATOR_INTERNAL
+            $env:CONTEXT_ORCHESTRATOR_INTERNAL = "1"
+            try {
+                $output = $payload | & $python.Source -m src.main 2>&1
+                return $output
+            }
+            finally {
+                $env:CONTEXT_ORCHESTRATOR_INTERNAL = $previous
             }
         }
         catch {
-            # Silently fail (don't interrupt user workflow)
+            return $null
         }
-    } -ArgumentList $payload | Out-Null
+    }
+
+    if ($Async) {
+        Start-Job -ScriptBlock $scriptBlock -ArgumentList $payload | Out-Null
+        return $true
+    }
+
+    $output = & $scriptBlock $payload
+    if (-not $output) {
+        return $null
+    }
+
+    $jsonLine = $output | Select-Object -Last 1
+    if (-not $jsonLine) {
+        return $null
+    }
+
+    try {
+        return $jsonLine | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        return $null
+    }
 }
+
+# Wrapper version (kept in profile for telemetry)
+$ContextOrchestratorWrapperVersion = "2025.11.16"
 
 # Wrapper for claude command
 function claude {
-    # Check if internal call
+    $realClaude = Resolve-CommandShim -Name "claude"
+
     if (Test-IsInternalCall) {
-        # Call real claude
-        & claude.exe @args
+        & $realClaude @args
         return
     }
 
-    # Generate session ID
+    $commandArgs = ($args -join ' ')
+    $command = ("claude $commandArgs").Trim()
     $sessionId = New-SessionId
+    $sessionActive = $false
 
-    # Capture command
-    $command = "claude $($args -join ' ')"
+    $startResponse = Invoke-ContextSessionRpc -Method "start_session" -Params @{
+        session_id = $sessionId
+    }
 
-    # Call real claude and capture output
-    $output = & claude.exe @args 2>&1 | Tee-Object -Variable capturedOutput
+    if ($startResponse -and $startResponse.result -and $startResponse.result.session_id) {
+        $sessionId = $startResponse.result.session_id
+        $sessionActive = $true
+    }
 
-    # Get exit code
+    $startedAt = Get-Date
+    $output = & $realClaude @args 2>&1 | Tee-Object -Variable capturedOutput
     $exitCode = $LASTEXITCODE
+    $finishedAt = Get-Date
 
-    # Send to Context Orchestrator
-    Send-ToContextOrchestrator -SessionId $sessionId -Command $command -Output ($capturedOutput -join "`n") -ExitCode $exitCode
+    if ($sessionActive) {
+        $metadata = @{
+            client = "claude"
+            binary = "claude"
+            cwd = (Get-Location).Path
+            shell = $PSVersionTable.PSEdition
+            args = $commandArgs
+            started_at = $startedAt.ToString("o")
+            finished_at = $finishedAt.ToString("o")
+            duration_seconds = [math]::Round(($finishedAt - $startedAt).TotalSeconds, 2)
+            wrapper_version = $ContextOrchestratorWrapperVersion
+            host = $env:COMPUTERNAME
+        }
 
-    # Return exit code
+        Invoke-ContextSessionRpc -Method "add_command" -Params @{
+            session_id = $sessionId
+            command = $command
+            output = ($capturedOutput -join "`n")
+            exit_code = $exitCode
+            metadata = $metadata
+        } | Out-Null
+
+        Invoke-ContextSessionRpc -Method "end_session" -Params @{
+            session_id = $sessionId
+        } -Async | Out-Null
+    }
+
     return $exitCode
 }
 
 # Wrapper for codex command
 function codex {
-    # Check if internal call
+    $realCodex = Resolve-CommandShim -Name "codex"
+
     if (Test-IsInternalCall) {
-        # Call real codex
-        & codex.exe @args
+        & $realCodex @args
         return
     }
 
-    # Generate session ID
+    $commandArgs = ($args -join ' ')
+    $command = ("codex $commandArgs").Trim()
     $sessionId = New-SessionId
+    $sessionActive = $false
 
-    # Capture command
-    $command = "codex $($args -join ' ')"
+    $startResponse = Invoke-ContextSessionRpc -Method "start_session" -Params @{
+        session_id = $sessionId
+    }
 
-    # Call real codex and capture output
-    $output = & codex.exe @args 2>&1 | Tee-Object -Variable capturedOutput
+    if ($startResponse -and $startResponse.result -and $startResponse.result.session_id) {
+        $sessionId = $startResponse.result.session_id
+        $sessionActive = $true
+    }
 
-    # Get exit code
+    $startedAt = Get-Date
+    $output = & $realCodex @args 2>&1 | Tee-Object -Variable capturedOutput
     $exitCode = $LASTEXITCODE
+    $finishedAt = Get-Date
 
-    # Send to Context Orchestrator
-    Send-ToContextOrchestrator -SessionId $sessionId -Command $command -Output ($capturedOutput -join "`n") -ExitCode $exitCode
+    if ($sessionActive) {
+        $metadata = @{
+            client = "codex"
+            binary = "codex"
+            cwd = (Get-Location).Path
+            shell = $PSVersionTable.PSEdition
+            args = $commandArgs
+            started_at = $startedAt.ToString("o")
+            finished_at = $finishedAt.ToString("o")
+            duration_seconds = [math]::Round(($finishedAt - $startedAt).TotalSeconds, 2)
+            wrapper_version = $ContextOrchestratorWrapperVersion
+            host = $env:COMPUTERNAME
+        }
 
-    # Return exit code
+        Invoke-ContextSessionRpc -Method "add_command" -Params @{
+            session_id = $sessionId
+            command = $command
+            output = ($capturedOutput -join "`n")
+            exit_code = $exitCode
+            metadata = $metadata
+        } | Out-Null
+
+        Invoke-ContextSessionRpc -Method "end_session" -Params @{
+            session_id = $sessionId
+        } -Async | Out-Null
+    }
+
     return $exitCode
 }
 
@@ -167,7 +265,7 @@ function Install-Wrapper {
     # Append wrapper functions
     Add-Content -Path $PROFILE -Value "`n$WrapperFunctions"
 
-    Write-Host "✓ Wrapper installed to: $PROFILE" -ForegroundColor Green
+    Write-Host "✁EWrapper installed to: $PROFILE" -ForegroundColor Green
     Write-Host ""
     Write-Host "Please restart PowerShell or run: . `$PROFILE" -ForegroundColor Yellow
 }
@@ -196,7 +294,7 @@ function Uninstall-Wrapper {
     # Write back
     Set-Content -Path $PROFILE -Value $newContent
 
-    Write-Host "✓ Wrapper uninstalled from: $PROFILE" -ForegroundColor Green
+    Write-Host "✁EWrapper uninstalled from: $PROFILE" -ForegroundColor Green
     Write-Host ""
     Write-Host "Please restart PowerShell" -ForegroundColor Yellow
 }

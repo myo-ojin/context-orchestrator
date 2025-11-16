@@ -119,7 +119,7 @@ context-orchestrator
 
 ### CLI Commands
 
-> 💡 **Tip:** Run `powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install` once so every PowerShell session is captured automatically. After that, `python -m src.cli session-history` will always have fresh memories to show.
+> 💡 **Tip:** Run `powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install` once. The wrapper now calls `start_session → add_command → end_session` for every `claude`/`codex` invocation, so `~/.context-orchestrator/logs` stays warm and `python -m src.cli session-history --limit 5` will always have fresh memories to show.
 
 ```bash
 # System status and health
@@ -141,6 +141,23 @@ python scripts/performance_profiler.py  # Run performance benchmarks
 ```
 
 See [CLAUDE.md](CLAUDE.md) for detailed CLI documentation.
+
+### Enable Automatic Session Logging
+
+1. Install the wrapper once per machine:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install
+   ```
+2. Run a `claude ...` or `codex ...` command. The wrapper generates a `session-<timestamp>` ID, fires `start_session → add_command → end_session`, and writes transcripts to `~/.context-orchestrator/logs`.
+3. Inspect the new entries:
+   ```bash
+   python -m src.cli session-history --limit 5 --format table
+   python -m src.cli session-history --session-id <session_id>
+   ```
+
+The setup wizard automatically runs the installer; rerun the command above if you reset your PowerShell profile.
+
+Re-run the install script anytime you rotate PowerShell profiles to keep the wrapper active.
 
 ### Testing & Quality Assurance
 

@@ -30,6 +30,7 @@ from src.services.ingestion import IngestionService
 from src.services.project_manager import ProjectManager
 from src.services.query_attributes import QueryAttributeExtractor, QueryAttributes
 from src.services.project_memory_pool import ProjectMemoryPool
+from src.services.session_log_collector import SessionLogCollector
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,7 @@ class SessionManager:
         search_service: Optional["SearchService"] = None,
         project_prefetch_settings: Optional[ProjectPrefetchSettings] = None,
         project_memory_pool: Optional[ProjectMemoryPool] = None,
+        session_log_collector: Optional[SessionLogCollector] = None,
     ):
         """
         Initialize Session Manager
@@ -91,6 +93,7 @@ class SessionManager:
         self.search_service = search_service
         self.project_prefetch_settings = project_prefetch_settings or ProjectPrefetchSettings()
         self.project_memory_pool = project_memory_pool
+        self.session_log_collector = session_log_collector
 
         logger.info("Initialized SessionManager")
 
@@ -124,6 +127,8 @@ class SessionManager:
             'project_hint_history': [],
             'prefetched_projects': [],
         }
+
+        self._start_session_log(session_id)
 
         logger.info(f"Started session: {session_id}")
         return session_id
@@ -173,6 +178,7 @@ class SessionManager:
         self.sessions[session_id]['last_activity'] = datetime.now()
         self._maybe_update_project_from_metadata(session_id, command_entry['metadata'])
         self._maybe_update_project_from_text(session_id, f"{command}\n{output}")
+        self._log_command_event(session_id, command_entry)
 
         logger.debug(f"Added command to session {session_id}: {command[:50]}...")
         return True
@@ -242,6 +248,57 @@ class SessionManager:
         except Exception as e:
             logger.error(f"Failed to end session {session_id}: {e}")
             return None
+        finally:
+            if session_id not in self.sessions:
+                self._close_session_log(session_id)
+
+    def _start_session_log(self, session_id: str) -> None:
+        """Initialize SessionLogCollector for a session if configured."""
+        if not self.session_log_collector:
+            return
+
+        try:
+            self.session_log_collector.start_session(session_id)
+        except Exception as exc:  # pragma: no cover - logging only
+            logger.warning(f"Failed to initialize session log for {session_id}: {exc}")
+
+    def _log_command_event(self, session_id: str, command_entry: Dict[str, Any]) -> None:
+        """Append a command event to SessionLogCollector."""
+        if not self.session_log_collector:
+            return
+
+        try:
+            metadata = dict(command_entry.get('metadata') or {})
+            metadata.setdefault('exit_code', command_entry.get('exit_code', 0))
+            metadata.setdefault('timestamp', command_entry.get('timestamp'))
+
+            output = command_entry.get('output') or ''
+            output_section = output if output.strip() else '<no output>'
+            content_lines = [
+                f"$ {command_entry.get('command', '').strip()}",
+                "",
+                "Output:",
+                output_section
+            ]
+
+            self.session_log_collector.append_event(
+                session_id,
+                'command',
+                '\n'.join(content_lines),
+                metadata=metadata
+            )
+        except Exception as exc:  # pragma: no cover - logging only
+            logger.warning(f"Failed to append session log event for {session_id}: {exc}")
+
+    def _close_session_log(self, session_id: str) -> None:
+        """Close SessionLogCollector entry when session ends."""
+        if not self.session_log_collector:
+            return
+
+        try:
+            self.session_log_collector.close_session(session_id)
+        except Exception as exc:  # pragma: no cover - logging only
+            logger.warning(f"Failed to close session log for {session_id}: {exc}")
 
     def _format_session_log(self, session: Dict[str, Any]) -> str:
         """
