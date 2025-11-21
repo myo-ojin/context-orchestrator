@@ -225,6 +225,33 @@ class HealthCheck:
             "Edit config: nano ~/.context-orchestrator/config.yaml"
         ]
 
+    def check_codex_logs(self) -> Tuple[bool, str, List[str]]:
+        """
+        Check if Codex logs directory exists and contains sessions
+
+        Returns:
+            Tuple of (success, message, remediation_steps)
+        """
+        try:
+            codex_home = Path(os.environ.get('USERPROFILE', '~')).expanduser() / '.codex'
+            sessions_dir = codex_home / 'sessions'
+
+            if not sessions_dir.exists():
+                # Codex not installed is OK (user may only use Claude)
+                return True, "Codex CLI not installed (optional)", []
+
+            # Count session files
+            session_files = list(sessions_dir.glob('**/rollout-*.jsonl'))
+            count = len(session_files)
+
+            if count == 0:
+                return True, "Codex directory exists (no sessions yet)", []
+            else:
+                return True, f"Codex sessions found: {count} session logs", []
+
+        except Exception as e:
+            return False, f"Failed to check Codex logs: {e}", []
+
     def run_all_checks(self) -> bool:
         """
         Run all health checks
@@ -237,7 +264,8 @@ class HealthCheck:
             ("Ollama Models", self.check_ollama_models),
             ("Data Directory", self.check_data_directory),
             ("Chroma DB", self.check_chroma_db),
-            ("Config File", self.check_config_file)
+            ("Config File", self.check_config_file),
+            ("Codex Logs", self.check_codex_logs)
         ]
 
         print("=" * 60)
@@ -252,11 +280,11 @@ class HealthCheck:
                 success, message, remediation = check_func()
 
                 if success:
-                    print("✓ PASS")
+                    print("[PASS]")
                     print(f"  {message}")
                     self.passed += 1
                 else:
-                    print("✗ FAIL")
+                    print("[FAIL]")
                     print(f"  {message}")
 
                     if remediation:
@@ -269,7 +297,7 @@ class HealthCheck:
                 print()
 
             except Exception as e:
-                print("✗ ERROR")
+                print("[ERROR]")
                 print(f"  {e}")
                 self.failed += 1
                 print()

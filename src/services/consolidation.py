@@ -15,7 +15,7 @@ Requirements: Requirements 5, 6, 7 (MVP - Clustering, Consolidation, Forgetting)
 """
 
 from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 import logging
 import math
@@ -110,7 +110,7 @@ class ConsolidationService:
             >>> print(f"Migrated: {stats['migrated_count']}, Deleted: {stats['memories_deleted']}")
         """
         logger.info("Starting memory consolidation...")
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
 
         stats = {
             'migrated_count': 0,
@@ -142,7 +142,7 @@ class ConsolidationService:
             logger.info(f"Deleted {deleted} old memories")
 
             # Calculate duration
-            duration = (datetime.now() - start_time).total_seconds()
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
             stats['duration_seconds'] = duration
 
             logger.info(f"Consolidation completed in {duration:.1f}s: {stats}")
@@ -150,7 +150,7 @@ class ConsolidationService:
 
         except Exception as e:
             logger.error(f"Consolidation failed: {e}", exc_info=True)
-            stats['duration_seconds'] = (datetime.now() - start_time).total_seconds()
+            stats['duration_seconds'] = (datetime.now(timezone.utc) - start_time).total_seconds()
             return stats
 
     def _migrate_working_memory(self) -> List[str]:
@@ -172,7 +172,7 @@ class ConsolidationService:
                 }
             )
 
-            cutoff_time = datetime.now() - timedelta(hours=self.working_memory_retention_hours)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.working_memory_retention_hours)
             migrated_ids: List[str] = []
 
             for entry in entries:
@@ -188,7 +188,7 @@ class ConsolidationService:
                     continue
 
                 updated_metadata = metadata.copy()
-                now_iso = datetime.now().isoformat()
+                now_iso = datetime.now(timezone.utc).isoformat()
                 updated_metadata['memory_type'] = MemoryType.SHORT_TERM.value
                 updated_metadata['updated_at'] = now_iso
                 updated_metadata['migrated_at'] = now_iso
@@ -237,7 +237,7 @@ class ConsolidationService:
                 memory_id = metadata.get('memory_id')
                 embedding = entry.get('embedding')
 
-                if not memory_id or not embedding:
+                if not memory_id or embedding is None:
                     continue
 
                 memory_embeddings.append((memory_id, embedding))
@@ -351,7 +351,7 @@ class ConsolidationService:
                 if created_at_str:
                     try:
                         created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
-                        age_days = (datetime.now() - created_at).days
+                        age_days = (datetime.now(timezone.utc) - created_at).days
                         recency = 1.0 / (1.0 + age_days)
                     except:
                         recency = 0.5
@@ -420,7 +420,7 @@ class ConsolidationService:
                 f"{memory_id}-metadata",
                 {
                     'is_compressed': True,
-                    'compressed_at': datetime.now().isoformat()
+                    'compressed_at': datetime.now(timezone.utc).isoformat()
                 }
             )
 
@@ -446,7 +446,7 @@ class ConsolidationService:
         deleted_count = 0
 
         try:
-            cutoff_date = datetime.now() - timedelta(days=self.age_threshold_days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.age_threshold_days)
             entries = self.vector_db.list_by_metadata({'is_memory_entry': True})
 
             for entry in entries:
@@ -510,14 +510,21 @@ class ConsolidationService:
             return None
 
         try:
-            return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            parsed = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            else:
+                parsed = parsed.astimezone(timezone.utc)
+            return parsed
         except Exception:
             logger.warning(f"Failed to parse timestamp: {timestamp}")
             return None
 
     @staticmethod
     def _cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
-        if not vec_a or not vec_b or len(vec_a) != len(vec_b):
+        if vec_a is None or vec_b is None:
+            return 0.0
+        if len(vec_a) == 0 or len(vec_b) == 0 or len(vec_a) != len(vec_b):
             return 0.0
 
         dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
@@ -577,7 +584,7 @@ class ConsolidationService:
             if created_at_str:
                 try:
                     created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
-                    age_days = (datetime.now() - created_at).days
+                    age_days = (datetime.now(timezone.utc) - created_at).days
                     recency_score = math.exp(-age_days / 30.0)  # 30-day half-life
                 except:
                     recency_score = 0.5
@@ -640,7 +647,7 @@ class ConsolidationService:
                 f"{memory_id}-metadata",
                 {
                     'strength': new_strength,
-                    'last_accessed': datetime.now().isoformat()
+                    'last_accessed': datetime.now(timezone.utc).isoformat()
                 }
             )
 

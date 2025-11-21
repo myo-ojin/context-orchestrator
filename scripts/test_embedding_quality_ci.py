@@ -34,14 +34,14 @@ def test_embedding_quality():
     test_cases = [
         {
             "name": "exact_match",
-            "query": "AppBrain release checklist",
-            "memory": "AppBrain release checklist",
+            "query": "OrchestratorX release checklist",
+            "memory": "OrchestratorX release checklist",
             "expected_min": 0.95
         },
         {
             "name": "full_content",
-            "query": "AppBrain release checklist",
-            "memory": """The AppBrain release checklist is as follows:
+            "query": "OrchestratorX release checklist",
+            "memory": """The OrchestratorX release checklist is as follows:
 1. Environment verification
 2. Test execution
 3. Deployment approval
@@ -52,8 +52,8 @@ Complete all steps before proceeding with production deployment.""",
         },
         {
             "name": "summary",
-            "query": "AppBrain release checklist",
-            "memory": "AppBrain release checklist includes environment checks, testing, and approval steps.",
+            "query": "OrchestratorX release checklist",
+            "memory": "OrchestratorX release checklist includes environment checks, testing, and approval steps.",
             "expected_min": 0.70
         }
     ]

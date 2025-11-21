@@ -16,6 +16,10 @@ try:
 except ImportError:  # pragma: no cover - fallback for environments without chromadb
     chromadb = None
     Settings = None
+try:
+    import numpy as np
+except ImportError:  # pragma: no cover
+    np = None
 from pathlib import Path
 import logging
 
@@ -239,10 +243,18 @@ class ChromaVectorDB:
             )
 
             items: List[Dict[str, Any]] = []
-            ids = results.get('ids') or []
-            metadatas = results.get('metadatas') or []
-            documents = results.get('documents') or []
-            embeddings = results.get('embeddings') or []
+            ids = results.get('ids')
+            if ids is None:
+                ids = []
+            metadatas = results.get('metadatas')
+            if metadatas is None:
+                metadatas = []
+            documents = results.get('documents')
+            if documents is None:
+                documents = []
+            embeddings = results.get('embeddings')
+            if embeddings is None:
+                embeddings = []
 
             for idx, item_id in enumerate(ids):
                 metadata = metadatas[idx] if idx < len(metadatas) else {}
@@ -261,7 +273,8 @@ class ChromaVectorDB:
                 if filter_metadata and len(filter_metadata) > 0:
                     ok = True
                     for k, v in filter_metadata.items():
-                        if metadata.get(k) != v:
+                        actual_value = self._normalize_metadata_value(metadata.get(k))
+                        if not self._metadata_value_equals(actual_value, v):
                             ok = False
                             break
                     if not ok:
@@ -274,6 +287,27 @@ class ChromaVectorDB:
         except Exception as e:
             logger.error(f"Failed to list by metadata {filter_metadata}: {e}")
             return []
+
+    @staticmethod
+    def _normalize_metadata_value(value: Any) -> Any:
+        """
+        Convert metadata values returned by Chroma into Python-native types.
+        Handles numpy arrays whose truthiness is ambiguous.
+        """
+        if np is not None and isinstance(value, np.ndarray):  # type: ignore[attr-defined]
+            if value.size == 1:
+                return value.item()
+            return value.tolist()
+        return value
+
+    @staticmethod
+    def _metadata_value_equals(actual: Any, expected: Any) -> bool:
+        """Safe equality check that tolerates lists/sets."""
+        if isinstance(actual, (list, tuple, set)):
+            if isinstance(expected, (list, tuple, set)):
+                return list(actual) == list(expected)
+            return expected in actual
+        return actual == expected
 
     def delete(self, id: str) -> None:
         """
@@ -336,16 +370,20 @@ class ChromaVectorDB:
                 limit=min(limit * 2, self.collection.count()) if self.collection.count() > 0 else limit
             )
 
-            if not results['ids']:
+            ids = results.get('ids')
+            if ids is None or len(ids) == 0:
                 return []
+
+            documents = results.get('documents') or []
+            metadatas = results.get('metadatas') or []
 
             # Convert to list of dicts
             memories = []
-            for i in range(len(results['ids'])):
+            for i in range(len(ids)):
                 memory = {
-                    'id': results['ids'][i],
-                    'content': results['documents'][i],
-                    'metadata': results['metadatas'][i]
+                    'id': ids[i],
+                    'content': documents[i] if i < len(documents) else "",
+                    'metadata': metadatas[i] if i < len(metadatas) else {}
                 }
                 memories.append(memory)
 

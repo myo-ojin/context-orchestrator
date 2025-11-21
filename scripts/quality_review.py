@@ -128,12 +128,12 @@ def get_sample_queries_by_topic() -> Dict[str, List[Dict[str, Any]]]:
         Dict mapping topic names to list of query dicts
     """
     return {
-        "AppBrain": [
-            {"query": "AppBrain change feed ingestion", "expected_relevance": "high"},
-            {"query": "AppBrain dashboard pilot", "expected_relevance": "high"},
-            {"query": "AppBrain release checklist", "expected_relevance": "high"},
-            {"query": "AppBrain microservices architecture", "expected_relevance": "medium"},
-            {"query": "AppBrain deployment procedures", "expected_relevance": "medium"},
+        "OrchestratorX": [
+            {"query": "OrchestratorX change feed ingestion", "expected_relevance": "high"},
+            {"query": "OrchestratorX dashboard pilot", "expected_relevance": "high"},
+            {"query": "OrchestratorX release checklist", "expected_relevance": "high"},
+            {"query": "OrchestratorX microservices architecture", "expected_relevance": "medium"},
+            {"query": "OrchestratorX deployment procedures", "expected_relevance": "medium"},
         ],
         "InsightOps": [
             {"query": "InsightOps dashboard features", "expected_relevance": "high"},

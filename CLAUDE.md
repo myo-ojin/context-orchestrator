@@ -50,14 +50,10 @@ python scripts/setup.py
 ```
 
 ### Required Models
-The system uses these Ollama models:
-- `nomic-embed-text` - Embedding generation (137M, Q4_K_M quantized)
-- `qwen2.5:7b` - Local inference for classification, summarization (3B, Q4_K_M quantized)
-
-Download via:
+Download these Ollama models:
 ```bash
-ollama pull nomic-embed-text
-ollama pull qwen2.5:7b
+ollama pull nomic-embed-text  # Embedding generation
+ollama pull qwen2.5:7b        # Local inference
 ```
 
 ## Architecture
@@ -144,16 +140,16 @@ scripts/
 └── load_scenarios.py          # Scenario data loader
 ```
 
-## Core Components
+## Core Concepts
 
-### 1. Memory Schemas
+### Memory Schemas
 Conversations are classified into four schemas:
 - **Incident**: Bug reports, errors, troubleshooting (不具合・原因・再現手順・修正PR)
 - **Snippet**: Code examples with usage context (コード片・使用理由・適用コンテキスト)
 - **Decision**: Architectural choices, trade-offs (選択肢・判断根拠・トレードオフ)
 - **Process**: Thought processes, learning, experimentation (思考プロセス・試行錯誤)
 
-### 2. Memory Processing Pipeline
+### Memory Processing Pipeline
 
 **Ingestion Flow:**
 1. Receive conversation (User + Assistant + metadata)
@@ -165,33 +161,32 @@ Conversations are classified into four schemas:
 
 **Search Flow:**
 1. Generate query embedding (local LLM)
-2. Parallel search: vector (Chroma) + keyword (BM25) → top 50 candidates
+2. Parallel search: vector (Chroma) + keyword (BM25) → top candidates
 3. Rerank via rule-based scoring (memory strength, recency, refs, similarity)
-4. Return top 10 results with refs and related memories
+4. Return top results with refs and related memories
 
-### 3. Model Routing Strategy
+### Model Routing Strategy
 
 The `ModelRouter` intelligently selects models based on task complexity:
 
-| Task | Model | Rationale | Cost |
-|------|-------|-----------|------|
-| Embedding generation | Local (nomic-embed-text) | Always needed, privacy-critical | Free |
-| Schema classification | Local (Qwen2.5-3B) | Simple, privacy-critical | Free |
-| Short summaries (<100 tokens) | Local (Qwen2.5-3B) | Sufficient quality | Free |
-| Long summaries (>500 tokens) | CLI (Claude/GPT) | High quality needed | User's existing plan |
-| Investigation requests | CLI (Claude/GPT) | Complex reasoning | User's existing plan |
-| Memory consolidation | CLI (Claude/GPT) | Complex reasoning | User's existing plan |
+| Task | Model | Rationale |
+|------|-------|-----------|
+| Embedding generation | Local (nomic-embed-text) | Always needed, privacy-critical |
+| Schema classification | Local (Qwen2.5-3B) | Simple, privacy-critical |
+| Short summaries (<100 tokens) | Local (Qwen2.5-3B) | Sufficient quality |
+| Long summaries (>500 tokens) | CLI (Claude/GPT) | High quality needed |
+| Investigation requests | CLI (Claude/GPT) | Complex reasoning |
+| Memory consolidation | CLI (Claude/GPT) | Complex reasoning |
 
 **CLI Invocation Prevention:**
 - Sets `CONTEXT_ORCHESTRATOR_INTERNAL=1` env var
 - PowerShell wrapper detects this flag and skips recording
 - Prevents infinite loops when orchestrator calls Claude/Codex
 
-### 4. Memory Hierarchy
+### Memory Hierarchy
 
 **Working Memory** (数時間保持):
-- Current task context
-- Retains for ~8 hours
+- Current task context, retains for ~8 hours
 - Auto-migrates to short-term on completion
 
 **Short-term Memory** (数日〜数週間):
@@ -202,7 +197,7 @@ The `ModelRouter` intelligently selects models based on task complexity:
 - Important knowledge
 - High importance score (based on refs, recency, access frequency)
 
-### 5. Consolidation Process
+### Consolidation Process
 
 Runs automatically at 3:00 AM (configurable):
 1. **Migrate working memory** to short-term (completed sessions)
@@ -211,318 +206,96 @@ Runs automatically at 3:00 AM (configurable):
 4. **Forget old memories** (>30 days, low importance <0.3)
 5. **Log statistics** (clusters created, memories compressed/deleted)
 
-### 6. Session Logging (Requirement 26)
+## Core Components
 
-**Purpose**: Preserve full terminal transcripts and auto-summarize when sessions close, preventing context loss from token limits or resets.
+For detailed component documentation, see:
+- **[docs/COMPONENTS.md](docs/COMPONENTS.md)** - Session Logging, Obsidian Integration, Codex Session Ingestion, Query Attribute Modeling, Cross-Encoder Reranking, Project Management, Search Bookmarks
 
-**Components:**
-- `SessionLogCollector`: Issues unique session_id, streams to `logs/<session_id>.log`, rotates at 10MB
-- `SessionSummaryWorker`: Queues closed logs, summarizes via local LLM, stores with metadata (session_id, start/end time, model), retries failures up to 3 times
-- `session-history` CLI: Retrieves raw logs and summaries by session_id
+**Quick overview:**
+- **Session Logging**: Preserves full terminal transcripts and auto-summarizes
+- **Obsidian Integration**: Auto-ingests conversation notes from Obsidian vault
+- **Codex Session Ingestion**: Captures Codex CLI sessions automatically
+- **Query Attribute Modeling (QAM)**: Extracts structured metadata from queries
+- **Cross-Encoder Reranking**: LLM-based relevance scoring with caching
+- **Project Management**: Organize memories by project/codebase
+- **Search Bookmarks**: Save frequently used search queries
 
-**Flow:**
-1. PowerShell wrapper or MCP client sends events to `SessionLogCollector`
-2. Events append to live log file (UTF-8 text)
-3. On session close, `SessionSummaryWorker` runs async summarization job
-4. Summary + metadata saved to session repository
-5. Failed jobs auto-retry with exponential backoff
+## CLI Commands
 
-### 7. Obsidian Integration (Requirements 1.5, 9)
-
-**Purpose**: Automatically detect and ingest conversation notes from Obsidian vault, enabling seamless integration with existing knowledge base.
-
-**Components:**
-- `ObsidianWatcher`: File system watcher that monitors `.md` files in the vault
-- `ObsidianParser`: Parses conversation format (`**User:**` / `**Assistant:**`) and Wikilinks
-
-**Flow:**
-1. `ObsidianWatcher` monitors vault directory using watchdog library
-2. When `.md` file is created/modified, check if it contains conversations
-3. `ObsidianParser` extracts:
-   - User/Assistant conversation turns
-   - Wikilinks (`[[filename]]`) for relationship tracking
-   - YAML frontmatter (tags, date, metadata)
-4. Each conversation is ingested through `IngestionService`
-5. Metadata includes file path, Wikilinks, and conversation index
-
-**Features:**
-- **Auto-detection**: Automatically finds conversation notes as they're created
-- **Debouncing**: Prevents duplicate processing of rapid file changes (2s interval)
-- **Graceful handling**: Errors in parsing don't crash the watcher
-- **Vault scanning**: Optional one-time import of existing notes via `scan_existing_notes()`
-- **Recursive monitoring**: Detects changes in subdirectories
-- **Context manager support**: Properly manages lifecycle with `with` statement
-
-**Configuration:**
-```yaml
-# config.yaml
-obsidian_vault_path: C:\Users\username\Documents\ObsidianVault
-```
-
-When `obsidian_vault_path` is set, ObsidianWatcher starts automatically on system startup.
-
-### 8. Query Attribute Modeling (QAM)
-
-**Purpose**: Extract structured metadata (topic, type, project) from queries to improve search precision and enable intelligent filtering.
-
-**Components:**
-- `QueryAttributeExtractor` in `src/services/query_attributes.py`: Heuristic-first extraction with LLM fallback
-- Confidence thresholds control when LLM enrichment triggers
-- Supports project auto-resolution for session context
-
-**Configuration:**
-```yaml
-search:
-  query_attribute_min_confidence: 0.4
-  query_attribute_llm_enabled: true
-```
-
-**Flow:**
-1. Heuristic extraction (fast keyword/pattern matching)
-2. If confidence <0.4 or heuristics fail → LLM fallback
-3. Extracted attributes applied to SearchService filters
-4. Confidence scores logged for threshold tuning
-
-### 9. Cross-Encoder Reranking
-
-**Purpose**: Use LLM-based relevance scoring to rerank top candidates, improving precision beyond vector+BM25 hybrid search.
-
-**Components:**
-- `CrossEncoderReranker` in `src/services/rerankers.py`: LRU-cached cross-encoder with metrics tracking
-- Parallel execution with fallback to heuristic scoring under load
-- Cache statistics available via `get_reranker_metrics` MCP tool
-
-**Configuration:**
-```yaml
-search:
-  cross_encoder_enabled: true
-  cross_encoder_top_k: 3
-  cross_encoder_cache_size: 128
-  cross_encoder_cache_ttl_seconds: 900
-  cross_encoder_max_parallel: 3
-  cross_encoder_fallback_max_wait_ms: 500
-```
-
-**Performance:**
-- Cache hit rates typically >60% in replay scenarios
-- Latency: ~2.2s per uncached pair (LLM-dependent)
-- Falls back to heuristics if queue wait exceeds threshold
-
-**Metrics Tracking:**
-- `cache_hits` / `cache_misses`: Cache effectiveness
-- `avg_llm_latency_ms`: Average LLM call time
-- `pairs_scored`: Total pairs evaluated
-- `prefetch_hits`: Project-based prefetch effectiveness
-
-### 10. Project Management (Phase 15)
-
-**Purpose**: Organize memories by project/codebase for scoped searches and better context management.
-
-**Components:**
-- `ProjectManager` in `src/services/project_manager.py`: CRUD operations for projects
-- `ProjectStorage` in `src/storage/project_storage.py`: JSON-based persistence
-- Auto-project resolution in SessionManager based on conversation context
-
-**Features:**
-- **Auto-detection**: Extracts project hints from conversation metadata and query attributes
-- **Prefetching**: Warms cross-encoder cache when project is auto-resolved (confidence >0.75)
-- **Session binding**: Associates sessions with projects for contextual search
-- **Manual override**: Users can set project via MCP tools or CLI
-
-**Configuration:**
-```yaml
-search:
-  project_prefetch_enabled: true
-  project_prefetch_min_confidence: 0.75
-  project_prefetch_queries:
-    - project status
-    - open issues
-    - risk summary
-```
-
-### 11. Search Bookmarks (Phase 15)
-
-**Purpose**: Save frequently used search queries for quick access and improved workflow efficiency.
-
-**Components:**
-- `BookmarkManager` in `src/services/bookmark_manager.py`: CRUD for bookmarks
-- `BookmarkStorage` in `src/storage/bookmark_storage.py`: JSON-based persistence
-- Usage statistics tracking for recommendation
-
-**Features:**
-- Named bookmarks with descriptions
-- Tag-based organization
-- Usage frequency tracking
-- Quick execution via MCP tools
-
-## Development Commands
-
-### Running the System
+### System Management
 ```bash
-# Start Context Orchestrator as MCP server (stdio mode)
+# Start MCP server
 python -m src.main
 
-# Or use console entry point (if installed with pip install -e .)
-context-orchestrator
-```
-
-### CLI Commands
-
-**System Status:**
-```bash
-# Show comprehensive system status
+# Show system status
 python -m src.cli status
-# or: context-orchestrator status
 
-# Displays:
-# - Data directory status
-# - Ollama connection and models
-# - Vector DB (Chroma) statistics
-# - BM25 index status
-# - Session logs statistics
-# - Obsidian integration status
-# - Last consolidation time
-```
-
-**Health Check:**
-```bash
-# Run diagnostics and get remediation steps
+# Run diagnostics
 python -m src.cli doctor
-# or: context-orchestrator doctor
 
-# Checks:
-# - Ollama service status
-# - Required models (nomic-embed-text, qwen2.5:7b)
-# - Data directory permissions
-# - Database integrity
-# - Configuration validity
-```
-
-**Memory Consolidation:**
-```bash
-# Manually run memory consolidation
+# Manual consolidation
 python -m src.cli consolidate
-# or: context-orchestrator consolidate
-
-# Performs:
-# - Working memory → Short-term migration
-# - Clustering similar memories
-# - Forgetting old/unimportant memories
-# - Reports statistics (migrated, clustered, deleted)
 ```
 
-**Memory Management:**
+### Memory Management
 ```bash
 # List recent memories
 python -m src.cli list-recent --limit 20
-# or: context-orchestrator list-recent --limit 20
 
-# Export memories to JSON (backup)
+# Export memories (backup)
 python -m src.cli export --output backup.json
-# or: context-orchestrator export --output backup.json
 
-# Import memories from JSON (restore)
+# Import memories (restore)
 python -m src.cli import --input backup.json
-python -m src.cli import --input backup.json --force  # Overwrite existing
-# or: context-orchestrator import --input backup.json
 ```
 
-**Session History:**
+### Session History
 ```bash
 # List all sessions
 python -m src.cli session-history
-# or: context-orchestrator session-history
 
-# Show specific session log
-python -m src.cli session-history --session-id <session_id>
+# Show specific session
+python -m src.cli session-history --session-id <id>
 
-# Show only summary
-python -m src.cli session-history --session-id <session_id> --summary-only
-
-# Open log in editor
-python -m src.cli session-history --session-id <session_id> --open
+# List Codex sessions
+python -m src.cli session-history --backend codex
 ```
 
-### Testing Commands
+### Testing & Performance
 ```bash
-# Run full test suite
+# Run tests
 pytest
-
-# Run unit tests only
 pytest tests/unit/
-
-# Run end-to-end tests
 pytest tests/e2e/
 
-# Run specific test file
-pytest tests/e2e/test_full_workflow.py
-
-# Run with coverage
-pytest --cov=src --cov-report=html
-
-# Run with verbose output
-pytest -v
-
-# Regression testing
-python -m scripts.run_regression_ci              # Run regression check against baseline
-python -m scripts.run_regression_ci --rpc-timeout 60  # For slow cloud LLMs
-
-# Replay scenarios
-python -m scripts.mcp_replay --requests tests/scenarios/query_runs.json
-python -m scripts.mcp_replay --export-features reports/features.csv  # Export for training
-
-# Benchmark QAM
-python -m scripts.bench_qam                       # Default queries
-python -m scripts.bench_qam --query-file tests/scenarios/query_runs.json
-
-# Train reranking weights
-python -m scripts.train_rerank_weights --features reports/features.csv --config config.yaml
-
-# Load scenario data
-python -m scripts.load_scenarios --file tests/scenarios/scenario_data.json
-```
-
-### Performance Profiling
-```bash
-# Run all performance benchmarks
+# Performance profiling
 python scripts/performance_profiler.py
 
-# Custom number of runs
-python scripts/performance_profiler.py --runs 200
-
-# Save report to custom location
-python scripts/performance_profiler.py --output ./performance_report.json
-
-# Benchmarks include:
-# - Search latency (P50/P95/P99, target ≤200ms)
-# - Ingestion throughput (target <5s/conversation)
-# - Consolidation time (target <5min for 10K memories)
-# - Memory footprint (target ≤1GB resident, ≤3GB peak)
+# Regression testing
+python -m scripts.run_regression_ci
 ```
+
+For complete testing documentation, see **[docs/TESTING.md](docs/TESTING.md)**
 
 ## Configuration
 
-Configuration is loaded from `~/.context-orchestrator/config.yaml`:
+Configuration is loaded from `~/.context-orchestrator/config.yaml`. Key settings:
 
 ```yaml
 # Paths
 data_dir: ~/.context-orchestrator
-obsidian_vault_path: C:\Users\...\ObsidianVault  # Optional
+obsidian_vault_path: /path/to/vault  # Optional
 
 # Ollama settings
 ollama_url: http://localhost:11434
 embedding_model: nomic-embed-text
 inference_model: qwen2.5:7b
 
-# CLI LLM (for heavy tasks)
-cli_command: claude  # or "codex"
-
 # Search parameters
 search_candidate_count: 50
 search_result_count: 10
-search_timeout_seconds: 2
 
-# Query Attribute Modeling (QAM)
+# Query Attribute Modeling
 query_attribute_min_confidence: 0.4
 query_attribute_llm_enabled: true
 
@@ -530,164 +303,14 @@ query_attribute_llm_enabled: true
 cross_encoder_enabled: true
 cross_encoder_top_k: 3
 cross_encoder_cache_size: 128
-cross_encoder_cache_ttl_seconds: 900
-cross_encoder_max_parallel: 3
-cross_encoder_fallback_max_wait_ms: 500
 
-# Project Prefetching
-project_prefetch_enabled: true
-project_prefetch_min_confidence: 0.75
-project_prefetch_queries:
-  - project status
-  - open issues
-  - risk summary
-
-# Vector and BM25 candidate counts
-vector_candidate_count: 100
-bm25_candidate_count: 30
-
-# Clustering
+# Memory management
 similarity_threshold: 0.9
-min_cluster_size: 2
-
-# Forgetting
 age_threshold_days: 30
 importance_threshold: 0.3
-compression_enabled: true
-
-# Working memory
-working_memory_retention_hours: 8
-auto_consolidate: true
-
-# Consolidation schedule (cron format)
-consolidation_schedule: "0 3 * * *"  # 3:00 AM daily
-
-# Session logging
-logging:
-  session_log_dir: ~/.context-orchestrator/logs
-  max_log_size_mb: 10
-  summary_model: qwen2.5:7b
-  level: INFO
-
-# Reranking weights (can be trained via scripts/train_rerank_weights.py)
-reranking_weights:
-  memory_strength: 0.3
-  recency: 0.2
-  refs_reliability: 0.1
-  bm25_score: 0.2
-  vector_similarity: 0.2
-  metadata_bonus: 1.0
 ```
 
-## Key Implementation Patterns
-
-### 1. Chunking Strategy
-- **Primary split**: Markdown headings (`#`, `##`, `###`)
-- **Overflow split**: Paragraphs (`\n\n`) if >512 tokens
-- **Preserve**: Code blocks (` ```...``` `) never split
-- **Conversations**: 1 turn (User + Assistant) = 1 chunk
-
-### 2. Reranking Score Calculation
-```python
-score = (
-    memory.strength * 0.3 +           # Memory strength
-    recency_score * 0.2 +             # Recency
-    len(memory.refs) * 0.1 +          # Refs reliability
-    memory.bm25_score * 0.2 +         # Keyword match
-    memory.vector_similarity * 0.2    # Vector similarity
-)
-```
-
-### 3. Error Handling (Enhanced in Phase 14)
-- **Graceful degradation**: Continue operating on partial failures
-- **Detailed logging**: All errors logged with context
-- **User-friendly messages**: Technical details hidden from users
-- **Fallback chains**: Cloud LLM fails → local LLM fallback
-
-**Error Handling Framework:**
-```python
-from src.utils.error_handler import ErrorHandler, ErrorContext, with_error_handling
-
-# Using ErrorContext for structured error handling
-try:
-    result = risky_operation()
-except Exception as e:
-    context = ErrorContext(
-        operation='search',
-        context={'query': query},
-        user_message='Failed to search memories',
-        suggestions=['Check database connection', 'Verify Ollama is running']
-    )
-    ErrorHandler.handle_error(e, context, reraise=False)
-
-# Using decorator for automatic error handling
-@with_error_handling("ingest_conversation", "Failed to ingest conversation")
-def ingest(conversation):
-    # Implementation
-    pass
-```
-
-**Structured Logging:**
-```python
-from src.utils.logger import setup_structured_logger, get_logger_with_context, log_operation
-
-# JSON-formatted logging
-logger = setup_structured_logger('my_service', 'INFO')
-logger.info('Processing item', extra={'context': {'item_id': '123'}})
-# Output: {"timestamp": "2025-01-15T10:00:00", "level": "INFO", "message": "Processing item", "context": {"item_id": "123"}}
-
-# Logger with automatic context injection
-logger = get_logger_with_context(__name__, {'service': 'ingestion'})
-
-# Operation timing context manager
-with log_operation(logger, 'search'):
-    results = search_memory(query)
-# Logs: Operation 'search' started
-# Logs: Operation 'search' completed in 123.45ms
-```
-
-### 4. PowerShell CLI Recording
-The system uses a PowerShell wrapper function that:
-1. Intercepts `claude` and `codex` commands
-2. Captures stdout/stderr via `Tee-Object`
-3. Sends to Context Orchestrator in background job (non-blocking)
-4. Preserves exit codes and error messages
-5. Checks `$env:CONTEXT_ORCHESTRATOR_INTERNAL` to prevent recursive recording
-
-### 5. Query Attribute Extraction
-- **Heuristic-first**: Fast keyword matching for common patterns (topic, type, project)
-- **LLM fallback**: When confidence <0.4 or heuristics fail
-- **Confidence tracking**: Logs confidence scores for tuning thresholds
-- **Language-aware**: Uses detected language for routing decisions
-- **Pattern examples**: "timeline view" → topic:timeline, "auth error" → type:incident
-
-### 6. Cross-Encoder Caching Strategy
-- **LRU cache**: (query, memory_id) pairs cached for TTL seconds
-- **Metrics tracking**: Hit rate, latency, queue depth via `get_reranker_metrics`
-- **Graceful degradation**: Falls back to heuristics under load (queue wait >500ms)
-- **Prefetch optimization**: Warms cache when project auto-resolves (confidence >0.75)
-- **Cache key**: Hash of normalized query + memory_id for collision avoidance
-
-### 7. Reranking Weight Training
-```python
-# 1. Export features from replay
-python -m scripts.mcp_replay --export-features reports/features.csv
-
-# 2. Train weights using logistic regression
-python -m scripts.train_rerank_weights --features reports/features.csv --config config.yaml
-
-# 3. Weights are written to config.reranking_weights
-# 4. SearchService reads weights dynamically from config
-```
-
-**Feature columns exported:**
-- `memory_strength`: Memory consolidation strength (0.0-1.0)
-- `recency`: Time-based recency score (0.0-1.0)
-- `refs_reliability`: Number of references (normalized)
-- `bm25_score`: BM25 keyword match score
-- `vector_similarity`: Cosine similarity (0.0-1.0)
-- `metadata_bonus`: Project/type/source match bonus
-- `is_relevant`: Ground truth label (1=relevant, 0=not relevant)
+See configuration file for complete options and defaults.
 
 ## Important Design Decisions
 
@@ -715,226 +338,37 @@ python -m scripts.train_rerank_weights --features reports/features.csv --config 
 - **Performance**: Sufficient for personal use (10K-100K memories)
 - **Portability**: Single directory backup
 
-## Testing Strategy (Updated Phase 14)
+## Development Guides
 
-### Unit Tests (`tests/unit/`)
-Focus on individual components:
-- `Chunker`: Token counting, heading splits, code block preservation
-- `SchemaClassifier`: Schema detection accuracy
-- `Reranker`: Score calculation logic
-- `BM25Index`: Keyword search correctness
-- **Coverage**: 20+ unit test files with mocked dependencies
+For detailed development guides, see:
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Common development tasks (adding schemas, modifying ranking, tuning reranker, etc.)
+- **[docs/TESTING.md](docs/TESTING.md)** - Testing strategy and regression testing
+- **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Solutions to common issues
 
-### Integration Tests
-Documented in `INTEGRATION_TEST_RESULTS.md`:
-- 7/10 components tested (70% coverage)
-- 100% pass rate for tested components
-- CLI commands (status, doctor, list-recent, export, import)
-- ObsidianParser (conversation extraction, wikilinks, frontmatter)
-- Error handling validation
-
-### End-to-End Tests (`tests/e2e/`) - Phase 14
-Comprehensive full-workflow validation in `tests/e2e/test_full_workflow.py`:
-
-**TestEndToEndWorkflow:**
-- Basic ingestion and retrieval loop
-- Multiple conversation retrieval with ranking
-- Consolidation workflow (cluster detection)
-- Search with special characters
-- Long content chunking validation
-- Japanese text handling
-- Code block preservation
-- Search result ranking validation
-
-**TestErrorHandling:**
-- Missing required fields
-- Empty content handling
-- Empty query handling
-
-**TestPerformance:**
-- Search latency measurement (target ≤200ms)
-- Batch ingestion throughput (target <5s/conversation)
-
-### Performance Profiling (`scripts/performance_profiler.py`)
-Automated benchmarking tool that measures:
-- **Search Latency**: P50/P95/P99 with 100+ runs
-- **Ingestion Throughput**: Conversations per second
-- **Consolidation Time**: Extrapolated to 10K memories
-- **Memory Footprint**: Peak and resident memory tracking
-- **JSON Reports**: Pass/fail for each target with detailed metrics
-
-Run with: `python scripts/performance_profiler.py [--runs N] [--output PATH]`
-
-### Target Metrics
-- **Coverage**: ≥85% statement coverage (unit tests)
-- **E2E Coverage**: 15+ test scenarios covering main workflows
-- **Search latency**: ≤200ms (typical ~80ms)
-- **Ingestion speed**: ≤5 seconds per conversation
-- **Memory usage**: ~1GB resident, ~3GB peak
-- **All performance targets**: Validated via profiler
-
-### Scenario-Based Regression Testing
-
-**Purpose**: Validate search quality across representative queries with automated baseline comparison.
-
-**Key Scripts:**
-- `scripts/mcp_replay.py`: Replays query scenarios against MCP server, measures Precision/NDCG
-- `scripts/run_regression_ci.py`: Wrapper that compares against baseline and fails on regressions
-- `scripts/bench_qam.py`: Benchmarks Query Attribute Extractor latency and accuracy
-- `scripts/train_rerank_weights.py`: Learns optimal reranking weights from feature exports
-
-**Workflow:**
-```bash
-# Export features from replay
-python -m scripts.mcp_replay --requests tests/scenarios/query_runs.json --export-features reports/features.csv
-
-# Train weights
-python -m scripts.train_rerank_weights --features reports/features.csv --config config.yaml
-
-# Run regression check
-python -m scripts.run_regression_ci
-
-# Check for zero-hit queries
-cat reports/mcp_runs/zero_hits.json
-```
-
-**Baselines:**
-- Stored in `reports/baselines/mcp_run-*.jsonl`
-- Regression thresholds: Precision/NDCG drop >0.02 fails CI
-- Zero-hit queries indicate missing dictionary/metadata entries
-
-**Metrics Tracked:**
-- **Macro Precision**: Precision averaged by query topic (target ≥0.65)
-- **Macro NDCG**: Normalized discounted cumulative gain by topic (target ≥0.85)
-- **Cross-encoder cache hit rate**: Cache effectiveness (target ≥60%)
-- **Language routing fallback frequency**: Unsupported language handling
-- **Reranker queue metrics**: Wait time, parallel execution efficiency
-- **QAM confidence**: Query attribute extraction accuracy
-
-**Scenario Files:**
-- `tests/scenarios/scenario_data.json`: Conversation data for ingestion
-- `tests/scenarios/query_runs.json`: Query scenarios with expected results
-- Multi-language support: English, Japanese, Spanish queries included
-
-## Common Development Tasks
-
-### Adding a new memory schema
-1. Update `SchemaClassifier._build_classification_prompt()`
-2. Add schema type to `Memory` dataclass in `src/models/__init__.py`
-3. Update classification logic to handle new schema fields
-4. Add test cases in `tests/unit/processing/test_classifier.py`
-
-### Modifying search ranking
-1. Edit `SearchService._rerank()` in `src/services/search.py`
-2. Adjust weight coefficients in score calculation
-3. Add unit tests for new scoring logic
-4. Run integration tests to validate overall search quality
-
-### Adding a new MCP tool
-1. Define tool schema in `MCPProtocolHandler`
-2. Implement handler method in `_route_to_service()`
-3. Connect to appropriate service (ingestion/search/consolidation)
-4. Update documentation in README and AGENTS.md
-
-### Changing consolidation behavior
-1. Modify `ConsolidationService` methods in `src/services/consolidation.py`
-2. Update configuration parameters in `config.yaml`
-3. Test with `python -m src.cli consolidate`
-4. Verify via `python -m src.cli status --verbose`
-
-### Adding a new query attribute pattern
-1. Update `QueryAttributeExtractor._extract_heuristics()` in `src/services/query_attributes.py`
-2. Add pattern matching rules and confidence scores
-3. Add test cases in `tests/unit/services/test_query_attributes.py`
-4. Benchmark with `python -m scripts.bench_qam --queries "your test query"`
-5. Validate in full replay: `python -m scripts.run_regression_ci`
-
-### Tuning cross-encoder reranker
-1. Adjust cache parameters in `config.yaml` (cache_size, ttl, max_parallel)
-2. Export features: `python -m scripts.mcp_replay --export-features reports/features.csv`
-3. Train new weights: `python -m scripts.train_rerank_weights --features reports/features.csv`
-4. Update `config.reranking_weights` with learned values
-5. Run regression test to validate improvements
-6. Monitor cache metrics via `get_reranker_metrics` MCP tool
-
-### Creating a new project
-1. Use MCP tool `create_project` or CLI: `python -m src.cli project create --name "MyProject"`
-2. Associate memories: Add `project_id` to conversation metadata during ingestion
-3. Query within project: Use `search_in_project` MCP tool
-4. Enable prefetching: Set `project_prefetch_enabled: true` in config
-
-## Troubleshooting
-
-### Ollama not responding
-```bash
-# Check if Ollama is running
-curl http://localhost:11434/api/tags
-
-# Start Ollama
-ollama serve
-
-# Verify models are installed
-ollama list
-```
-
-### PowerShell wrapper not working
-```powershell
-# Check if wrapper is loaded
-Get-Command claude
-
-# Reload profile
-. $PROFILE
-
-# Re-run setup
-python scripts/setup.py --repair
-```
-
-### Search returns no results
-1. Check if memories are indexed: `python -m src.cli list-recent`
-2. Verify Chroma DB exists: `ls ~/.context-orchestrator/chroma_db/`
-3. Check logs: `python -m src.cli logs --tail 50`
-4. Rebuild index: `python -m src.cli reindex`
-
-### High memory usage
-1. Check consolidation schedule: `python -m src.cli status --verbose`
-2. Run manual consolidation: `python -m src.cli consolidate`
-3. Adjust forgetting thresholds in `config.yaml`
-4. Export and prune old memories: `python -m src.cli export --before 2024-01-01`
-
-### Regression tests failing
-1. Check baseline file exists: `ls reports/baselines/`
-2. Review metrics: `cat reports/mcp_runs/zero_hits.json`
-3. Inspect latest run: `cat reports/mcp_runs/mcp_run-*.jsonl | tail -50`
-4. Increase RPC timeout for slow LLMs: `python -m scripts.run_regression_ci --rpc-timeout 60`
-5. Update baseline if intentional: `cp reports/mcp_runs/mcp_run-*.jsonl reports/baselines/`
-
-### Cross-encoder reranker slow
-1. Check cache hit rate: Use `get_reranker_metrics` MCP tool
-2. Increase cache size: Set `cross_encoder_cache_size: 256` in config
-3. Reduce top_k: Set `cross_encoder_top_k: 2` (fewer LLM calls)
-4. Enable prefetching: Set `project_prefetch_enabled: true`
-5. Check parallel execution: Set `cross_encoder_max_parallel: 5` for more concurrency
-6. Monitor queue: Check logs for "fallback to heuristics" messages
+**Quick reference:**
+- Adding new memory schema → Update `SchemaClassifier`, add tests
+- Modifying search ranking → Edit `SearchService._rerank()`, adjust weights
+- Adding MCP tool → Define schema in `MCPProtocolHandler`, implement handler
+- Changing consolidation → Modify `ConsolidationService`, update config
 
 ## Performance Targets
 
-- **Search latency**: 80-200ms (typical: ~80ms, excluding cross-encoder reranking)
-- **Cross-encoder latency**: ~2.2s per uncached pair (LLM-dependent)
-- **Cross-encoder cache hit rate**: ≥60% (in replay scenarios)
+- **Search latency**: 80-200ms (typical: ~80ms)
+- **Cross-encoder latency**: ~2.2s per uncached pair
+- **Cross-encoder cache hit rate**: ≥60%
 - **Ingestion time**: <5 seconds per conversation
 - **QAM extraction**: <100ms (heuristics), <2s (LLM fallback)
-- **Memory footprint**: 1GB resident, 3GB peak (during inference)
-- **Disk usage**: ~10MB/year (73MB/10 years)
-- **Consolidation**: Complete in <5 minutes for 10K memories
+- **Memory footprint**: 1GB resident, 3GB peak
+- **Consolidation**: <5 minutes for 10K memories
 - **Regression metrics**: Macro Precision ≥0.65, Macro NDCG ≥0.85
 
 ## Security & Privacy
 
 ### Data Protection
-- **All data stored locally** in `~/.context-orchestrator/`
-- **OS-level access control** (file permissions)
-- **No telemetry or external tracking**
-- **Export/import** for manual backups
+- All data stored locally in `~/.context-orchestrator/`
+- OS-level access control (file permissions)
+- No telemetry or external tracking
+- Export/import for manual backups
 
 ### Privacy-Sensitive Processing
 - **Embeddings**: Always local (nomic-embed-text)
@@ -951,7 +385,7 @@ python scripts/setup.py --repair
 ## References
 
 ### Specification Documents
-- **Requirements**: `.kiro/specs/dev-knowledge-orchestrator/requirements.md` - Full requirements
+- **Requirements**: `.kiro/specs/dev-knowledge-orchestrator/requirements.md`
   - MVP: Requirements 1-13 (Core system)
   - Phase 2: Requirements 21-26 (Obsidian, CLI, Session logging)
   - Phase 15: Query attributes, Cross-encoder reranking, Project management, Search bookmarks
@@ -1004,15 +438,6 @@ with open('file.txt', 'w', encoding='utf-8') as f:
     f.write('日本語テキスト')
 ```
 
-In PowerShell scripts:
-```powershell
-# Use UTF-8 encoding for output
-[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::UTF8)
-
-# Or specify encoding in Out-File
-$content | Out-File -FilePath $path -Encoding utf8
-```
-
 **Why this matters:**
 - Japanese characters will be corrupted if saved with wrong encoding
 - Ollama local LLM expects UTF-8 for Japanese text processing
@@ -1029,14 +454,9 @@ $content | Out-File -FilePath $path -Encoding utf8
 
 ### Formatting & Linting
 ```bash
-# Format code
-black .
-
-# Lint
-ruff .
-
-# Type check
-mypy src
+black .      # Format code
+ruff .       # Lint
+mypy src     # Type check
 ```
 
 ### Commit Messages

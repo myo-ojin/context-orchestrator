@@ -54,10 +54,10 @@ class QueryAttributeExtractor:
     """Hybrid heuristic + LLM attribute extractor inspired by QAM."""
 
     PROJECT_KEYWORDS: Dict[str, str] = {
-        "appbrain": "AppBrain",
-        "orchestrator": "AppBrain",
-        "pilot": "AppBrain",
-        "demo": "AppBrain",
+        "appbrain": "OrchestratorX",
+        "orchestrator": "OrchestratorX",
+        "pilot": "OrchestratorX",
+        "demo": "OrchestratorX",
         "bugfixer": "BugFixer",
         "再発防止": "BugFixer",
         "再デプロイ": "BugFixer",

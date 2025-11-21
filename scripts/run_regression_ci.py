@@ -78,6 +78,39 @@ def check_embedding_quality(baseline_path: Path, quality_report_path: Path) -> b
     return True
 
 
+def extract_run_metrics(path: Path) -> tuple[float | None, float | None]:
+    """Parse the replay log for macro precision and cache hit rate (if available)."""
+
+    macro_precision: float | None = None
+    cache_hit_rate: float | None = None
+
+    if not path.exists():
+        return macro_precision, cache_hit_rate
+
+    with open(path, "r", encoding="utf-8") as log_file:
+        for line in log_file:
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            metrics_block = payload.get("metrics")
+            if isinstance(metrics_block, dict):
+                macro_precision = metrics_block.get("macro_precision", macro_precision)
+
+            reranker_block = payload.get("reranker_metrics")
+            if isinstance(reranker_block, dict):
+                reranker_metrics = reranker_block.get("metrics", reranker_block)
+                if isinstance(reranker_metrics, dict):
+                    cache_hit_rate = reranker_metrics.get("cache_hit_rate", cache_hit_rate)
+
+    return macro_precision, cache_hit_rate
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run MCP replay regression check")
     parser.add_argument(
@@ -173,32 +206,26 @@ def main():
             latest_run_path = run_files[0]
 
     if latest_run_path and latest_run_path.exists():
-        # Load last line of JSONL to get summary metrics
-        with open(latest_run_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            if lines:
-                try:
-                    summary = json.loads(lines[-1])
-                    macro_precision = summary.get("macro_precision", 1.0)
-                    cache_hit_rate = summary.get("cache_hit_rate", 0.0)
+        macro_precision, cache_hit_rate = extract_run_metrics(latest_run_path)
 
-                    # Check precision threshold
-                    if macro_precision < args.min_precision_threshold:
-                        print(
-                            f"[FAIL] Macro precision {macro_precision:.3f} < threshold {args.min_precision_threshold:.2f}"
-                        )
-                        raise SystemExit(1)
+        if macro_precision is not None:
+            if macro_precision < args.min_precision_threshold:
+                print(
+                    f"[FAIL] Macro precision {macro_precision:.3f} < threshold {args.min_precision_threshold:.2f}"
+                )
+                raise SystemExit(1)
+        else:
+            print("[WARN] Could not locate macro precision in latest run log")
 
-                    # Check cache hit rate threshold
-                    if cache_hit_rate < args.min_cache_hit_rate:
-                        print(
-                            f"[FAIL] Cache hit rate {cache_hit_rate:.2f} < threshold {args.min_cache_hit_rate:.2f}"
-                        )
-                        raise SystemExit(1)
+        if cache_hit_rate is not None:
+            if cache_hit_rate < args.min_cache_hit_rate:
+                print(f"[FAIL] Cache hit rate {cache_hit_rate:.2f} < threshold {args.min_cache_hit_rate:.2f}")
+                raise SystemExit(1)
+        else:
+            print("[WARN] Could not locate cache hit rate in latest run log")
 
-                    print(f"[PASS] Absolute thresholds met: Precision={macro_precision:.3f}, Cache={cache_hit_rate:.2f}")
-                except (json.JSONDecodeError, KeyError) as e:
-                    print(f"[WARN] Could not parse metrics from latest run: {e}")
+        if macro_precision is not None and cache_hit_rate is not None:
+            print(f"[PASS] Absolute thresholds met: Precision={macro_precision:.3f}, Cache={cache_hit_rate:.2f}")
 
     # Check embedding quality against baseline thresholds
     embedding_ok = check_embedding_quality(
