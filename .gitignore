@@ -25,6 +25,7 @@ wheels/
 venv/
 ENV/
 env/
+.venv311/
 
 # IDE
 .vscode/
@@ -53,7 +54,24 @@ config.yaml
 chroma_db/
 bm25_index/
 .context-orchestrator/
+reports/*.json
+reports/*.jsonl
+reports/*.csv
+!reports/.gitignore
+!reports/baselines/
+
+# Development artifacts (exclude from OSS)
+.kiro/
+.claude/
+docs/
+progress/
+tmp_*.py
+tmp_*.txt
+tmp_*.json
+nul
 
 # OS
 .DS_Store
 Thumbs.db
+*.bak
+*~

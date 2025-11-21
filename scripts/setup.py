@@ -195,8 +195,8 @@ class SetupWizard:
         print()
         print("Step 4: Configure CLI command")
         print()
-        print("PowerShell wrappers now record both `claude` and `codex` automatically.")
-        print("Cloud-side CLI calls will default to `claude` (you can edit config.yaml later if needed).")
+        print("PowerShell wrappers now record both claude and codex automatically.")
+        print("Cloud-side CLI calls will default to claude (edit config.yaml later if needed).")
         self.config.cli.command = 'claude'
         print(f"✁ECLI command defaulted to: {self.config.cli.command}")
 
@@ -258,6 +258,50 @@ class SetupWizard:
             return False
         except Exception as e:
             print(f"✁EFailed to run wrapper installer: {e}")
+            return False
+
+
+    def install_cli_wrapper(self) -> bool:
+        """Install PowerShell CLI recording wrapper"""
+        print()
+        print("Step 6: Installing CLI recording wrapper...")
+        print()
+
+        script_path = Path(__file__).parent / 'setup_cli_recording.ps1'
+        if not script_path.exists():
+            print(f"✁EWrapper script not found: {script_path}")
+            return False
+
+        if os.name != 'nt':
+            print("⚠ PowerShell wrapper installation skipped (non-Windows host).")
+            print("   Run the script manually on Windows to capture CLI sessions.")
+            return True
+
+        try:
+            result = subprocess.run(
+                [
+                    'powershell',
+                    '-NoLogo',
+                    '-ExecutionPolicy',
+                    'Bypass',
+                    '-File',
+                    str(script_path),
+                    '-Install'
+                ],
+                check=False
+            )
+            if result.returncode == 0:
+                print("✁ECLI recording wrapper installed.")
+                return True
+
+            print(f"✁ECLI recording wrapper exited with code {result.returncode}. Re-run the script above if needed.")
+            return False
+
+        except FileNotFoundError:
+            print("✁EPowerShell executable not found. Install PowerShell 7+ or run the wrapper manually later.")
+            return False
+        except Exception as exc:
+            print(f"✁EFailed to run wrapper installer: {exc}")
             return False
 
     def print_next_steps(self):

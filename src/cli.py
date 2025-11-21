@@ -332,10 +332,17 @@ def cmd_session_history(args):
     try:
         config = load_config(args.config)
 
-        log_dir = Path(config.logging.session_log_dir)
+        # Determine log directory based on backend
+        if args.backend == 'codex':
+            # Codex session directory
+            codex_home = Path(os.environ.get('USERPROFILE', '~')).expanduser() / '.codex'
+            log_dir = codex_home / 'sessions'
+        else:
+            # Context Orchestrator logs
+            log_dir = Path(config.logging.session_log_dir)
 
         if not log_dir.exists():
-            print("No session logs found")
+            print(f"No session logs found for backend '{args.backend}'")
             return
 
         # If session_id provided
@@ -343,11 +350,24 @@ def cmd_session_history(args):
             session_id = args.session_id
 
             # Get log file
-            log_file = log_dir / f"{session_id}.log"
+            if args.backend == 'codex':
+                # Codex files are in sessions/YYYY/MM/DD/rollout-*-<session_id>.jsonl
+                codex_files = list(log_dir.glob(f'**/rollout-*-{session_id}.jsonl'))
+                if not codex_files:
+                    # Try alternative pattern: rollout-<timestamp>-<session_id>.jsonl
+                    codex_files = list(log_dir.glob(f'**/*{session_id}.jsonl'))
 
-            if not log_file.exists():
-                print(f"Session not found: {session_id}")
-                sys.exit(1)
+                if not codex_files:
+                    print(f"Codex session not found: {session_id}")
+                    sys.exit(1)
+
+                log_file = codex_files[0]
+            else:
+                log_file = log_dir / f"{session_id}.log"
+
+                if not log_file.exists():
+                    print(f"Session not found: {session_id}")
+                    sys.exit(1)
 
             # Show summary only
             if args.summary_only:
@@ -393,22 +413,31 @@ def cmd_session_history(args):
 
         # List all sessions
         else:
-            log_files = sorted(log_dir.glob('*.log'), key=lambda p: p.stat().st_mtime, reverse=True)
+            if args.backend == 'codex':
+                # List Codex rollout files
+                log_files = sorted(log_dir.glob('**/rollout-*.jsonl'), key=lambda p: p.stat().st_mtime, reverse=True)
+            else:
+                log_files = sorted(log_dir.glob('*.log'), key=lambda p: p.stat().st_mtime, reverse=True)
 
             print("=" * 60)
-            print(f"Session Logs ({len(log_files)} sessions)")
+            print(f"Session Logs - {args.backend} ({len(log_files)} sessions)")
             print("=" * 60)
             print()
 
             for log_file in log_files[:args.limit]:
-                session_id = log_file.stem
+                if args.backend == 'codex':
+                    # Extract session_id from filename: rollout-<timestamp>-<session_id>.jsonl
+                    session_id = log_file.stem.split('-', 2)[-1] if '-' in log_file.stem else log_file.stem
+                else:
+                    session_id = log_file.stem
+
                 size_kb = log_file.stat().st_size / 1024
                 mtime = log_file.stat().st_mtime
 
                 import datetime
                 mtime_str = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
 
-                print(f"{session_id:<30} {size_kb:>8.1f} KB  {mtime_str}")
+                print(f"{session_id:<40} {size_kb:>8.1f} KB  {mtime_str}")
 
             print()
 
@@ -658,6 +687,7 @@ def main():
     # session-history command
     parser_session = subparsers.add_parser('session-history', help='Show session history')
     parser_session.add_argument('--session-id', help='Session ID to show')
+    parser_session.add_argument('--backend', choices=['context-orchestrator', 'codex'], default='context-orchestrator', help='Backend to read logs from')
     parser_session.add_argument('--open', action='store_true', help='Open log in editor')
     parser_session.add_argument('--summary-only', action='store_true', help='Show summary only')
     parser_session.add_argument('--limit', type=int, default=20, help='Number of sessions to list')

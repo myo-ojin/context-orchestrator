@@ -1,6 +1,6 @@
 # Contributing to Context Orchestrator
 
-Thank you for your interest in contributing to Context Orchestrator! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to Context Orchestrator! This document provides guidelines and instructions for contributing to the project.
 
 ## Table of Contents
 
@@ -11,32 +11,55 @@ Thank you for your interest in contributing to Context Orchestrator! This docume
 - [Coding Guidelines](#coding-guidelines)
 - [Testing](#testing)
 - [Submitting Changes](#submitting-changes)
+- [Issue Reporting](#issue-reporting)
 - [Project Structure](#project-structure)
 
 ## Code of Conduct
 
-Be respectful and constructive in all interactions. We aim to create a welcoming environment for all contributors.
+### Our Pledge
+
+We are committed to providing a welcoming and inclusive environment for all contributors. We expect:
+
+- Respectful and constructive communication
+- Focus on technical merit and project goals
+- Acceptance of diverse perspectives and experiences
+- Graceful handling of disagreements
+
+### Unacceptable Behavior
+
+- Harassment, discrimination, or personal attacks
+- Trolling, insulting comments, or ad hominem attacks
+- Publishing others' private information
+- Any conduct that could be considered unprofessional
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.11 or higher
-- Ollama (for local LLM integration)
-- Git
-- Basic understanding of:
-  - MCP (Model Context Protocol)
-  - Vector databases (Chroma)
-  - LLM interactions
+Before contributing, ensure you have:
 
-### First-Time Contributors
+- **Python 3.11+** installed
+- **Git** for version control
+- **Ollama** running locally (for LLM integration)
+- **Basic understanding** of MCP protocol (helpful but not required)
 
-1. Fork the repository on GitHub
-2. Clone your fork locally
-3. Create a feature branch
-4. Make your changes
-5. Test your changes
-6. Submit a pull request
+### Find an Issue
+
+1. Check [GitHub Issues](https://github.com/myo-ojin/llm-brain/issues)
+2. Look for issues tagged `good first issue` or `help wanted`
+3. Comment on the issue to indicate you're working on it
+4. Wait for maintainer acknowledgment before starting
+
+### Fork and Clone
+
+```bash
+# Fork the repository on GitHub, then:
+git clone https://github.com/YOUR_USERNAME/llm-brain.git
+cd llm-brain
+
+# Add upstream remote
+git remote add upstream https://github.com/myo-ojin/llm-brain.git
+```
 
 ## Development Setup
 
@@ -368,6 +391,66 @@ llm-brain/
 └── CONTRIBUTING.md             # This file
 ```
 
+## Issue Reporting
+
+### Bug Reports
+
+Use the bug report template:
+
+```markdown
+**Describe the bug**
+A clear description of what the bug is.
+
+**To Reproduce**
+Steps to reproduce:
+1. Run command '...'
+2. Query with '...'
+3. See error
+
+**Expected behavior**
+What you expected to happen.
+
+**Actual behavior**
+What actually happened.
+
+**Environment**
+- OS: Windows 11 / Ubuntu 22.04 / macOS 14
+- Python version: 3.11.5
+- Context Orchestrator version: 0.1.0
+- Ollama version: 0.1.20
+
+**Logs**
+```
+Paste relevant logs here
+```
+
+**Additional context**
+Any other relevant information.
+```
+
+### Feature Requests
+
+Use the feature request template:
+
+```markdown
+**Is your feature request related to a problem?**
+A clear description of the problem.
+
+**Describe the solution you'd like**
+A clear description of what you want to happen.
+
+**Describe alternatives you've considered**
+Alternative solutions or features you've considered.
+
+**Additional context**
+Any other context or screenshots.
+
+**Willingness to contribute**
+- [ ] I'm willing to implement this feature
+- [ ] I need help implementing this feature
+- [ ] I'm just suggesting the idea
+```
+
 ## Areas for Contribution
 
 ### High Priority
@@ -392,10 +475,17 @@ Look for issues labeled:
 - Advanced search filters
 - Memory analytics dashboard
 
+## Recognition
+
+Contributors are recognized in:
+- GitHub contributors page
+- Release notes (for significant contributions)
+- README acknowledgments (for major features)
+
 ## Questions?
 
-- **Documentation**: See [CLAUDE.md](CLAUDE.md)
-- **Issues**: [GitHub Issues](https://github.com/myo-ojin/llm-brain/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/myo-ojin/llm-brain/discussions)
+- **GitHub Discussions**: Ask questions and discuss ideas
+- **GitHub Issues**: Report bugs and request features
+- **Documentation**: Check [CLAUDE.md](CLAUDE.md) for developer guide
 
-Thank you for contributing to Context Orchestrator! 🎉
+Thank you for contributing to Context Orchestrator! 🙏
