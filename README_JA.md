@@ -221,14 +221,13 @@ python -m src.cli export --output backup.json
 python -m src.cli import --input backup.json
 ```
 
-> 💡 ヒント: `powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install` を一度実行すると、`claude`/`codex` コマンドのたびに `start_session → add_command → end_session` RPC が自動で飛び、`~/.context-orchestrator/logs` に最新ログが蓄積されます。続けて `python -m src.cli session-history --limit 5 --format table` を叩けばすぐに履歴を確認できます。
+> 💡 ヒント: `powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install` を一度実行すると、`claude`/`codex` コマンドのたびに `start_session → add_command → end_session` RPC が自動で送信され、`~/.context-orchestrator/logs` にログが蓄積されます。続けて `python -m src.cli session-history --limit 5 --format table` を叩けば直ちに履歴を確認できます。
 
 ### セッション自動記録を有効化する手順
-1. PowerShell でラッパーをインストール  
-   `powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install`
-2. 任意の `claude ...` または `codex ...` コマンドを実行（wrapper がセッションIDを払い出し、MCPで start/add/end を順番に呼びます）。
-3. 直後に `python -m src.cli session-history --limit 5` や `session-history --session-id <ID>` でログ/サマリを確認。生ログは `~/.context-orchestrator/logs/session-*.log` に保存されます。
-セットアップウィザード完了時にもこのラッパーは自動で実行されますが、PowerShell プロファイルを初期化・再作成した場合は上記コマンドで再インストールしてください。
+1. PowerShell で `scripts/setup_cli_recording.ps1 -Install` を実行してラッパーをインストール。
+2. 任意の `claude` または `codex` コマンドを実行（wrapper がセッションIDを払い出し、MCP経由で start/add/end を順番に呼びます）。
+3. `python -m src.cli session-history --limit 5` や `--session-id <ID>` でログ/サマリを確認。生ログは `~/.context-orchestrator/logs/session-*.log` に保存されます。
+セットアップウィザード完了時にもこのラッパーは自動実行されますが、PowerShell プロファイルを初期化・再作成した際は上記コマンドで再インストールしてください。
 
 ## 仕組み
 
