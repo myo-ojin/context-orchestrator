@@ -71,12 +71,12 @@ Need the full walkthrough (clone → setup wizard → smoke tests)? Follow the d
 
 ```bash
 # Clone & enter repository
-git clone https://github.com/myo-ojin/context-orchestrator.git
-cd context-orchestrator
+git clone https://github.com/myo-ojin/llm-brain.git
+cd llm-brain
 
 # Create virtual environment
 python -m venv .venv
-.\\.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 
 # Install dependencies
 pip install -r requirements.txt
@@ -99,11 +99,12 @@ ollama pull qwen2.5:7b
 python -m src.cli status
 python -m src.cli doctor
 
-# Edge-case regression
-pytest tests/unit/services/test_search_edge_cases.py -q
+# Ingestion dry-run (no data sent)
+python -m scripts.claude_session_ingestor --dry-run --cwd .
+python -m scripts.codex_session_ingestor  --dry-run --cwd .
 
-# Hybrid replay against the latest baseline
-python -m scripts.run_regression_ci --baseline reports/baselines/mcp_run-20251109-143546.jsonl
+# Check that session logs are readable
+python -m src.cli session-history --limit 5
 ```
 
 ## Usage
@@ -136,8 +137,6 @@ python -m src.cli import --input backup.json   # Import memories
 python -m src.cli session-history  # List all sessions
 python -m src.cli session-history --session-id <id>  # Show specific session
 
-# Performance profiling
-python scripts/performance_profiler.py  # Run performance benchmarks
 ```
 
 See [CLAUDE.md](CLAUDE.md) for detailed CLI documentation.
@@ -148,44 +147,33 @@ See [CLAUDE.md](CLAUDE.md) for detailed CLI documentation.
    ```powershell
    powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install
    ```
-2. Run a `claude ...` or `codex ...` command. The wrapper generates a `session-<timestamp>` ID, fires `start_session → add_command → end_session`, and writes transcripts to `~/.context-orchestrator/logs`.
-3. Inspect the new entries:
+2. Run a `claude ...` or `codex ...` command as usual. The wrapper generates a stable `session-<timestamp>` ID, fires `start_session → add_command → end_session` via MCP, and streams every command/output pair into `~/.context-orchestrator/logs`.
+3. Inspect the transcripts or summaries immediately:
    ```bash
    python -m src.cli session-history --limit 5 --format table
-   python -m src.cli session-history --session-id <session_id>
-   ```
+  python -m src.cli session-history --session-id session-20251116-104455-a1b2  # open a specific log
+  ```
 
-The setup wizard automatically runs the installer; rerun the command above if you reset your PowerShell profile.
+The setup wizard now runs the wrapper installer automatically; rerun the command above whenever you reset your PowerShell profile or update to a new shell.
 
-Re-run the install script anytime you rotate PowerShell profiles to keep the wrapper active.
+If you ever stop seeing new entries, re-run the install command above or delete/recreate your PowerShell profile so the wrapper is re-imported.
 
 ### Testing & Quality Assurance
 
-Context Orchestrator includes comprehensive test suites to ensure reliability and performance:
+軽量配布向けに、最低限の動作確認コマンドだけ残しています。
 
 ```bash
-# Unit tests (including edge cases)
-pytest tests/unit/services/test_search_edge_cases.py  # 48 edge case tests (100% pass)
+# ヘルスチェック
+python -m src.cli status
+python -m src.cli doctor
 
-# Regression testing
-python -m scripts.run_regression_ci  # Compare against baseline metrics
+# セッション取り込みのドライラン（送信なし）
+python -m scripts.claude_session_ingestor --dry-run --cwd .
+python -m scripts.codex_session_ingestor  --dry-run --cwd .
 
-# Load testing
-python -m scripts.load_test --num-queries 100  # Consecutive query load test
-python -m scripts.concurrent_test --concurrency 5 --rounds 10  # Parallel query test
-
-# Quality review
-python -m scripts.quality_review --samples-per-topic 5  # Topic-based quality analysis
-
-# Query pattern testing
-python -m scripts.mcp_replay --requests tests/scenarios/diverse_queries.json  # 50 diverse queries
+# 直近ログの確認
+python -m src.cli session-history --limit 5
 ```
-
-**Test Coverage:**
-- **Edge Cases** (48 tests): Zero-hit queries, special characters (20 types), emoji (9 types), whitespace (6 types), extreme length queries, project ID filtering
-- **Load Tests**: 100 consecutive queries with memory leak detection, concurrent execution with thread safety validation
-- **Quality Metrics**: Precision/Recall/F1, false positive/negative rates, score distribution analysis
-- **Query Patterns**: 50 diverse queries across 5 categories (long/short, multilingual, technical/natural, domain-specific, vague/specific)
 
 ### Structured Summaries & Scenario Loader
 
@@ -201,10 +189,7 @@ KeyActions:
 ```
 
 - `KeyActions` は必ず `- ` で始まる箇条書きにする。段落や番号付きリストは検証に失敗する。
-- `scripts.load_scenarios` は取り込み時にこの形式をチェックし、違反があるとメモ ID と生成サマリの抜粋を表示して中断する。
-- エラーが出た場合は該当会話かテンプレートを修正し、`python -m scripts.load_scenarios --file tests/scenarios/scenario_data.json` を再実行する。
-
-CI の `python -m scripts.run_regression_ci` も同じ検証を行うため、テンプレートを更新した際は README とシナリオ README を同期させてからテストを流してください。
+- 取り込み時の構造チェックはセッションインジェスター側で行われるため、上記フォーマットを守ってメモを生成してください。
 
 ## Configuration
 
@@ -285,18 +270,7 @@ python -m src.main  # 以降の要約はフランス語扱いで routing
 
 ### Cross-Encoder Reranker Cache
 
-- `search.cross_encoder_cache_size` / `search.cross_encoder_cache_ttl_seconds` で LRU キャッシュの容量と保持期間（秒）を制御できます。
-- `python -m scripts.mcp_replay` を実行すると、キャッシュヒット率や LLM レイテンシが “Reranker Metrics” として表示され、`reports/mcp_runs/*.jsonl` にも保存されます。
-- MCP 経由で `{"jsonrpc":"2.0","id":1,"method":"get_reranker_metrics","params":{}}` を呼び出すと、現在のキャッシュ統計をオンデマンドで取得できます。
-- `--export-features <path>` を付けてリプレイすると、各検索結果の rerank 特徴量が CSV に出力され、後述の重み学習スクリプトに渡せます。
-
-### Rerank Weight Training
-
-1. `python -m scripts.mcp_replay --requests tests/scenarios/query_runs.json --export-features reports/features.csv`
-2. `python -m scripts.train_rerank_weights --features reports/features.csv --config config.yaml`
-3. `python -m scripts.run_regression_ci` を再実行して Precision/NDCG を確認し、必要に応じて `reranking_weights` や `search.cross_encoder_cache_*` を調整してください。
-
-クラウド側へのフォールバックが発生すると `Language routing fallback (lang=...)` ログにレイテンシ（ミリ秒）と成否が出力されます。`python -m scripts.run_regression_ci` や平常運用中に `logs/context_orchestrator.log` を tail しておけば、遅延や失敗回数を継続的にモニタリングできます。
+LRU キャッシュのパラメータは `search.cross_encoder_cache_*` で調整できます。リリースパッケージにはベンチマーク／学習スクリプトは含めていません。詳細なチューニングが必要な場合は開発ブランチ（`dev/tool-scripts` など）に含まれるツール群を参照してください。
 
 
 ## Troubleshooting
@@ -381,25 +355,6 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture and development guide.
 
 Run performance benchmarks to validate system performance:
 
-```bash
-# Run all benchmarks
-python scripts/performance_profiler.py
-
-# Custom run count
-python scripts/performance_profiler.py --runs 200
-
-# Save report to custom location
-python scripts/performance_profiler.py --output ./perf_report.json
-```
-
-The profiler measures:
-- **Search Latency**: P50/P95/P99 latencies with target ≤200ms
-- **Ingestion Throughput**: Conversations per second, target <5s/conversation
-- **Consolidation Time**: Extrapolated time for 10K memories, target <5 minutes
-- **Memory Footprint**: Peak and resident memory usage
-
-Reports are saved as JSON with pass/fail indicators for each target.
-
 ## Documentation
 
 - **Requirements**: `.kiro/specs/dev-knowledge-orchestrator/requirements.md` - Full project requirements
@@ -457,21 +412,6 @@ black .
 # Lint
 ruff .
 ```
-
-### Regression Replay Check
-
-Run this guard whenever retrieval, QAM, or memory code changes:
-
-```bash
-python -m scripts.run_regression_ci
-```
-
-This helper wraps `scripts.mcp_replay` against the canonical baseline (`reports/baselines/mcp_run-20251109-143546.jsonl`), saves the latest log under `reports/mcp_runs/`, and fails if either condition is met:
-
-- Macro Precision or Macro NDCG drops by more than 0.02 versus the baseline.
-- `reports/mcp_runs/zero_hits.json` records any zero-hit queries (indicates missing dictionary/metadata entries).
-
-Override `--baseline`, `--requests`, or `--output` when adding new scenarios, and commit refreshed baselines once metrics improve. For CI, activate `.venv311` then add a step such as `python -m scripts.run_regression_ci`; no extra services are required because the script launches the MCP server via `scripts.mcp_stdio`.
 
 ## Support
 
