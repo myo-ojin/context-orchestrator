@@ -163,8 +163,8 @@ class SessionManager:
             ... )
         """
         if session_id not in self.sessions:
-            logger.warning(f"Session not found: {session_id}")
-            return False
+            logger.warning(f"Session not found: {session_id} (reopening)")
+            self.start_session(session_id)
 
         command_entry = {
             'timestamp': datetime.now().isoformat(),
@@ -202,8 +202,8 @@ class SessionManager:
             >>> memory_id = manager.end_session(session_id, create_obsidian_note=True)
         """
         if session_id not in self.sessions:
-            logger.warning(f"Session not found: {session_id}")
-            return None
+            logger.warning(f"Session not found: {session_id} (reopening)")
+            self.start_session(session_id)
 
         session = self.sessions[session_id]
 

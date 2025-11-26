@@ -92,7 +92,8 @@ class MCPProtocolHandler:
 
         try:
             for line in sys.stdin:
-                line = line.strip()
+                # Strip newline/whitespace and possible BOM/garbled BOM (PowerShell pipeline)
+                line = line.lstrip("\ufeff").lstrip("ï»¿").strip()
 
                 if not line:
                     continue

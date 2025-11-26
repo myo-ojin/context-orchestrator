@@ -63,6 +63,13 @@ from src.mcp.protocol_handler import MCPProtocolHandler
 
 logger = get_logger(__name__)
 
+# Ensure stdio uses UTF-8 (avoids BOM mishandling when invoked from PowerShell)
+try:
+    sys.stdin.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 
 def init_storage(config: Config) -> tuple[ChromaVectorDB, BM25Index]:
     """
