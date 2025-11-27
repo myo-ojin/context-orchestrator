@@ -1,721 +1,812 @@
-# Issue Log - Context Orchestrator
+﻿# Issue Log - Context Orchestrator
 
-���̃t�@�C���͎����E�^�p���ɔ��������ۑ�𐮗����A�Ή������ƍ���̉��P�v������L���邽�߂̃��O�ł��B
+このファイルは実装・運用中に発生した課題を整理し、対応履歴と今後の改善計画を共有するためのログです。
 
-## �^�p���[��
-- �V�����ۑ�� **Open Issues** �ɒǉ����AID ����ӂɍ̔Ԃ���B
-- �Ή��󋵂��ς������ **Status / Next Action** ���X�V����B������� **Issue Details** �Ɍ����ƑΏ��A�Ĕ��h�~����L�^���������� **Resolved Issues** �ֈړ�����B
-- �d�l�ǉ��Ⓑ���v��ɕR�Â��^�X�N�́A���������Ɋւ�炸�ڍ׃Z�N�V�����Ŕw�i�ƃS�[���𖾎�����B
+## 運用ルール
+- 新しい課題は **Open Issues** に追加し、ID を一意に採番する。
+- 対応状況が変わったら **Status / Next Action** を更新する。完了後は **Issue Details** に原因と対処、再発防止策を記録したうえで **Resolved Issues** へ移動する。
+- 仕様追加や長期計画に紐づくタスクは、完了時期に関わらず詳細セクションで背景とゴールを明示する。
 
 ## Open Issues
 | ID | Title | Status | Created | Owner | Next Action |
 |----|-------|--------|---------|-------|-------------|
-| #2025-11-13-09 | ???[???x?[?X???????L???O?{CrossEncoder???????iPhase 4?j | Under Review | 2025-11-13 | ryomy | Phase 6?????????????????p???]?? |
-| #2025-11-14-01 | ???I?e?X?g?v?????iPhase 7: Quality Assurance?j | Planned | 2025-11-14 | ryomy | ???l??N?G???p?^?[???A?G?b?W?P?[?X?A????e?X?g?A?i???e?X?g????{ |
+| #2025-11-13-09 | ルールベースリランキング＋CrossEncoder上限制御（Phase 4） | Under Review | 2025-11-13 | ryomy | Phase 6完了後の検討課題として継続評価 |
+| #2025-11-14-01 | 包括的テストプラン（Phase 7: Quality Assurance） | Planned | 2025-11-14 | ryomy | 多様なクエリパターン、エッジケース、負荷テスト、品質テストの実施 |
+| #2025-11-26-02 | Log bridge improvements and remaining risks | Open | 2025-11-26 | ryomy | 優先度1-2のリスクから順次対応：RegEx脆弱性、初期化重量化、PowerShell空白パス、プロセス死活監視、ポーリング負荷、タイムスタンプ順序 |
+| #2025-11-26-03 | Session memorization (indexing) implementation | Open | 2025-11-26 | ryomy | セッション終了検知ロジックの設計と実装（end_session呼び出しでingestion_serviceを経由してベクトルDB/BM25にインデックス化） |
+| #2025-11-26-04 | Repository cleanup and distribution preparation | Open | 2025-11-26 | ryomy | タスクA-Eを順次実施：コミット、新規追加、不要ファイル削除、設定改善、GitHub同期 |
+
 ## Resolved Issues
 | ID | Title | Resolved | Owner | Notes |
 |----|-------|----------|-------|-------|
-| #2025-11-15-01 | Codex/Claude session logging bridge missing | 2025-11-21 | ryomy | Phase 0-4�����iClaude���S�����C���W�F�X�g�����j�A���r���[�w�E6����+�ă��r���[3����+�ǉ��C��4����+�āX���r���[4���ڐ��������A�����e�X�g�SPASS�iExit Criteria 3/3�B���j�B�ڍׂ� `reports/issue_15-01_review_plan.md` �Q�ƁB|
-| #2025-11-13-01 | �������\���̉��P�iEnriched Summary�j | 2025-11-13 | ryomy | Phase 2����: ���ߍ��ݕi��0.910�i?0.80�j�APrecision/NDCG�ێ��APhase 3�ɐi�� |
-| #2025-11-11-02 | �������ʂ̍ו����ƃR���e�L�X�g�x�[�X�I�� | 2025-11-14 | ryomy | Phase 6�ő啝���P�B���i���C�e���V71%�팸�ALLM�Ăяo��63%�팸�j�ɂ��s�v�Ɣ��f |
-| #2025-11-11-03 | �v���W�F�N�g�������v�[�������ւ̈ڍs | 2025-11-13 | ryomy | Phase 3����: ProjectMemoryPool/warm_cache�����A������ID�t�B���^�����O�@�\�APrecision+136%���P |
-| #2025-11-12-01 | �S�������p�t�H�[�}���X�Z�k�� | 2025-11-14 | ryomy | Phase 6�ŒB��: 11.8�b��3.4�b�i71%�팸�j�A5�b�ڕW�ł͂Ȃ������p�\�� |
-| #2025-11-11-01 | QAM�����̋L�����^�f�[�^���� | 2025-11-12 | ryomy | Phase 2�L���b�V���œK���ɂ��ڕW���x�B���iP=75.8%, NDCG=1.30�j�AQAM�����͕s�v�Ɣ��f |
-| #2025-11-10-07 | �����p�C�v���C���œK����QAM�����g�[ | 2025-11-11 | ryomy | LLM���d���E�L���b�V���œK���� #2025-11-10-06 �ŒB���AQAM������ #2025-11-11-01 �ŕ��j�]�� |
-| #2025-11-10-06 | �Z�b�V���������v���W�F�N�g����ƃL���b�V���œK�� | 2025-11-11 | ryomy | 3�w�L���b�V���iL1/L2/L3�j���������A�q�b�g��70%�B���i�ڕW70-80%�j�APhase 3���� |
-| #2025-11-05-07 | main.py �Ɗe�N���X�� __init__ �����s��v | 2025-11-05 | TBD | main.py �̌Ăяo������S�ďC�����AMCP �T�[�o�[���N�����邱�Ƃ��m�F |
-| #2025-11-05-06 | LocalLLMClient �� embedding/inference ���f�������󂯎��Ȃ� | 2025-11-05 | TBD | __init__ �Ɗe���\�b�h�Ɉ�����ǉ����A�f�t�H���g���f�����𓝈� |
-| #2025-11-05-05 | BM25Index �������� main.py �ƕs��v | 2025-11-05 | TBD | main.py �� `index_path` ��n���悤�C�����ABM25 ���� `persist_path` �����e |
-| #2025-11-05-04 | ChromaVectorDB �� collection_name ���󂯎��Ȃ� | 2025-11-05 | TBD | �R���X�g���N�^�� collection_name ��ǉ����Amain/cli ����w��\�ɂ��� |
-| #2025-11-05-03 | nomic-embed-text-v1.5 ���f�������݂��Ȃ� | 2025-11-05 | TBD | �S 22 �t�@�C���� `nomic-embed-text` �ɒu�����AOllama ���W�X�g���ɍ��킹�� |
-| #2025-11-05-02 | SearchService �� get_memory / list_recent ������ | 2025-11-05 | TBD | MCP/CLI ����Ă΂�� 2 ���\�b�h���������A154 �e�X�g���Ď��s |
-| #2025-11-03-03 | Phase5 core�T�[�r�X������ | 2025-11-10 | ryomy | ConsolidationService �� migrate/cluster/forget �� main.py �̃X�P�W���[���A�g�������ς� |
-| #2025-11-03-01 | Ollama ���ߍ��� API �Ăяo���� 400 �G���[ | 2025-11-03 | TBD | `generate_embedding` �� `input` �L�[�ŌĂяo���悤�C�� |
-| #2025-11-03-02 | Chunk ���^�f�[�^�� memory_id ������ | 2025-11-03 | TBD | Chunker/Indexer �� `memory_id` / `chunk_index` �𖄂ߍ��ނ悤���C |
-| #2025-11-09-01 | Hybrid search/rerank modernization plan | 2025-11-09 | ryomy | QAM �����Ecross-encoder �ă����N�Etier �� recency �W���݌v�̕��j������ |
-| #2025-11-10-01 | �\�����v��e���v�� + ������V�i���I�g�[ + RPC �^�C���A�E�g�Ή� | 2025-11-10 | ryomy | �v��e���v�����V�� load_scenarios ���؁A`--rpc-timeout` �ǉ������� |
-| #2025-11-10-02 | �v��e���v�������ƍ\�����؂̎����� | 2025-11-10 | ryomy | README/�V�i���I README �ǋL�� scripts.load_scenarios �̍\�����؃��O�𐮔� |
-| #2025-11-10-03 | ���ꌟ�m�� LLM ���[�e�B���O�g�� | 2025-11-10 | ryomy | fallback ���O�v���� CLI override �菇�𐮔� |
-| #2025-11-10-04 | �N���X�G���R�[�_�������Ƒ����ꃊ�v���C�g�� | 2025-11-10 | ryomy | reranker LRU �L���b�V���� replay �w�W�𐮔� |
+| #2025-11-15-01 | Codex/Claude session logging bridge missing | 2025-11-27 | ryomy | log_bridge.py実装完了、Unicode問題修正、セッションログ取得機能完成。インデックス化は#2025-11-26-03で継続 |
+| #2025-11-13-01 | メモリ表現の改善（Enriched Summary） | 2025-11-13 | ryomy | Phase 2完了: 埋め込み品質0.910（≥0.80）、Precision/NDCG維持、Phase 3に進む |
+| #2025-11-11-02 | 検索結果の細分化とコンテキストベース選別 | 2025-11-14 | ryomy | Phase 6で大幅改善達成（レイテンシ71%削減、LLM呼び出し63%削減）により不要と判断 |
+| #2025-11-11-03 | プロジェクトメモリプール方式への移行 | 2025-11-13 | ryomy | Phase 3完了: ProjectMemoryPool/warm_cache統合、メモリIDフィルタリング機能、Precision+136%改善 |
+| #2025-11-12-01 | 全数検索パフォーマンス短縮化 | 2025-11-14 | ryomy | Phase 6で達成: 11.8秒→3.4秒（71%削減）、5秒目標ではないが実用十分 |
+| #2025-11-11-01 | QAM属性の記憶メタデータ統合 | 2025-11-12 | ryomy | Phase 2キャッシュ最適化により目標精度達成（P=75.8%, NDCG=1.30）、QAM統合は不要と判断 |
+| #2025-11-10-07 | 検索パイプライン最適化とQAM辞書拡充 | 2025-11-11 | ryomy | LLM多重化・キャッシュ最適化は #2025-11-10-06 で達成、QAM辞書は #2025-11-11-01 で方針転換 |
+| #2025-11-10-06 | セッション自動プロジェクト判定とキャッシュ最適化 | 2025-11-11 | ryomy | 3層キャッシュ（L1/L2/L3）実装完了、ヒット率70%達成（目標70-80%）、Phase 3完了 |
+| #2025-11-05-07 | main.py と各クラスの __init__ 引数不一致 | 2025-11-05 | TBD | main.py の呼び出し側を全て修正し、MCP サーバーが起動することを確認 |
+| #2025-11-05-06 | LocalLLMClient が embedding/inference モデル名を受け取らない | 2025-11-05 | TBD | __init__ と各メソッドに引数を追加し、デフォルトモデル名を統一 |
+| #2025-11-05-05 | BM25Index 引数名が main.py と不一致 | 2025-11-05 | TBD | main.py が `index_path` を渡すよう修正し、BM25 側も `persist_path` を許容 |
+| #2025-11-05-04 | ChromaVectorDB が collection_name を受け取らない | 2025-11-05 | TBD | コンストラクタに collection_name を追加し、main/cli から指定可能にした |
+| #2025-11-05-03 | nomic-embed-text-v1.5 モデルが存在しない | 2025-11-05 | TBD | 全 22 ファイルを `nomic-embed-text` に置換し、Ollama レジストリに合わせた |
+| #2025-11-05-02 | SearchService に get_memory / list_recent が無い | 2025-11-05 | TBD | MCP/CLI から呼ばれる 2 メソッドを実装し、154 テストを再実行 |
+| #2025-11-03-03 | Phase5 coreサービス未実装 | 2025-11-10 | ryomy | ConsolidationService の migrate/cluster/forget と main.py のスケジューラ連携を実装済み |
+| #2025-11-03-01 | Ollama 埋め込み API 呼び出しで 400 エラー | 2025-11-03 | TBD | `generate_embedding` を `input` キーで呼び出すよう修正 |
+| #2025-11-03-02 | Chunk メタデータに memory_id が無い | 2025-11-03 | TBD | Chunker/Indexer が `memory_id` / `chunk_index` を埋め込むよう改修 |
+| #2025-11-09-01 | Hybrid search/rerank modernization plan | 2025-11-09 | ryomy | QAM 導入・cross-encoder 再ランク・tier 別 recency 係数設計の方針を決定 |
+| #2025-11-10-01 | 構造化要約テンプレ + 多言語シナリオ拡充 + RPC タイムアウト対応 | 2025-11-10 | ryomy | 要約テンプレ刷新と load_scenarios 検証、`--rpc-timeout` 追加を完了 |
+| #2025-11-10-02 | 要約テンプレ強化と構造検証の自動化 | 2025-11-10 | ryomy | README/シナリオ README 追記と scripts.load_scenarios の構造検証ログを整備 |
+| #2025-11-10-03 | 言語検知と LLM ルーティング拡張 | 2025-11-10 | ryomy | fallback ログ計測と CLI override 手順を整備 |
+| #2025-11-10-04 | クロスエンコーダ高速化と多言語リプレイ拡張 | 2025-11-10 | ryomy | reranker LRU キャッシュと replay 指標を整備 |
 
 ---
 
-### #2025-11-05-07 main.py �Ɗe�N���X�� __init__ �����s��v
-- **����**: Phase 8-9 �Ŏ������� main.py ���APhase 1-7 �Œ�`���ꂽ storage/services �Q�̃V�O�l�`����������Ă������߁A���������ɘA���I�� TypeError �������� MCP �T�[�o�[���N���ł��Ȃ������B  
-- **�Ώ�**: ModelRouter�AIngestionService�AConsolidationService �ɓn���������Ə�����S�Č������Avector_db �� indexer �̕s�������������B12 �R���|�[�l���g������ɏ���������邱�Ƃ��m�F�ς݁B  
-- **�Ĕ��h�~**: �d�l�t�F�[�Y���ƂɎ��ۂ̋N���e�X�g���s���A�e�N���X�̃V�O�l�`�������� issue �����Ă���C������B
+### #2025-11-05-07 main.py と各クラスの __init__ 引数不一致
+- **現象**: Phase 8-9 で実装した main.py が、Phase 1-7 で定義された storage/services 群のシグネチャを誤解していたため、初期化時に連鎖的な TypeError が発生し MCP サーバーが起動できなかった。  
+- **対処**: ModelRouter、IngestionService、ConsolidationService に渡す引数名と順序を全て見直し、vector_db や indexer の不足分も加えた。12 コンポーネントが正常に初期化されることを確認済み。  
+- **再発防止**: 仕様フェーズごとに実際の起動テストを行い、各クラスのシグネチャ差分は issue 化してから修正する。
 
-### #2025-11-05-05 BM25Index �̈������� main.py �ƕs��v
-- **����**: main.py �� `index_path` ��n���̂ɑ΂��ABM25Index �� `persist_path` �����҂��Ă������ߏ������Ɏ��s�B  
-- **�Ώ�**: main.py ���ŃL�[�����C�����ABM25 ��������݊��� `index_path` ���󂯕t����悤�ɂ����B  
-- **�⑫**: ������ settings ����̃p�X�w��~�X�������� grep �Ŋm�F�B
+### #2025-11-05-05 BM25Index の引数名が main.py と不一致
+- **現象**: main.py が `index_path` を渡すのに対し、BM25Index は `persist_path` を期待していたため初期化に失敗。  
+- **対処**: main.py 側でキー名を修正し、BM25 側も後方互換で `index_path` を受け付けるようにした。  
+- **補足**: 併せて settings からのパス指定ミスが無いか grep で確認。
 
-### #2025-11-05-04 ChromaVectorDB �� collection_name ���󂯎��Ȃ�
-- **����**: main/cli ����R���N�V��������n���Ȃ����߁A�����e�i���g�̕��s�^�p���ł��Ȃ������B  
-- **�Ώ�**: `collection_name` ������ǉ����A�f�t�H���g�l�� config �Ɠ����B  
-- **����**: CLI �� MCP �o���ŋN�����A�قȂ�R���N�V���������w�肵���ۂɏՓ˂��Ȃ����Ƃ��m�F�B
+### #2025-11-05-04 ChromaVectorDB が collection_name を受け取らない
+- **現象**: main/cli からコレクション名を渡せないため、複数テナントの並行運用ができなかった。  
+- **対処**: `collection_name` 引数を追加し、デフォルト値を config と同期。  
+- **検証**: CLI と MCP 双方で起動し、異なるコレクション名を指定した際に衝突しないことを確認。
 
-### #2025-11-05-03 nomic-embed-text-v1.5 ���f�������݂��Ȃ�
-- **����**: 22 �t�@�C���� `nomic-embed-text-v1.5` ���Q�Ƃ��Ă������AOllama ���ɊY�����f�����Ȃ��S�Ă̖��ߍ��݌Ăяo�������s�B  
-- **�Ώ�**: ���ׂ� `nomic-embed-text` �ɒu�����AREADME �� scripts �������ɓ���B  
-- **�Ĕ��h�~**: �V���f�����g���ۂ͌������W�X�g���ő��݊m�F���Ă��瓱������B
+### #2025-11-05-03 nomic-embed-text-v1.5 モデルが存在しない
+- **現象**: 22 ファイルで `nomic-embed-text-v1.5` を参照していたが、Ollama 側に該当モデルがなく全ての埋め込み呼び出しが失敗。  
+- **対処**: すべて `nomic-embed-text` に置換し、README と scripts も同名に統一。  
+- **再発防止**: 新モデルを使う際は公式レジストリで存在確認してから導入する。
 
-### #2025-11-05-02 SearchService �� get_memory / list_recent ������
-- **����**: MCP �v���g�R���� CLI �� `get_memory` �� `list_recent` ���Ăяo���Ă������ASearchService �Ɏ������Ȃ� runtime error �ɂȂ��Ă����B  
-- **�Ώ�**: VectorDB �� `get` / `list_by_metadata` �𗘗p���� 2 ���\�b�h�������B154 �e�X�g�����s���A�����@�\�ւ̉e�����������Ƃ��m�F�B  
-- **�Ĕ��h�~**: Handler ����V���\�b�h���ĂԑO�ɃT�[�r�X�w�� stub ��p�ӂ���B
+### #2025-11-05-02 SearchService に get_memory / list_recent が無い
+- **現象**: MCP プロトコルと CLI が `get_memory` と `list_recent` を呼び出していたが、SearchService に実装がなく runtime error になっていた。  
+- **対処**: VectorDB の `get` / `list_by_metadata` を利用して 2 メソッドを実装。154 テストを実行し、既存機能への影響が無いことを確認。  
+- **再発防止**: Handler から新メソッドを呼ぶ前にサービス層へ stub を用意する。
 
-### #2025-11-03-03 Phase5 core�T�[�r�X������
-- **����**: Phase5 �őz�肵�Ă��� Consolidation/�폜�t���[���������̂܂܎c��ASession/Fuse �A�g�����삵�Ȃ������B  
-- **�Ώ� (2025-11-10)**: ConsolidationService.consolidate() �� _migrate_working_memory �� _cluster_similar_memories �� _process_clusters �� _forget_old_memories �����Ɏ��s���銮�S�p�C�v���C����񋟂��Amain.py �� init_services / check_and_run_consolidation / APScheduler �����Ԏ��s�� 24 ���ԊĎ����s���\���ɍX�V�B�폜�t�F�[�Y�ł� Indexer.delete_by_memory_id �ɂ�� chunk �ꊇ�폜�� SearchService �̃��^�f�[�^�t�B���^�Ő�������ۂB  
-- **����**: pytest 69 passed / 10 skipped�Apytest --cov=src 61% �ɉ����A�蓮���s�� Consolidation ���v���O�� scheduler �� timestamp �X�V���m�F�ς݁B  
-- **�Ĕ��h�~**: Consolidation ���v�� LLM �N���C�A���g�w�̃��W���[���������r���[���APhase6 �ȍ~�̋@�\�ǉ����� CLI/MCP �N���e�X�g��K�{������B  
+### #2025-11-03-03 Phase5 coreサービス未実装
+- **現象**: Phase5 で想定していた Consolidation/削除フローが未実装のまま残り、Session/Fuse 連携が動作しなかった。  
+- **対処 (2025-11-10)**: ConsolidationService.consolidate() が _migrate_working_memory → _cluster_similar_memories → _process_clusters → _forget_old_memories を順に実行する完全パイプラインを提供し、main.py の init_services / check_and_run_consolidation / APScheduler から夜間実行と 24 時間監視を行う構成に更新。削除フェーズでは Indexer.delete_by_memory_id による chunk 一括削除と SearchService のメタデータフィルタで整合性を保つ。  
+- **検証**: pytest 69 passed / 10 skipped、pytest --cov=src 61% に加え、手動実行で Consolidation 統計ログと scheduler の timestamp 更新を確認済み。  
+- **再発防止**: Consolidation 統計と LLM クライアント層のモジュールを定期レビューし、Phase6 以降の機能追加時に CLI/MCP 起動テストを必須化する。  
 
 ### #2025-11-09-01 Hybrid search/rerank modernization plan
-- **�w�i**: timeline �� change-feed �̂悤�Ȗ��m�ȃN�G���� working/short-term ��������ɏ�ʂ�苒���A�K�v�Ȓ����������������BBM25 ���������� chunk ���T�}������ɗ���ꍇ�����݁B  
-- **�O���x�X�g�v���N�e�B�X**: QAM �ɂ��N�G���������o�AHYRR �̂悤�� dense+BM25 �n�C�u���b�h�ACLEF CheckThat! 2025 �� cross-encoder ���p�ACaGR-RAG �̃N�G���N���X�^�����O�ɂ�� tail latency �팸�B  
+- **背景**: timeline や change-feed のような明確なクエリで working/short-term メモが常に上位を占拠し、必要な長期メモが埋もれる。BM25 が強すぎて chunk がサマリより上に来る場合も存在。  
+- **外部ベストプラクティス**: QAM によるクエリ属性抽出、HYRR のような dense+BM25 ハイブリッド、CLEF CheckThat! 2025 の cross-encoder 併用、CaGR-RAG のクエリクラスタリングによる tail latency 削減。  
 - **Next Actions**:  
-  1. LLM �� topic/type/project �����𒊏o�� SearchService �̃t�B���^/metadata bonus �ɓK�p�B  
-  2. dense100 + BM25 30 �̌��� cross-encoder �ɓn���A�������[�� `_rerank` �̓t�H�[���o�b�N���B  
-  3. tier ���Ƃ� recency �W���𒲐����A��������������ł���悤 `_calculate_recency_score` ���Đ݌v�B  
-  4. chunk �������L���O�Ώۂ���O���A�̗p�����̕⑫���Ƃ��Ă̂ݕԂ��B  
-  5. `scripts.mcp_replay` �� Precision/NDCG �������v�����A�g�s�b�N�P�ʂɃo�b�`�������� IO ���œK���B
+  1. LLM で topic/type/project 属性を抽出し SearchService のフィルタ/metadata bonus に適用。  
+  2. dense100 + BM25 30 の候補を cross-encoder に渡し、既存ルール `_rerank` はフォールバック化。  
+  3. tier ごとに recency 係数を調整し、長期メモが浮上できるよう `_calculate_recency_score` を再設計。  
+  4. chunk をランキング対象から外し、採用メモの補足情報としてのみ返す。  
+  5. `scripts.mcp_replay` で Precision/NDCG を自動計測し、トピック単位にバッチ処理して IO を最適化。
 
-### #2025-11-10-01 �\�����v��e���v�� + ������V�i���I�g�[ + RPC�^�C���A�E�g�Ή�
-- **����**: �v�񂪎��R�`���� Topic/DocType/Project ��񂪌������₷���A������V�i���I���s���B�܂� `scripts.mcp_replay` ���d���N�G���Ń^�C���A�E�g���Ă����B  
-- **�Ή� (2025-11-10)**:  
-  1. `src/services/ingestion.py` ���\�����e���v�� (Topic/DocType/Project/KeyActions) + ������q���[���X�e�B�N�X + �Ď��s/�t�H�[���o�b�N�t���ɍ��V�B  
-  2. `tests/scenarios/scenario_data.json` �ɓ��{��E�X�y�C����E�p�ꍬ�݃P�[�X��ǉ����A`tests/unit/services/test_ingestion_summary.py` �Ńt�H�[�}�b�g���؂��������B  
-  3. `scripts/mcp_replay.py` / `scripts.run_regression_ci.py` �� `--rpc-timeout` ��ǉ����A�N���E�h LLM �⑽����N�G���ł� CI ����������悤�ɂ����B  
-- **����**: `python -m scripts.run_regression_ci --rpc-timeout 60` �� Macro Precision 0.667 / Macro NDCG 0.893�A�[���q�b�g 0 ���i`reports/mcp_runs/mcp_run-20251110-000125.jsonl`�j�B  
-- **�Ĕ��h�~**: ���v�����v�g�� `docs/prompts/legacy_ingestion_summary.txt` �ɑޔ����A�e���v���ύX��ǐՂł���悤�ɂ����B
+### #2025-11-10-01 構造化要約テンプレ + 多言語シナリオ拡充 + RPCタイムアウト対応
+- **現象**: 要約が自由形式で Topic/DocType/Project 情報が欠落しやすく、多言語シナリオも不足。また `scripts.mcp_replay` が重いクエリでタイムアウトしていた。  
+- **対応 (2025-11-10)**:  
+  1. `src/services/ingestion.py` を構造化テンプレ (Topic/DocType/Project/KeyActions) + 多言語ヒューリスティクス + 再試行/フォールバック付きに刷新。  
+  2. `tests/scenarios/scenario_data.json` に日本語・スペイン語・英語混在ケースを追加し、`tests/unit/services/test_ingestion_summary.py` でフォーマット検証を自動化。  
+  3. `scripts/mcp_replay.py` / `scripts.run_regression_ci.py` に `--rpc-timeout` を追加し、クラウド LLM や多言語クエリでも CI が完走するようにした。  
+- **検証**: `python -m scripts.run_regression_ci --rpc-timeout 60` で Macro Precision 0.667 / Macro NDCG 0.893、ゼロヒット 0 件（`reports/mcp_runs/mcp_run-20251110-000125.jsonl`）。  
+- **再発防止**: 旧プロンプトを `docs/prompts/legacy_ingestion_summary.txt` に退避し、テンプレ変更を追跡できるようにした。
 
-### #2025-11-10-02 �v��e���v�������ƍ\�����؂̎�����
-- **����**: KeyActions ���i����ԍ��t���ŏo�͂����P�[�X������A�V�i���I�Ď�荞�ݎ��Ɉُ���������Ă����B  
-- **�Ώ� (2025-11-10)**: README / tests/scenarios/README �Ƀt�H�[�}�b�g�K��ƕ����菇��ǋL���Ascripts/load_scenarios.py �����؎��s���Ƀ��� ID�E�v�񔲐��E�����e���v�����܂ރG���[���O���o���đ���~����悤�X�V�B  
-- **����**: 	ests/unit/services/test_ingestion_summary.py �ŉӏ������e���v���̐���n/�t�H�[���o�b�N�n���ێ����A���[�_�[�o�R�ł����� is_structured_summary �t���[���g�����Ƃŕs���T�}���� ValueError �ɂȂ邱�Ƃ��m�F�i���O���e��ǉ��Ń`�F�b�N�j�B  
-- **�Ĕ��h�~**: ���[�_�[�� CI �̑o���Ńe���v�����؂��s���A�ŐV�Ńe���v���ƃ��J�o���[�菇�� README �Q�ɕK���L�ڂ���^�p�֓���B  
+### #2025-11-10-02 要約テンプレ強化と構造検証の自動化
+- **現象**: KeyActions が段落や番号付きで出力されるケースがあり、シナリオ再取り込み時に異常を見逃していた。  
+- **対処 (2025-11-10)**: README / tests/scenarios/README にフォーマット規約と復旧手順を追記し、scripts/load_scenarios.py が検証失敗時にメモ ID・要約抜粋・推奨テンプレを含むエラーログを出して即停止するよう更新。  
+- **検証**: 	ests/unit/services/test_ingestion_summary.py で箇条書きテンプレの正常系/フォールバック系を維持し、ローダー経由でも同じ is_structured_summary フローを使うことで不正サマリが ValueError になることを確認（ログ内容を追加でチェック）。  
+- **再発防止**: ローダーと CI の双方でテンプレ検証を行い、最新版テンプレとリカバリー手順を README 群に必ず記載する運用へ統一。  
 
-### #2025-11-10-03 ���ꌟ�m�� LLM ���[�e�B���O�g��
-- **����**: langdetect �ɂ�鎩������͓����ς݂��������A�N���E�h LLM �ւ̃t�F�[���I�[�o�[���������Ă����C�e���V���v���ł����ACLI ���猾������������i�����������B  
-- **�Ώ� (2025-11-10)**: IngestionService �� `LanguageRoutingMetrics` ��ǉ����ăN���E�h�o�H�̏�������/���s�����L�^���Afallback �������� `Language routing fallback (lang=...)` ���O�֏o�́B����Ɋ��ϐ� `CONTEXT_ORCHESTRATOR_LANG_OVERRIDE` �� conversation metadata ���猾����㏑���ł���悤�ɂ��AREADME �� override �菇��ǋL�B  
-- **����**: `CONTEXT_ORCHESTRATOR_LANG_OVERRIDE=fr` ��ݒ肵����ԂŃV�i���I���Đ����A���O�� 2 �񕪂� fallback ���C�e���V���o�͂���邱�ƁA����� `tests/unit/services/test_ingestion_summary.py` ���p�����Ēʉ߂��邱�Ƃ��m�F�B  
-- **�Ĕ��h�~**: �t�H�[���o�b�N�Ď��� override �菇�� README/config �e���v���ɂ��K�����L���A���ニ�[�e�B���O���X�V����ۂ͓����v���t�b�N���ێ�����B  
-### #2025-11-10-04 �N���X�G���R�[�_�������Ƒ����ꃊ�v���C�g��
-- **����**: �A�����v���C�œ��� (query, memory_id) �����x�� LLM �ɓ����Ă���A8?11 �b�̑҂����ԂƃR�X�g���������B`query_runs.json` ���p��݂̂��������߁A���ꃋ�[�e�B���O���ׂ����Č����`�F�b�N���ł��Ȃ������B  
-- **�Ώ� (2025-11-10)**: `CrossEncoderReranker` �� LRU �L���b�V���i�T�C�Y/TTL �� config �Ő���j�ƃ��C�e���V���v���������A`get_reranker_metrics` MCP �c�[���o�R�Ńq�b�g�����擾�ł���悤�ɂ����B����� `scripts.mcp_replay` �Ń��v���C�I����Ƀ��g���N�X��₢���킹�A�uReranker Metrics�v�Ƃ��� stdout / JSONL �ɋL�^�B`tests/scenarios/query_runs.json` �ɂ͓��{��/�X�y�C����̃N�G����ǉ����A�����ꃋ�[�e�B���O�ƃL���b�V���������������؂���悤�ɂ����B  
-- **����**: `python -m scripts.mcp_replay --requests tests/scenarios/query_runs.json` �����s���A`cache_hit_rate` �� LLM ���C�e���V���\������邱�ƁA�����N�G���� 2 �񗬂��Ă� LLM �Ăяo�����������Ȃ����Ƃ��m�F�B  
-- **�Ĕ��h�~**: reranker �֘A�̐ݒ�� README / config �e���v���ɕK���ǋL���ACI �ł� `get_reranker_metrics` �����ăq�b�g���E���s�����Ď�����B  
+### #2025-11-10-03 言語検知と LLM ルーティング拡張
+- **現象**: langdetect による自動判定は導入済みだったが、クラウド LLM へのフェールオーバーが発生してもレイテンシを計測できず、CLI から言語を強制する手段も無かった。  
+- **対処 (2025-11-10)**: IngestionService に `LanguageRoutingMetrics` を追加してクラウド経路の処理時間/失敗数を記録し、fallback 発生時は `Language routing fallback (lang=...)` ログへ出力。さらに環境変数 `CONTEXT_ORCHESTRATOR_LANG_OVERRIDE` や conversation metadata から言語を上書きできるようにし、README に override 手順を追記。  
+- **検証**: `CONTEXT_ORCHESTRATOR_LANG_OVERRIDE=fr` を設定した状態でシナリオを再生し、ログに 2 回分の fallback レイテンシが出力されること、および `tests/unit/services/test_ingestion_summary.py` が継続して通過することを確認。  
+- **再発防止**: フォールバック監視と override 手順は README/config テンプレにも必ず併記し、今後ルーティングを更新する際は同じ計測フックを維持する。  
+### #2025-11-10-04 クロスエンコーダ高速化と多言語リプレイ拡張
+- **現象**: 連続リプレイで同じ (query, memory_id) を何度も LLM に投げており、8〜11 秒の待ち時間とコスト増が発生。`query_runs.json` も英語のみだったため、言語ルーティングを跨いだ再現性チェックができなかった。  
+- **対処 (2025-11-10)**: `CrossEncoderReranker` に LRU キャッシュ（サイズ/TTL は config で制御）とレイテンシ統計を実装し、`get_reranker_metrics` MCP ツール経由でヒット率を取得できるようにした。さらに `scripts.mcp_replay` でリプレイ終了後にメトリクスを問い合わせ、「Reranker Metrics」として stdout / JSONL に記録。`tests/scenarios/query_runs.json` には日本語/スペイン語のクエリを追加し、多言語ルーティングとキャッシュ挙動を自動検証するようにした。  
+- **検証**: `python -m scripts.mcp_replay --requests tests/scenarios/query_runs.json` を実行し、`cache_hit_rate` と LLM レイテンシが表示されること、同じクエリを 2 回流しても LLM 呼び出し数が増えないことを確認。  
+- **再発防止**: reranker 関連の設定は README / config テンプレに必ず追記し、CI では `get_reranker_metrics` を見てヒット率・失敗数を監視する。  
 
-### #2025-11-10-05 �f�[�^�h���u���ă����N�d�݊w�K
-- **����**: ���[���x�[�X�̏d�݂��o�����̂܂܂ŁA���x���P�̗]�n�������Ă������������Ē����ł��Ȃ������Breplay �œ�����e�R���|�[�l���g�̍v���x���L�^����Ă��炸�A�w�K�f�[�^������i���Ȃ������B  
-- **�Ώ� (2025-11-10)**: `scripts.mcp_replay` �� `--export-features` ��ǉ����A�e���ʂ� `memory_strength/recency/bm25/vector/metadata` �� CSV �փG�N�X�|�[�g�ł���悤�ɂ����B`scripts/train_rerank_weights.py` �� CSV ��ǂݍ��݁A�P�����W�X�e�B�b�N��A�Ɋ�Â��d�݂��w�K���� `config.reranking_weights` �ɏ����߂���悤�ɂ����BSearchService �� config �̏d�݂�ǂݍ���ŃX�R�A�v�Z�ɗ��p���Ametadata bonus ���X�P�[���u���ɂ����B  
-- **����**: ������ CSV ���쐬 �� �w�K�X�N���v�g�ŏd�݂��o�� �� config.yaml ���X�V �� `python -m scripts.run_regression_ci` �����s���APrecision/NDCG �Ɍ�ނ��Ȃ����Ƃ��m�F�B  
-- **�Ĕ��h�~**: reranking_weights �̍X�V�菇�� README �ɒǋL���ACI �ł� `--export-features`�{`train_rerank_weights` �̗���ō����̂���d�݂𓾂邱�Ƃ����[��������B
+### #2025-11-10-05 データドリブン再ランク重み学習
+- **現象**: ルールベースの重みが経験則のままで、精度改善の余地があっても根拠を持って調整できなかった。replay で得られる各コンポーネントの貢献度も記録されておらず、学習データを作る手段がなかった。  
+- **対処 (2025-11-10)**: `scripts.mcp_replay` に `--export-features` を追加し、各結果の `memory_strength/recency/bm25/vector/metadata` を CSV へエクスポートできるようにした。`scripts/train_rerank_weights.py` で CSV を読み込み、単純ロジスティック回帰に基づく重みを学習して `config.reranking_weights` に書き戻せるようにした。SearchService は config の重みを読み込んでスコア計算に利用し、metadata bonus もスケーラブルにした。  
+- **検証**: 特徴量 CSV を作成 → 学習スクリプトで重みを出力 → config.yaml を更新 → `python -m scripts.run_regression_ci` を実行し、Precision/NDCG に後退がないことを確認。  
+- **再発防止**: reranking_weights の更新手順を README に追記し、CI では `--export-features`＋`train_rerank_weights` の流れで根拠のある重みを得ることをルール化する。
 
-### #2025-11-10-06 �Z�b�V���������v���W�F�N�g����ƃL���b�V���œK��
-- **�ړI**: �V�K�Z�b�V�����ł� project_id ����̂܂܎n�܂�A�v��/����/�L���b�V���Ƀv���W�F�N�g�������f����Ȃ��B
-- **�v����**:
-  1. SessionManager �� project_hint ��ǉ����ACLI/Obsidian �̃��^�f�[�^�� QueryAttributeExtractor �̌��ʂ���i�K�I�ɐ��肷��B
-  2. �M���x��臒l�𒴂������b metadata �� project_id �������t�^���A�v��e���v���ESearchService�ECrossEncoder reranker �֔��f����B
-  3. ���[�U�[�� session set-project <name> �Ȃǂŏ㏑���ł���悤�ɂ��A�C�����ʂ��q���[���X�e�B�b�N�����փt�B�[�h�o�b�N����B
-  4. �v���W�F�N�g�m�莞�� search_in_project ���v���t�F�b�`���ăn�C�v���I�����L���b�V���ɍڂ��A�L���b�V���q�b�g�������コ����B
-  5. ���胍�O�i����l/�M���x/�C�������j���o�͂��A���x�������r���[����B
-- **�i�� (2025-11-11 �ߑO)**:
-  - SessionManager �� `ProjectPrefetchSettings` �� SearchService �Q�Ƃ�ǉ����Aproject_hint ��臒l�𒴂����u�Ԃ� `prefetch_project` ����x�������s����t�b�N�������Bprefetch �����E���s���O���ێ����Č㑱���͂ł����Ԃɂ����B
-  - SearchService ���� `prefetch` �t���O�t���� search_in_project / cross-encoder �Ăяo���� `prefetch_project` API �������BCrossEncoderReranker �̃��g���N�X�� `prefetch_requests/hits/misses` ��ǉ����A`scripts/mcp_replay` �ŉ����ł���悤�ɂ����B
-  - config/template �Ƀv���t�F�b�`�p�p�����[�^��ǉ����AMCP �V�i���I `tests/scenarios/query_runs.json` �ƃ��j�b�g�e�X�g�isession_manager / search_service_rerank / rerankers�j���g���B
-  - **�e�X�g���ʁi.venv311���j**: �S35���̃��j�b�g�e�X�g���p�X�B��A�e�X�g�������iPrecision 0.712, NDCG 1.310�j�B
-- **�ڍו��� (2025-11-11 �ߌ�)**:
-  - **�������x**: �x�[�X���C������啝���P�iPrecision +90%, NDCG +148%�j�A�[���q�b�g0���B
-  - **�L���b�V���q�b�g��**: 11%�i�ڕW60%�ɖ��B�j
-    - ���X�R�A�����O�y�A: 79���i22�N�G�� + 6�v���t�F�b�`�j
-    - LLM�Ăяo��: 70���i�L���b�V���~�X�j�A�L���b�V���q�b�g: 9��
-    - �v���t�F�b�`: 6����s�A18�y�A���X�R�A�����O�������q�b�g0
-  - **���{��������**:
-    1. **���S��v�v��**: �L���b�V���L�[�� `query::project_id::candidate_id` �ŁA�N�G�������S��v���Ȃ��ƃq�b�g���Ȃ�
-    2. **�N�G���̕s��v**: �v���t�F�b�`�N�G���i"project status", "open issues"�j�Ǝ��ۂ̃N�G���i"change feed", "dashboard pilot"���j���S���قȂ�
-    3. **���ID�̉e��**: �����N�G���ł��������ʂ��قȂ�΃L���b�V���L�[���قȂ�
-    4. **TTL�Z��**: 900�b�i15���j�ł͍�ƃZ�b�V�������ɂ������؂�̉\��
-  - **���P�v��i3�t�F�[�Y�j**:
-    - Phase 1: TTL�����i8���ԁj+ �L���b�V���T�C�Y�g��i256�j�� ���҃q�b�g�� 18-22%
-    - Phase 2: �L�[���[�h�x�[�X�L���b�V���i�d�v��b���o�ŕ����}�b�`�j�� ���҃q�b�g�� 45-55%
-    - Phase 3: �Z�}���e�B�b�N�ގ��x�x�[�X�L���b�V���i���ߍ��ݗގ��x>0.85�Ńq�b�g�j�� ���҃q�b�g�� 70-80%
-  - **�������e��**: 8����TTL�ł��ő�7MB�i�V�X�e���S�̂�0.2%�����j�A�p�t�H�[�}���X�ቺ�Ȃ��i�S����O(1)�j
-- **�i�� (2025-11-11 �ߌ�)**:
-  - Phase 1����: TTL�����i28800�b/8���ԁj�A�L���b�V���T�C�Y�g��i256�j
-  - **Phase 2���� (2025-11-11 �[��)**: �L�[���[�h�x�[�X�L���b�V������
-    - **�������e**:
-      - `src/utils/keyword_extractor.py`: �L�[���[�h���o���[�e�B���e�B�i161�s�A�p���Ή��A�X�g�b�v���[�h�t�B���^�����O�j
-      - `CrossEncoderReranker`: L1�i���S��v�j+ L2�i�L�[���[�h�����}�b�`�j��2�w�L���b�V��
-      - `_build_keyword_cache_key()`: Top 3�L�[���[�h����\�[�g�ς݃V�O�l�`������
-      - `_score_with_cache()`: L1 �� L2 �� LLM �t�H�[���o�b�N���W�b�N
-      - ���g���N�X�ǉ�: `keyword_cache_hits/misses`, `keyword_cache_hit_rate`, `total_cache_hit_rate`
-    - **�e�X�g����**:
-      - ���j�b�g�e�X�g: 29���S�ăp�X�ikeyword_extractor 24�� + reranker 5���j
-      - **�������ʑ���** (`test_keyword_cache.py`):
-        - �x�[�X���C��: 11%
-        - **Phase 2������: 28.57%**�i2.6�{���P�I�j
-        - L1�i���S��v�j: 25% hit rate�i1/4�j
-        - L2�i�L�[���[�h�j: 33.33% hit rate�i1/3�j
-        - LLM�Ăяo��: 4�N�G����2��̂݁i���Ғʂ�j
-    - **�L�[���[�h���o����**:
-      - "change feed ingestion errors" �� `change+errors+ingestion`
-      - "ingestion errors in change feed" �� `change+errors+ingestion`�i����V�O�l�`���I�j
-      - "errors in change feed ingestion" �� `change+errors+ingestion`�i����V�O�l�`���I�j
-      - �ꏇ���قȂ�N�G���ł������L�[���[�h�𐳂������o���AL2�L���b�V���q�b�g����
-    - **���ӎ���**: MCP replay�ł̊��S����͖����{�i�T�[�o�[�ċN�����K�v�j
-  - ��: Phase 3�i�Z�}���e�B�b�N�ގ��x�x�[�X�j�̎���
-- **�o������**: �ŏI�I�ɃL���b�V���q�b�g�� 70-80%�A���ό������C�e���V 0.3�b��B�����邱�ƁB
+### #2025-11-10-06 セッション自動プロジェクト判定とキャッシュ最適化
+- **目的**: 新規セッションでは project_id が空のまま始まり、要約/検索/キャッシュにプロジェクト名が反映されない。
+- **プラン**:
+  1. SessionManager に project_hint を追加し、CLI/Obsidian のメタデータや QueryAttributeExtractor の結果から段階的に推定する。
+  2. 信頼度が閾値を超えたら会話 metadata に project_id を自動付与し、要約テンプレ・SearchService・CrossEncoder reranker へ反映する。
+  3. ユーザーが session set-project <name> などで上書きできるようにし、修正結果をヒューリスティック辞書へフィードバックする。
+  4. プロジェクト確定時に search_in_project をプリフェッチしてハイプリオ情報をキャッシュに載せ、キャッシュヒット率を向上させる。
+  5. 推定ログ（推定値/信頼度/修正履歴）を出力し、精度を定期レビューする。
+- **進捗 (2025-11-11 午前)**:
+  - SessionManager に `ProjectPrefetchSettings` と SearchService 参照を追加し、project_hint が閾値を超えた瞬間に `prefetch_project` を一度だけ実行するフックを実装。prefetch 履歴・失敗ログも保持して後続分析できる状態にした。
+  - SearchService 側で `prefetch` フラグ付きの search_in_project / cross-encoder 呼び出しと `prefetch_project` API を実装。CrossEncoderReranker のメトリクスに `prefetch_requests/hits/misses` を追加し、`scripts/mcp_replay` で可視化できるようにした。
+  - config/template にプレフェッチ用パラメータを追加し、MCP シナリオ `tests/scenarios/query_runs.json` とユニットテスト（session_manager / search_service_rerank / rerankers）を拡張。
+  - **テスト結果（.venv311環境）**: 全35件のユニットテストがパス。回帰テストも成功（Precision 0.712, NDCG 1.310）。
+- **詳細分析 (2025-11-11 午後)**:
+  - **検索精度**: ベースラインから大幅改善（Precision +90%, NDCG +148%）、ゼロヒット0件。
+  - **キャッシュヒット率**: 11%（目標60%に未達）
+    - 総スコアリングペア: 79件（22クエリ + 6プリフェッチ）
+    - LLM呼び出し: 70件（キャッシュミス）、キャッシュヒット: 9件
+    - プリフェッチ: 6回実行、18ペアをスコアリングしたがヒット0
+  - **根本原因特定**:
+    1. **完全一致要求**: キャッシュキーが `query::project_id::candidate_id` で、クエリが完全一致しないとヒットしない
+    2. **クエリの不一致**: プリフェッチクエリ（"project status", "open issues"）と実際のクエリ（"change feed", "dashboard pilot"等）が全く異なる
+    3. **候補IDの影響**: 同じクエリでも検索結果が異なればキャッシュキーが異なる
+    4. **TTL短い**: 900秒（15分）では作業セッション中にも期限切れの可能性
+  - **改善計画（3フェーズ）**:
+    - Phase 1: TTL延長（8時間）+ キャッシュサイズ拡大（256）→ 期待ヒット率 18-22%
+    - Phase 2: キーワードベースキャッシュ（重要語彙抽出で部分マッチ）→ 期待ヒット率 45-55%
+    - Phase 3: セマンティック類似度ベースキャッシュ（埋め込み類似度>0.85でヒット）→ 期待ヒット率 70-80%
+  - **メモリ影響**: 8時間TTLでも最大7MB（システム全体の0.2%未満）、パフォーマンス低下なし（全操作O(1)）
+- **進捗 (2025-11-11 午後)**:
+  - Phase 1完了: TTL延長（28800秒/8時間）、キャッシュサイズ拡大（256）
+  - **Phase 2完了 (2025-11-11 夕方)**: キーワードベースキャッシュ実装
+    - **実装内容**:
+      - `src/utils/keyword_extractor.py`: キーワード抽出ユーティリティ（161行、英日対応、ストップワードフィルタリング）
+      - `CrossEncoderReranker`: L1（完全一致）+ L2（キーワード部分マッチ）の2層キャッシュ
+      - `_build_keyword_cache_key()`: Top 3キーワードからソート済みシグネチャ生成
+      - `_score_with_cache()`: L1 → L2 → LLM フォールバックロジック
+      - メトリクス追加: `keyword_cache_hits/misses`, `keyword_cache_hit_rate`, `total_cache_hit_rate`
+    - **テスト結果**:
+      - ユニットテスト: 29件全てパス（keyword_extractor 24件 + reranker 5件）
+      - **初期効果測定** (`test_keyword_cache.py`):
+        - ベースライン: 11%
+        - **Phase 2実装後: 28.57%**（2.6倍改善！）
+        - L1（完全一致）: 25% hit rate（1/4）
+        - L2（キーワード）: 33.33% hit rate（1/3）
+        - LLM呼び出し: 4クエリで2回のみ（期待通り）
+    - **キーワード抽出検証**:
+      - "change feed ingestion errors" → `change+errors+ingestion`
+      - "ingestion errors in change feed" → `change+errors+ingestion`（同一シグネチャ！）
+      - "errors in change feed ingestion" → `change+errors+ingestion`（同一シグネチャ！）
+      - 語順が異なるクエリでも同じキーワードを正しく抽出し、L2キャッシュヒット実現
+    - **注意事項**: MCP replayでの完全測定は未実施（サーバー再起動が必要）
+  - 次: Phase 3（セマンティック類似度ベース）の実装
+- **出口条件**: 最終的にキャッシュヒット率 70-80%、平均検索レイテンシ 0.3秒を達成すること。
 
-### #2025-11-11-01 QAM�����̋L�����^�f�[�^����
-- **�w�i**: QueryAttributeExtractor�iQAM�j�́ALLM���g���ăN�G������topic/doc_type/project_name/severity�����𒊏o���A���^�f�[�^�{�[�i�X�i�ő�+0.10�j��t�^����@�\�BPhase 15�Ŏ������ꂽ���ALLM�t�H�[���o�b�N���p�����A28�N�G���~3.3s/call = 92.4�b�̗ݐϒx���������N�����Ă����iissues.md �^�C���A�E�g���� 2025-11-11�j�B
-- **�Ώ� (2025-11-12)**:
-  - QAM�������ɂ�茟�����x���ĕ]��: Macro Precision 75.8%, Macro NDCG 1.30�i�ڕW?65%/?0.85��啝���߁j�A�[���q�b�g0��
-  - Phase 2�L���b�V���œK���iKeyword-based L2 cache�j�ɂ��A28.57%�̃q�b�g���B���i�N�G���o���G�[�V�����z���j
-  - Cross-encoder reranking����v�ȃ����L���O���P��S�����AQAM�Ȃ��ł��\���@�\
-  - �R�X�g�x�l�t�B�b�g����: �R�X�g�i3.3�b/�N�G���j���x�l�t�B�b�g�i+0.10�̃��^�f�[�^�{�[�i�X�j��啝�ɏ���
-- **���_**: QAM�����͕s�v�BPhase 2�L���b�V���œK����Cross-encoder reranking�ɂ��AQAM�Ȃ��ŖڕW���x��B���BLLM�R�X�g�ƃ��C�e���V���l�����A������������B
-- **�ĕ]���g���K�[**: �������x��60%����������ꍇ�A�܂��͌y�ʂȃN�G���������o��@�i<100ms�j�����p�\�ɂȂ����ꍇ�ɍČ����B
-- **�֘A�R�[�h**: src/services/search.py:336-350�i_extract_query_attributes �͏�� None ��Ԃ��j
+### #2025-11-11-01 QAM属性の記憶メタデータ統合
+- **背景**: QueryAttributeExtractor（QAM）は、LLMを使ってクエリからtopic/doc_type/project_name/severity属性を抽出し、メタデータボーナス（最大+0.10）を付与する機能。Phase 15で実装されたが、LLMフォールバックが頻発し、28クエリ×3.3s/call = 92.4秒の累積遅延を引き起こしていた（issues.md タイムアウト調査 2025-11-11）。
+- **対処 (2025-11-12)**:
+  - QAM無効化により検索精度を再評価: Macro Precision 75.8%, Macro NDCG 1.30（目標≥65%/≥0.85を大幅超過）、ゼロヒット0件
+  - Phase 2キャッシュ最適化（Keyword-based L2 cache）により、28.57%のヒット率達成（クエリバリエーション吸収）
+  - Cross-encoder rerankingが主要なランキング改善を担当し、QAMなしでも十分機能
+  - コストベネフィット分析: コスト（3.3秒/クエリ）がベネフィット（+0.10のメタデータボーナス）を大幅に上回る
+- **結論**: QAM統合は不要。Phase 2キャッシュ最適化とCross-encoder rerankingにより、QAMなしで目標精度を達成。LLMコストとレイテンシを考慮し、統合を見送る。
+- **再評価トリガー**: 検索精度が60%を下回った場合、または軽量なクエリ属性抽出手法（<100ms）が利用可能になった場合に再検討。
+- **関連コード**: src/services/search.py:336-350（_extract_query_attributes は常に None を返す）
 
-### #2025-11-11-03 �v���W�F�N�g�������v�[�������ւ̈ڍs�i�i�K�I�k�ރ��[�N�t���[�j
-- **�w�i**: ����̃v���t�F�b�`�i����N�G���ŃL���b�V���E�H�[�~���O�j�́A�N�G���x�[�X�̃L���b�V���L�[�i"query::project_id::candidate_id"�j�̂��߁A���ۂ̃N�G���ƈقȂ�ƑS���q�b�g���Ȃ��B#2025-11-10-06�ŋL�^: �v���t�F�b�`6����s�A18�y�A���q�b�g0�B�l�J���҂͐�����?�����ԁA����v���W�F�N�g�ɏW����Ƃ��邽�߁A�v���W�F�N�g�X�R�[�v�ł̋L�������O�L���b�V������Α啝�ȃq�b�g�����P�����҂ł���B
-- **�v���g�^�C�v���� (2025-11-12)**:
-  - **Phase 1: �ŏ��@�\�Z�b�g** - ���ʌ��ؗp�v���g�^�C�v
-  - **�������e**:
-    1. `ProjectMemoryPool` �N���X (280�s): �v���W�F�N�g�L���̈ꊇ���[�h��embedding���O����
-    2. `CrossEncoderReranker.warm_semantic_cache_from_pool()` (+48�s): L3�L���b�V���ւ̒��ړ���
-    3. `SessionManager` ���� (+24�s): �v���W�F�N�g�m�莞��warm_cache�������s
-    4. �P�̃e�X�g12��: �S�ăp�X (1.58s)
-  - **�@�\�t���[**:
-    1. �v���W�F�N�g�m��i�M���x>0.75�j�� ProjectMemoryPool.load_project()
-    2. �v���W�F�N�g�̑S�L���擾�i�ő�100���ATTL=8���ԁj
-    3. �e�L����embedding���O����
-    4. CrossEncoder��L3�Z�}���e�B�b�N�L���b�V���ɓ����i�N�G����ˑ��j
-    5. �ȍ~�̌�����embedding�ގ��x>0.85�ŃL���b�V���q�b�g
-  - **���،���**: warm_cache�����ɒv���I�o�O�����i�������R���e���cembedding��L3�L���b�V���ɓ����A�N�G��embedding�Ɣ�r���邽�ߖ��Ӗ��j
-- **�A�[�L�e�N�`���Č��� (2025-11-12)**:
-  - **���肵�����[�N�t���[**: �i�K�I�k�ރ��[�N�t���[A�i���񏈗���胊�\�[�X�����D��j
-  - **�V���[�N�t���[**:
+### #2025-11-11-03 プロジェクトメモリプール方式への移行（段階的縮退ワークフロー）
+- **背景**: 現状のプリフェッチ（特定クエリでキャッシュウォーミング）は、クエリベースのキャッシュキー（"query::project_id::candidate_id"）のため、実際のクエリと異なると全くヒットしない。#2025-11-10-06で記録: プリフェッチ6回実行、18ペア→ヒット0。個人開発者は数時間〜数日間、同一プロジェクトに集中作業するため、プロジェクトスコープでの記憶を事前キャッシュすれば大幅なヒット率改善が期待できる。
+- **プロトタイプ実装 (2025-11-12)**:
+  - **Phase 1: 最小機能セット** - 効果検証用プロトタイプ
+  - **実装内容**:
+    1. `ProjectMemoryPool` クラス (280行): プロジェクト記憶の一括ロードとembedding事前生成
+    2. `CrossEncoderReranker.warm_semantic_cache_from_pool()` (+48行): L3キャッシュへの直接投入
+    3. `SessionManager` 統合 (+24行): プロジェクト確定時にwarm_cache自動実行
+    4. 単体テスト12件: 全てパス (1.58s)
+  - **機能フロー**:
+    1. プロジェクト確定（信頼度>0.75）→ ProjectMemoryPool.load_project()
+    2. プロジェクトの全記憶取得（最大100件、TTL=8時間）
+    3. 各記憶のembedding事前生成
+    4. CrossEncoderのL3セマンティックキャッシュに投入（クエリ非依存）
+    5. 以降の検索でembedding類似度>0.85でキャッシュヒット
+  - **検証結果**: warm_cache実装に致命的バグ発見（メモリコンテンツembeddingをL3キャッシュに投入、クエリembeddingと比較するため無意味）
+- **アーキテクチャ再検討 (2025-11-12)**:
+  - **決定したワークフロー**: 段階的縮退ワークフローA（並列処理よりリソース効率優先）
+  - **新ワークフロー**:
     ```
-    �v���W�F�N�g�m��
-      ��
-    �������v�[���擾�i30���j
-      ��
-    L1/L2/L3�`�F�b�N�i30���ɑ΂��āj
-      �� �L���b�V���~�X
-    LLM���������v�[���������i30���A3����j
-      �� ���ʕs���i<top_k�j
-    �S�������i100���j
-      ��
-    L1/L2/L3�`�F�b�N�i100���ɑ΂��āj
-      �� �L���b�V���~�X
-    LLM���S�������i100���A3����j
+    プロジェクト確定
+      ↓
+    メモリプール取得（30件）
+      ↓
+    L1/L2/L3チェック（30件に対して）
+      ↓ キャッシュミス
+    LLMがメモリプール内検索（30件、3並列）
+      ↓ 結果不足（<top_k）
+    全数検索（100件）
+      ↓
+    L1/L2/L3チェック（100件に対して）
+      ↓ キャッシュミス
+    LLMが全数検索（100件、3並列）
     ```
-  - **�\���p�t�H�[�}���X�i3������s�j**:
-    - �P�[�X1�i�v���W�F�N�g���ŏ\���A70%�j: 21.2�b
-    - �P�[�X2�i�S�������K�v�A25%�j: 89.4�b
-    - �P�[�X3�i�v���W�F�N�g���m��A5%�j: 68.2�b
-    - **�d�ݕt������: 40.6�b/�N�G��**�i�]��118.1�b����66%�Z�k�j
-  - **���񏈗���r**: ���[�N�t���[B�i������s�j��42.8�b/�N�G���AA��5%����
-  - **Phase 2�������e**:
-    1. `ProjectMemoryPool.get_memory_ids()`: �v���W�F�N�g�̃�����ID�Z�b�g�擾
-    2. `SearchService.search_in_project()`: �������v�[���t�B���^�����O����
-    3. ���ʕs�����胍�W�b�N�i`len(results) < top_k`���X�R�A臒l�l���j
-    4. ���[�U�[�t�B�[�h�o�b�N�i�u�ǉ�������...�v�j
-- **Phase 2���������E���ʌ��� (2025-11-12)**:
-  - **�����T�}���[**:
-    - �t�@�C���ύX: 4�t�@�C���iproject_memory_pool.py, search.py, main.py, issues.md�j
-    - �ǉ��R�[�h: 210�s�ihelper methods 3�� + search_in_project rewrite�j
-    - �o�O�t�B�b�N�X: main.py�����������C���iProjectMemoryPool �� SearchService�j
-    - �e�X�g����: ���j�b�g�e�X�g12/12�p�X�A��A�e�X�g���i
-  - **�������x**: ? **�啝���P**
-    - Macro Precision: 0.375 �� **0.841** (+124%)
-    - Macro NDCG: 0.528 �� **1.243** (+135%)
-    - �[���q�b�g: **0��**�i�����j
-  - **�p�t�H�[�}���X**: ?? **�ڕW���B**
-    - LLM�Ăяo��: **59��**�i�ڕW?20��A��+39��j
-    - �L���b�V���q�b�g��: **11%**�i�ڕW?14%�A��-3%�j
-    - Prefetch�q�b�g��: **0%**�i0/18�y�A�j
-  - **���{��������**:
-    1. **Prefetch�@�\�s�S**: �v���W�F�N�g�����F���͓���i4�v���W�F�N�g�A�M���x0.9�j���Ă��邪�Awarm_cache()���Ă΂�Ă��Ȃ��A�܂��̓v�[�����O���[�h���x�����s����Ă���
-    2. **�L���b�V���~�X�}�b�`**: Prefetch�N�G���i"project status"���j�Ǝ��ۂ̃N�G���i"change feed"���j������
-    3. **LLM�ҋ@����**: ����2570ms�A�ő�11061ms�i4�{�̂΂���j
-  - **���̃A�N�V����**:
-    - �D��x��: Prefetch�@�\�̃f�o�b�O�iSessionManager.set_project_hint()��warm_cache()�̌Ăяo���^�C�~���O�m�F�j
-    - �D��x��: Prefetch�N�G�������ۂ̎g�p�p�^�[���ɍ��킹�Ē���
-    - �D��x��: �L���b�V���E�H�[�~���O�헪�̌�����
-- **warm_cache���� (2025-11-12 �ߌ�)**:
-  - **�������e**:
-    - SearchService.prefetch_project()�Ƀf���A���헪�L���b�V���E�H�[�~���O�ǉ�
-      - Step 1: ProjectMemoryPool.warm_cache() �� L3�Z�}���e�B�b�N�L���b�V���i�N�G����ˑ��j
-      - Step 2: Prefetch�N�G�����s �� L1/L2�L���b�V���i�N�G���ˑ��j
-    - SessionManager._maybe_trigger_project_prefetch()�̃R�����g�X�V
-    - �t�@�C���ύX: search.py (+95�s), session_manager.py (+4�s)
-    - �e�X�g����: ���j�b�g�e�X�g�S�ăp�X
-  - **��A�e�X�g���ʁiwarm_cache������j**:
-    - Macro Precision: 0.841�i�ω��Ȃ��j
-    - Macro NDCG: 1.243�i�ω��Ȃ��j
-    - LLM�Ăяo��: 59��i�ω��Ȃ��j
-    - �L���b�V���q�b�g��: 11%�i�ω��Ȃ��j
-    - Prefetch�q�b�g��: 0/18�i�ω��Ȃ��j
-    - **���P�_**: ����LLM�ҋ@ 2570ms��2313ms (-10%)�A�ő�LLM�ҋ@ 11061ms��3832ms (-65%)
-  - **���ʖ��m�F�̌�������**:
-    1. **�e�X�g�V�i���I�s��**: ���݂�query_runs.json�͓���v���W�F�N�g���̋L���ƃN�G�������Ȃ�
-    2. **������ID�t�B���^�����O���ʂ���**: ���100��30�팸�͊��ɋ@�\���Ă��邪�Awarm_cache�̌��ʂ͑���ł��Ă��Ȃ�
-    3. **L3�L���b�V���̎d�g�݊m�F**: ������embedding�����ID���ƂɊi�[���A�N�G��embedding�Ƃ̗ގ��x?0.85�ŃL���b�V���q�b�g�i�݌v�͐������j
-  - **���̌��؃X�e�b�v**:
-    - Phase 3a: ������ID�t�B���^�����O���ʂ̒�ʑ���i���O���́j?
-    - Phase 3b: �e�X�g�V�i���I�g�[�i����v���W�F�N�g���̋L��30��+�N�G��15���ǉ��j?
-    - Phase 3c: warm_cache���ʂ̍đ��� ?
-- **Phase 3a-c ���{���� (2025-11-13)**:
-  - **Phase 3a: ������ID�t�B���^�����O���ʑ���**:
-    - ���O����m�F: `Pool filtering: 100��30 candidates`�i70%�팸�j������ɋ@�\
-    - �t�B���^�����O���W�b�N�͑z��ʂ蓮��
-  - **Phase 3b: �V�i���I�g�[**:
-    - AppBrain��b: 8��38���i+30���j
-    - AppBrain��p�N�G��: 0��15���i�V�K�ǉ��j
-    - ����b��: 60��82���A���N�G����: 28��43��
-    - expand_appbrain_scenarios.py�Ŏ��������iArchitecture 5, Code 10, Ops 5, Config 5, Testing 5�j
-  - **Phase 3c: warm_cache�đ��茋��**:
-    - **�e�X�g����**: PASSED�AZero-hit queries 0��
-    - **�������x�啝���P**:
-      - Macro Precision: 0.375��0.841 (+124%)
-      - Macro NDCG: 0.528��1.345 (+155%)
-    - **�v���W�F�N�g�q���g���퓮��**: AppBrain, InsightOps, PhaseSync, BugFixer���������o
-    - **LLM�Ăяo���팸����**: 64��i�ڕW20��ȉ��ɑ΂����B�j
-    - **�L���b�V�����ʖ��m�F**:
-      - Cache hit rate: 10%�i�ڕW60%���B�j
+  - **予測パフォーマンス（3並列実行）**:
+    - ケース1（プロジェクト内で十分、70%）: 21.2秒
+    - ケース2（全数検索必要、25%）: 89.4秒
+    - ケース3（プロジェクト未確定、5%）: 68.2秒
+    - **重み付き平均: 40.6秒/クエリ**（従来118.1秒から66%短縮）
+  - **並列処理比較**: ワークフローB（並列実行）は42.8秒/クエリ、Aが5%高速
+  - **Phase 2実装内容**:
+    1. `ProjectMemoryPool.get_memory_ids()`: プロジェクトのメモリIDセット取得
+    2. `SearchService.search_in_project()`: メモリプールフィルタリング統合
+    3. 結果不足判定ロジック（`len(results) < top_k`かつスコア閾値考慮）
+    4. ユーザーフィードバック（「追加検索中...」）
+- **Phase 2実装完了・効果検証 (2025-11-12)**:
+  - **実装サマリー**:
+    - ファイル変更: 4ファイル（project_memory_pool.py, search.py, main.py, issues.md）
+    - 追加コード: 210行（helper methods 3件 + search_in_project rewrite）
+    - バグフィックス: main.py初期化順序修正（ProjectMemoryPool → SearchService）
+    - テスト結果: ユニットテスト12/12パス、回帰テスト合格
+  - **検索精度**: ✅ **大幅改善**
+    - Macro Precision: 0.375 → **0.841** (+124%)
+    - Macro NDCG: 0.528 → **1.243** (+135%)
+    - ゼロヒット: **0件**（完璧）
+  - **パフォーマンス**: ⚠️ **目標未達**
+    - LLM呼び出し: **59回**（目標≤20回、差+39回）
+    - キャッシュヒット率: **11%**（目標≥14%、差-3%）
+    - Prefetchヒット率: **0%**（0/18ペア）
+  - **根本原因分析**:
+    1. **Prefetch機能不全**: プロジェクト自動認識は動作（4プロジェクト、信頼度0.9）しているが、warm_cache()が呼ばれていない、またはプール事前ロードが遅延実行されている
+    2. **キャッシュミスマッチ**: Prefetchクエリ（"project status"等）と実際のクエリ（"change feed"等）が乖離
+    3. **LLM待機時間**: 平均2570ms、最大11061ms（4倍のばらつき）
+  - **次のアクション**:
+    - 優先度高: Prefetch機能のデバッグ（SessionManager.set_project_hint()とwarm_cache()の呼び出しタイミング確認）
+    - 優先度中: Prefetchクエリを実際の使用パターンに合わせて調整
+    - 優先度低: キャッシュウォーミング戦略の見直し
+- **warm_cache統合 (2025-11-12 午後)**:
+  - **実装内容**:
+    - SearchService.prefetch_project()にデュアル戦略キャッシュウォーミング追加
+      - Step 1: ProjectMemoryPool.warm_cache() → L3セマンティックキャッシュ（クエリ非依存）
+      - Step 2: Prefetchクエリ実行 → L1/L2キャッシュ（クエリ依存）
+    - SessionManager._maybe_trigger_project_prefetch()のコメント更新
+    - ファイル変更: search.py (+95行), session_manager.py (+4行)
+    - テスト結果: ユニットテスト全てパス
+  - **回帰テスト結果（warm_cache統合後）**:
+    - Macro Precision: 0.841（変化なし）
+    - Macro NDCG: 1.243（変化なし）
+    - LLM呼び出し: 59回（変化なし）
+    - キャッシュヒット率: 11%（変化なし）
+    - Prefetchヒット率: 0/18（変化なし）
+    - **改善点**: 平均LLM待機 2570ms→2313ms (-10%)、最大LLM待機 11061ms→3832ms (-65%)
+  - **効果未確認の原因分析**:
+    1. **テストシナリオ不足**: 現在のquery_runs.jsonは同一プロジェクト内の記憶とクエリが少ない
+    2. **メモリIDフィルタリング効果が主**: 候補100→30削減は既に機能しているが、warm_cacheの効果は測定できていない
+    3. **L3キャッシュの仕組み確認**: メモリembeddingを候補IDごとに格納し、クエリembeddingとの類似度≥0.85でキャッシュヒット（設計は正しい）
+  - **次の検証ステップ**:
+    - Phase 3a: メモリIDフィルタリング効果の定量測定（ログ分析）✅
+    - Phase 3b: テストシナリオ拡充（同一プロジェクト内の記憶30件+クエリ15件追加）✅
+    - Phase 3c: warm_cache効果の再測定 ✅
+- **Phase 3a-c 実施結果 (2025-11-13)**:
+  - **Phase 3a: メモリIDフィルタリング効果測定**:
+    - ログから確認: `Pool filtering: 100→30 candidates`（70%削減）が正常に機能
+    - フィルタリングロジックは想定通り動作
+  - **Phase 3b: シナリオ拡充**:
+    - AppBrain会話: 8→38件（+30件）
+    - AppBrain専用クエリ: 0→15件（新規追加）
+    - 総会話数: 60→82件、総クエリ数: 28→43件
+    - expand_appbrain_scenarios.pyで自動生成（Architecture 5, Code 10, Ops 5, Config 5, Testing 5）
+  - **Phase 3c: warm_cache再測定結果**:
+    - **テスト成功**: PASSED、Zero-hit queries 0件
+    - **検索精度大幅改善**:
+      - Macro Precision: 0.375→0.841 (+124%)
+      - Macro NDCG: 0.528→1.345 (+155%)
+    - **プロジェクトヒント正常動作**: AppBrain, InsightOps, PhaseSync, BugFixerを自動検出
+    - **LLM呼び出し削減せず**: 64回（目標20回以下に対し未達）
+    - **キャッシュ効果未確認**:
+      - Cache hit rate: 10%（目標60%未達）
       - Prefetch hit rate: 0% (0/18)
       - Avg LLM latency: 8318ms
-  - **warm_cache���ʂ��o�Ȃ���������**:
-    1. **�L���b�V���L�[�~�X�}�b�`**: L3�L���b�V����`(query_embedding, candidate_id)`�����Awarm_cache()�o�^���̃L�[����v���Ă��Ȃ��\��
-    2. **�N�G��embedding�s��**: warm_cache���ɂ̓N�G��embedding�����݂��Ȃ����߁A������embedding�����o�^���Ă��������Ƀ}�b�`�ł��Ȃ�
-    3. **Similarity threshold�ߑ�**: �R�T�C���ގ��x?0.85������������\��
-  - **Phase 3d: �ڍ׃f�o�b�O�������� (2025-11-13 01:30)**:
-    - **���{����1: `filter_dict`�����G���[**
+  - **warm_cache効果が出ない原因分析**:
+    1. **キャッシュキーミスマッチ**: L3キャッシュは`(query_embedding, candidate_id)`だが、warm_cache()登録時のキーが一致していない可能性
+    2. **クエリembedding不在**: warm_cache時にはクエリembeddingが存在しないため、メモリembeddingだけ登録しても検索時にマッチできない
+    3. **Similarity threshold過大**: コサイン類似度≥0.85が厳しすぎる可能性
+  - **Phase 3d: 詳細デバッグ調査結果 (2025-11-13 01:30)**:
+    - **根本原因1: `filter_dict`引数エラー**
       ```
       ERROR: ChromaVectorDB.list_by_metadata() got an unexpected keyword argument 'filter_dict'
       ```
-      - `ProjectMemoryPool.load_project()`�����s���Awarm_cache��0���̃������Ŏ��s����Ă���
-      - �C���ӏ�: `src/services/project_memory_pool.py:107` ��`filter_dict`���������m�F�E�C��
-    - **���{����2: �ގ��x��臒l���B�i�݌v��̌��E�j**
-      - L3_CHECK���O����m�F�����ގ��x:
-        - `similarity=0.592` (臒l0.85�����A69%)
-        - `similarity=0.447` (臒l0.85�����A53%)
-        - `similarity=0.553` (臒l0.85�����A65%)
-        - `similarity=0.397` (臒l0.85�����A47%)
-      - **�S�Ă̗ގ��x��0.85��傫�������**
-      - ���R: **�N�G��embedding�ƃ�����embedding�͈Ӗ��I�ɈقȂ�**
-        - ������embedding: �L�����e�S�̂�\���i��: "AppBrain��release checklist�S��"�j
-        - �N�G��embedding: ���[�U�[�̎���Ӑ}�i��: "AppBrain release gating checklist"�j
-        - ���҂̃R�T�C���ގ��x�͍ō��ł�0.6���x�ŁA0.85�ɂ͓͂��Ȃ�
-    - **���_**: warm_cache�ɂ��**�N�G����ˑ���L3�L���b�V��**�͐݌v��̌��E������A���ʂ͌���I
-  - **���̃A�N�V�����āi�D��x���j**:
-    - **Option B (�ŗD�搄��)**: Workflow A���S����
-      - �v�[����������D�悵�A���ʕs�����̂ݑS�������Ƀt�H�[���o�b�N
-      - ������ID�t�B���^�����O���ʁi100��30���A70%�팸�j���ő�����p
-      - ����ɂ��LLM�Ăяo������30���ȉ��ɍ팸�\
-      - warm_cache�̌��ʂɈˑ������A�m����LLM�팸���B���ł���
-    - **Option C**: Prefetch�N�G���̐��x����
-      - ���ۂ̎g�p�p�^�[���ɋ߂��N�G����prefetch_queries�ɒǉ�
-      - �v���W�F�N�g�ŗL�̕p�o�N�G����config.yaml�Őݒ�\�ɂ���
-      - ������L1/L2�L���b�V���őΉ��i�N�G��embedding�x�[�X�j
-    - **Option A**: �ގ��x臒l��0.6�ɉ�����
-      - warm_cache���@�\����悤�ɂȂ邪�A���x�ቺ�̃��X�N����
-      - �񐄏��i���̃I�v�V�����̕������ʓI�j
-- **�o������**: �������v�[���t�B���^�����O�ɂ��LLM�Ăяo��70%�팸�A�L���b�V���q�b�g��14%�ێ��APrecision?84%�ێ�
-  - ? �������v�[���t�B���^�����O: �@�\�m�F�ς݁i100��30���A70%�팸�j
-  - ? LLM�Ăяo���팸: ���B�i66��A�ڕW20��j
-  - ? Precision�ێ�: 82.6%�i�ڕW84%�قڒB���j
-  - ? �L���b�V���q�b�g��: 10%�i�ڕW14%���B�j
-  - **���_**: warm_cache�����͋Z�p�I�Ɏ��������������AL3�L���b�V���̐݌v��̐���ɂ����ʂ�����I�B**Option B�iWorkflow A���S�����j��D�悷�ׂ�**
-- **Phase 3e: �o�O�C����warm_cache����m�F (2025-11-13 �ߌ�)**:
-  - **���{�����C���i4���j**:
-    1. `filter_dict` �� `filter_metadata` (project_memory_pool.py:108)
-    2. �����L�[�t�B���^�����O��$and���Z�q�T�|�[�g (vector_db.py:229-234)
-    3. `_merge_candidates` �� `_merge_results` (search.py:1387)
-    4. `_rerank_with_cross_encoder` �� `_rerank` + `_apply_cross_encoder_rerank` (search.py:1401-1416)
-  - **���،���**:
-    - ? ���j�b�g�e�X�g: 12/12 passed (ProjectMemoryPool)
-    - ? �v�[�����[�h����: **100 memories loaded** (�ȑO��0)
-    - ? warm_cache����: **100 embeddings stored** in L3 cache
-    - ? L3�L���b�V���`�F�b�N����: �ގ��x0.39-0.72���v���i臒l0.85�����j
-    - ? Prefetch����: 3/3�N�G�����s�Apool=100 memories
-    - ? L3�L���b�V���q�b�g��: **0%** (�S��臒l���B)
-  - **�m�F���ꂽ�݌v��̐���**:
-    - �N�G��embedding vs ������embedding�̗ގ��x: 0.39-0.72�i����0.55�j
-    - 臒l0.85�ɂ͓͂��Ȃ��iissues.md:302-310�ŗ\���ς݁j
-    - warm_cache�͋Z�p�I�ɐ��퓮�삵�Ă��邪�A�ގ��x�̐�����A���ʂ͌���I
-  - **���_**:
-    - ProjectMemoryPool/warm_cache�̎�����**�Z�p�I�Ɋ���**
-    - �v�[���T�C�Y0��100�ւ̉��P�ɂ��A������ID�t�B���^�����O�i100��30���j���@�\
-    - L3�L���b�V���̌��ʂ͌���I�����A�v�[���t�B���^�����O�ɂ��LLM�팸�͎����\
-    - **���̗D��A�N�V����**: issues.md:313-317��Option B�iWorkflow A���S�����j�𐄏�
-      - �v�[����������D�悵�A���ʕs�����̂ݑS������
-      - ������ID�t�B���^�����O���ʂ��ő劈�p
-      - LLM�Ăяo������30���ȉ��ɍ팸�i�ڕW�B���\�j
-- **Phase 3f: L3�L���b�V����ގ��x�̍��{�������� (2025-11-13 ��)**:
-  - **�����̌o��**:
-    - Phase 3e�ŗގ��x0.39-0.72���m�F�������A�����embedding���f���̖�肩�݌v��̖�肩���s��
-    - ���[�U�[����u�x�N�g��������������ł��ĂȂ��񂶂�Ȃ��H�v�Ǝw�E
-    - �Ɨ�����embedding�i���e�X�g�itest_embedding_quality.py�j�����{
-  - **�e�X�g���ʁi�����ׂ������j**:
-    - ? Exact match: similarity = 1.000 (���f�����퓮��)
-    - ? Query vs Full content: similarity = 0.881 (臒l0.85��**����**!)
-    - ? Query vs Summary: similarity = 0.910 (臒l0.85��**����**!)
-    - **���_**: nomic-embed-text���f�����̂͐���ɓ��삵�Ă���A�K�؂ȃR���e���c�ł����0.85�𒴂���ގ��x��B���\
-  - **�����̒���: �Ȃ��e�X�g�Ɩ{�ԂŌ��ʂ��قȂ�̂��H**:
-    - �e�X�g: 0.88-0.91�̍����ގ��x
-    - �{�ԃ��O: 0.39-0.72�̒Ⴂ�ގ��x
-    - �� **�i�[����Ă���R���e���c���قȂ�**�Ƃ�������
-  - **���{�����̓���**:
-    - `src/services/ingestion.py:665`: ���������^�f�[�^�G���g����`memory.summary`��`document`�t�B�[���h�Ɋi�[
+      - `ProjectMemoryPool.load_project()`が失敗し、warm_cacheが0件のメモリで実行されていた
+      - 修正箇所: `src/services/project_memory_pool.py:107` の`filter_dict`引数名を確認・修正
+    - **根本原因2: 類似度が閾値未達（設計上の限界）**
+      - L3_CHECKログから確認した類似度:
+        - `similarity=0.592` (閾値0.85未満、69%)
+        - `similarity=0.447` (閾値0.85未満、53%)
+        - `similarity=0.553` (閾値0.85未満、65%)
+        - `similarity=0.397` (閾値0.85未満、47%)
+      - **全ての類似度が0.85を大きく下回る**
+      - 理由: **クエリembeddingとメモリembeddingは意味的に異なる**
+        - メモリembedding: 記憶内容全体を表現（例: "AppBrainのrelease checklist全文"）
+        - クエリembedding: ユーザーの質問意図（例: "AppBrain release gating checklist"）
+        - 両者のコサイン類似度は最高でも0.6程度で、0.85には届かない
+    - **結論**: warm_cacheによる**クエリ非依存のL3キャッシュ**は設計上の限界があり、効果は限定的
+  - **次のアクション案（優先度順）**:
+    - **Option B (最優先推奨)**: Workflow A完全実装
+      - プール内検索を優先し、結果不足時のみ全数検索にフォールバック
+      - メモリIDフィルタリング効果（100→30件、70%削減）を最大限活用
+      - これによりLLM呼び出し数を30件以下に削減可能
+      - warm_cacheの効果に依存せず、確実にLLM削減が達成できる
+    - **Option C**: Prefetchクエリの精度向上
+      - 実際の使用パターンに近いクエリをprefetch_queriesに追加
+      - プロジェクト固有の頻出クエリをconfig.yamlで設定可能にする
+      - 既存のL1/L2キャッシュで対応（クエリembeddingベース）
+    - **Option A**: 類似度閾値を0.6に下げる
+      - warm_cacheが機能するようになるが、精度低下のリスクあり
+      - 非推奨（他のオプションの方が効果的）
+- **出口条件**: メモリプールフィルタリングによりLLM呼び出し70%削減、キャッシュヒット率14%維持、Precision≥84%維持
+  - ✅ メモリプールフィルタリング: 機能確認済み（100→30件、70%削減）
+  - ❌ LLM呼び出し削減: 未達（66回、目標20回）
+  - ✅ Precision維持: 82.6%（目標84%ほぼ達成）
+  - ❌ キャッシュヒット率: 10%（目標14%未達）
+  - **結論**: warm_cache統合は技術的に実装完了したが、L3キャッシュの設計上の制約により効果が限定的。**Option B（Workflow A完全実装）を優先すべき**
+- **Phase 3e: バグ修正とwarm_cache動作確認 (2025-11-13 午後)**:
+  - **実施した修正（4件）**:
+    1. `filter_dict` → `filter_metadata` (project_memory_pool.py:108)
+    2. 複数キーフィルタリングの$and演算子サポート (vector_db.py:229-234)
+    3. `_merge_candidates` → `_merge_results` (search.py:1387)
+    4. `_rerank_with_cross_encoder` → `_rerank` + `_apply_cross_encoder_rerank` (search.py:1401-1416)
+  - **検証結果**:
+    - ✅ ユニットテスト: 12/12 passed (ProjectMemoryPool)
+    - ✅ プールロード成功: **100 memories loaded** (以前は0)
+    - ✅ warm_cache成功: **100 embeddings stored** in L3 cache
+    - ✅ L3キャッシュチェック動作: 類似度0.39-0.72を計測（閾値0.85未満）
+    - ✅ Prefetch完了: 3/3クエリ実行、pool=100 memories
+    - ❌ L3キャッシュヒット率: **0%** (全て閾値未達)
+  - **確認された設計上の制約**:
+    - クエリembedding vs メモリembeddingの類似度: 0.39-0.72（平均0.55）
+    - 閾値0.85には届かない（issues.md:302-310で予測済み）
+    - warm_cacheは技術的に正常動作しているが、類似度の性質上、効果は限定的
+  - **結論**:
+    - ProjectMemoryPool/warm_cacheの実装は**技術的に完了**
+    - プールサイズ0→100への改善により、メモリIDフィルタリング（100→30件）が機能
+    - L3キャッシュの効果は限定的だが、プールフィルタリングによるLLM削減は実現可能
+    - **次の優先アクション**: issues.md:313-317のOption B（Workflow A完全実装）を推奨
+      - プール内検索を優先し、結果不足時のみ全数検索
+      - メモリIDフィルタリング効果を最大活用
+      - LLM呼び出し数を30件以下に削減（目標達成可能）
+- **Phase 3f: L3キャッシュ低類似度の根本原因特定 (2025-11-13 夜)**:
+  - **調査の経緯**:
+    - Phase 3eで類似度0.39-0.72を確認したが、これはembeddingモデルの問題か設計上の問題かが不明
+    - ユーザーから「ベクトル化がしっかりできてないんじゃない？」と指摘
+    - 独立したembedding品質テスト（test_embedding_quality.py）を実施
+  - **テスト結果（驚くべき発見）**:
+    - ✅ Exact match: similarity = 1.000 (モデル正常動作)
+    - ✅ Query vs Full content: similarity = 0.881 (閾値0.85を**超過**!)
+    - ✅ Query vs Summary: similarity = 0.910 (閾値0.85を**超過**!)
+    - **結論**: nomic-embed-textモデル自体は正常に動作しており、適切なコンテンツであれば0.85を超える類似度を達成可能
+  - **矛盾の調査: なぜテストと本番で結果が異なるのか？**:
+    - テスト: 0.88-0.91の高い類似度
+    - 本番ログ: 0.39-0.72の低い類似度
+    - → **格納されているコンテンツが異なる**という仮説
+  - **根本原因の特定**:
+    - `src/services/ingestion.py:665`: メモリメタデータエントリは`memory.summary`を`document`フィールドに格納
       ```python
       self.vector_db.add(
           id=f"{memory.id}-metadata",
           embedding=embedding,
           metadata=metadata,
-          document=memory.summary  # �� ���������I
+          document=memory.summary  # ← ここが問題！
       )
       ```
-    - `src/services/project_memory_pool.py:136-141`: �v�[���ǂݍ��ݎ���`content`�t�B�[���h�i=summary�j���擾����embedding����
+    - `src/services/project_memory_pool.py:136-141`: プール読み込み時は`content`フィールド（=summary）を取得してembedding生成
       ```python
       content = memory.get('content', '')  # ChromaDB document = memory.summary
       embedding = self.model_router.generate_embedding(content)
       ```
-    - **���̍\��**:
-      - **warm_cache�Ɋi�[**: `memory.summary`��embedding�i���k���ꂽ�Z���v�񕶁j
-      - **�N�G��**: �ڍׂȎ��R���ꎿ��i��: "AppBrain release checklist steps"�j
-      - **��r�Ώ�**: �v�� vs �ڍ׃N�G�� �� �Ӗ��I�ȗ��x���قȂ邽�ߗގ��x���Ⴂ�i0.39-0.72�j
-  - **�e�X�g�������������R**:
-    - �e�X�g�ł͊��S�ȕ��́i"The AppBrain release checklist is as follows:..."�j���g�p
-    - �N�G���Ɠ������x�E�ڍ׃��x���̃R���e���c�Ȃ̂ō����ގ��x�i0.88-0.91�j
-  - **�݌v��̍��{�I�ȉۑ�**:
-    - L3�L���b�V���́uquery embedding vs memory embedding�v�̔�r��O��Ƃ���
-    - �������A���ۂɂ́uquery embedding vs summary embedding�v���r���Ă���
-    - �v��͏�񂪈��k����Ă���A�N�G���̏ڍׂȃL�[���[�h�╶���������Ă���
-    - ���̂��߁A�Ӗ��I�ɂ͊֘A�������Ă��ގ��x�X�R�A���Ⴍ�Ȃ�i0.39-0.72�j
-  - **������̌��**:
-    - **Option 1**: memory.summary�̑����full content�i�S�`�����N�����j��embedding����
-      - Pros: �ڍ׏���ێ��A�N�G���Ƃ̗��x����v
-      - Cons: 512�g�[�N�����̃R���e���c��embedding�i�����ቺ�A�v�Z�R�X�g��
-    - **Option 2**: L3�L���b�V��臒l��0.60-0.70�Ɋɘa
-      - Pros: ������summary embedding�ŋ@�\����悤�ɂȂ�
-      - Cons: ���x�ቺ�̃��X�N�A�U�z����������\��
-    - **Option 3**: enhanced summary�𐶐��i�L�[���[�h + �v��j
-      - Pros: �v��̊Ȍ����ƃL�[���[�h�̏ڍא��𗼗�
-      - Cons: summary�t�B�[���h�̍Đ������K�v�A�ڍs�R�X�g
-    - **Option 4**: L3�L���b�V������߁AWorkflow A�i�v�[���t�B���^�����O�j�ɒ���
-      - Pros: ������ID�t�B���^�����O��70%�팸���m���ɒB���ł���
-      - Cons: warm_cache�̓��������ʂɂȂ�
-  - **�����A�N�V����**:
-    - **�Z���i�����j**: Option 4�����{
-      - ���R: warm_cache�̌��ʂ�����I�ł��邱�Ƃ�����
-      - Workflow A���S�����ɂ��A�v�[���t�B���^�����O��70%�팸���m���ɒB��
-      - L3�L���b�V���̉��P�͒����ۑ�Ƃ��Đ؂藣��
-    - **�������iPhase 4�ȍ~�j**: Option 3������
-      - �L�[���[�h���o + �v��̃n�C�u���b�h��@��enhanced summary�𐶐�
-      - �����f�[�^�̍Đ����E�ڍs�v����������
-  - **���_**:
-    - L3�L���b�V����ގ��x�̍��{�����́u**summary embedding vs query embedding**�v�̗��x�s��v
-    - embedding�i���͖��Ȃ��i�e�X�g��0.88-0.91���m�F�j
-    - �݌v��̐���ł���Asummary���e�̉��P�Ȃ��ɂ͉�������
-    - **Option 4�iWorkflow A�D��j�𐄏�**���AL3���P�͒����ۑ�Ƃ��Ĉ���
-- **Phase 3g: ������ID�s��v�̏C���ƃv�[���t�B���^�����O���� (2025-11-13 ��)**:
-  - **�w�i**: Phase 3f��L3�L���b�V���̍��{��������肵�����A���[�U�[����u�v�[���t�B���^�������[���q�b�g�𐶂�ł���v�Ƃ̎w�E
-  - **�������ꂽ���**:
-    - **������ID�s��v**: ProjectMemoryPool��`mem-123-metadata`��Ԃ����A�`�����N����`mem-123`������
-    - **����**: `"mem-123"` ? `{"mem-123-metadata"}` �� �v�[���t�B���^�����O�őS��₪���O
-    - **���{����**: ingestion.py:661��`f"{memory.id}-metadata"`�Ƃ��Ċi�[�Aproject_memory_pool.py:323�ł��̂܂ܕԋp
-  - **���{�����C��**:
+    - **問題の構造**:
+      - **warm_cacheに格納**: `memory.summary`のembedding（圧縮された短い要約文）
+      - **クエリ**: 詳細な自然言語質問（例: "AppBrain release checklist steps"）
+      - **比較対象**: 要約 vs 詳細クエリ → 意味的な粒度が異なるため類似度が低い（0.39-0.72）
+  - **テストが成功した理由**:
+    - テストでは完全な文章（"The AppBrain release checklist is as follows:..."）を使用
+    - クエリと同じ粒度・詳細レベルのコンテンツなので高い類似度（0.88-0.91）
+  - **設計上の根本的な課題**:
+    - L3キャッシュは「query embedding vs memory embedding」の比較を前提とする
+    - しかし、実際には「query embedding vs summary embedding」を比較している
+    - 要約は情報が圧縮されており、クエリの詳細なキーワードや文脈を失っている
+    - このため、意味的には関連があっても類似度スコアが低くなる（0.39-0.72）
+  - **解決策の候補**:
+    - **Option 1**: memory.summaryの代わりにfull content（全チャンク結合）でembedding生成
+      - Pros: 詳細情報を保持、クエリとの粒度が一致
+      - Cons: 512トークン超のコンテンツはembedding品質が低下、計算コスト増
+    - **Option 2**: L3キャッシュ閾値を0.60-0.70に緩和
+      - Pros: 既存のsummary embeddingで機能するようになる
+      - Cons: 精度低下のリスク、偽陽性が増える可能性
+    - **Option 3**: enhanced summaryを生成（キーワード + 要約）
+      - Pros: 要約の簡潔性とキーワードの詳細性を両立
+      - Cons: summaryフィールドの再生成が必要、移行コスト
+    - **Option 4**: L3キャッシュを諦め、Workflow A（プールフィルタリング）に注力
+      - Pros: メモリIDフィルタリングで70%削減が確実に達成できる
+      - Cons: warm_cacheの投資が無駄になる
+  - **推奨アクション**:
+    - **短期（即時）**: Option 4を実施
+      - 理由: warm_cacheの効果が限定的であることが判明
+      - Workflow A完全実装により、プールフィルタリングで70%削減を確実に達成
+      - L3キャッシュの改善は長期課題として切り離す
+    - **中長期（Phase 4以降）**: Option 3を検討
+      - キーワード抽出 + 要約のハイブリッド手法でenhanced summaryを生成
+      - 既存データの再生成・移行プランを策定
+  - **結論**:
+    - L3キャッシュ低類似度の根本原因は「**summary embedding vs query embedding**」の粒度不一致
+    - embedding品質は問題なし（テストで0.88-0.91を確認）
+    - 設計上の制約であり、summary内容の改善なしには解決困難
+    - **Option 4（Workflow A優先）を推奨**し、L3改善は長期課題として扱う
+- **Phase 3g: メモリID不一致の修正とプールフィルタリング復旧 (2025-11-13 夜)**:
+  - **背景**: Phase 3fでL3キャッシュの根本原因を特定したが、ユーザーから「プールフィルタが実質ゼロヒットを生んでいる」との指摘
+  - **発見された問題**:
+    - **メモリID不一致**: ProjectMemoryPoolは`mem-123-metadata`を返すが、チャンク候補は`mem-123`を持つ
+    - **結果**: `"mem-123"` ∉ `{"mem-123-metadata"}` → プールフィルタリングで全候補が除外
+    - **根本原因**: ingestion.py:661で`f"{memory.id}-metadata"`として格納、project_memory_pool.py:323でそのまま返却
+  - **実施した修正**:
     1. **SearchService._get_memory_id_from_candidate()** (search.py:1290-1296):
-       - �������G���g�����̏ꍇ�A`-metadata` suffix����������base memory ID��Ԃ�
-       - �`�����N���i`mem-123`�j�ƃ������G���g�����i`mem-123-metadata`�j������������`mem-123`��Ԃ��悤�ɓ���
+       - メモリエントリ候補の場合、`-metadata` suffixを除去してbase memory IDを返す
+       - チャンク候補（`mem-123`）とメモリエントリ候補（`mem-123-metadata`）両方が正しく`mem-123`を返すように統一
     2. **ProjectMemoryPool.get_memory_ids()** (project_memory_pool.py:297-336):
-       - embeddings dict����擾����ID����`-metadata` suffix������
-       - �ԋp�l��f��memory ID set�i`{"mem-123", "mem-456", ...}`�j�ɐ��K��
-  - **���،���**:
-    - ? ���j�b�g�e�X�g: ProjectMemoryPool 12/12 passed
-    - ? Memory ID extraction logic: 4/4 test cases passed (test_memory_id_fix.py)
-    - ? ��A�e�X�g: **regression passed** with significant improvements
-  - **�p�t�H�[�}���X�w�W (mcp_run-20251113-170221.jsonl)**:
-    - **Macro Precision**: 0.886 (baseline 0.375 �� **+136%���P**)
-    - **Macro NDCG**: 1.470 (baseline 0.528 �� **+178%���P**)
-    - **�L���b�V���q�b�g��**: 21% (Phase 3e: 0% �� ���P)
-    - **LLM�Ăяo����**: 67��
+       - embeddings dictから取得したIDから`-metadata` suffixを除去
+       - 返却値を素のmemory ID set（`{"mem-123", "mem-456", ...}`）に正規化
+  - **検証結果**:
+    - ✅ ユニットテスト: ProjectMemoryPool 12/12 passed
+    - ✅ Memory ID extraction logic: 4/4 test cases passed (test_memory_id_fix.py)
+    - ✅ 回帰テスト: **regression passed** with significant improvements
+  - **パフォーマンス指標 (mcp_run-20251113-170221.jsonl)**:
+    - **Macro Precision**: 0.886 (baseline 0.375 → **+136%改善**)
+    - **Macro NDCG**: 1.470 (baseline 0.528 → **+178%改善**)
+    - **キャッシュヒット率**: 21% (Phase 3e: 0% → 改善)
+    - **LLM呼び出し数**: 67回
     - **Prefetch**: 10 requests (hits 7, misses 20)
-    - **�[���q�b�g�N�G��**: 0��
-  - **���_**:
-    - ������ID�s��v�̏C���ɂ��A**�v�[���t�B���^�����O������**
-    - Precision/NDCG���啝���P�i136-178%����j
-    - �L���b�V���q�b�g����0%��21%�ɉ��P
-    - �v�[���t�B���^�����O�ɂ����팸������ɋ@�\
-    - **Phase 3����**: ProjectMemoryPool/warm_cache�����͋Z�p�I�E�@�\�I�Ɋ���
-  - **���̐����A�N�V����**:
-    - Phase 4�Ƃ��āAL3�L���b�V����summary���P�i�L�[���[�h+�v��n�C�u���b�h�j������
-    - �܂��́A�����21%�L���b�V���q�b�g���ŉ^�p���A���ʂ��p�����j�^�����O
+    - **ゼロヒットクエリ**: 0件
+  - **結論**:
+    - メモリID不一致の修正により、**プールフィルタリングが復旧**
+    - Precision/NDCGが大幅改善（136-178%向上）
+    - キャッシュヒット率が0%→21%に改善
+    - プールフィルタリングによる候補削減が正常に機能
+    - **Phase 3完了**: ProjectMemoryPool/warm_cache統合は技術的・機能的に完了
+  - **次の推奨アクション**:
+    - Phase 4として、L3キャッシュのsummary改善（キーワード+要約ハイブリッド）を検討
+    - または、現状の21%キャッシュヒット率で運用し、効果を継続モニタリング
 
-### #2025-11-10-07 �����p�C�v���C���œK����QAM�����g�[
-- **�w�i**: ����̌����͏\�����������A���ߍ��ݐ������ BM25 �𒀎����s���Ă��邽�ߔ����Ȃ���]�肪����B�܂� `source=session` �̃��O�� Runbook ����ʂɏo�邱�Ƃ�����ACrossEncoder reranker �̓������s���i����x�j������`�ŁA���O��͕��� 2.2s/49 call�i`mcp_run-20251111-005159.jsonl`�j�ƃL���[�x���̒��󂪂���BQAM�����͑�\��b�𒆐S�ɐ����������A��{�J���^�X�N�� 90% �ȏ���J�o�[���Ă��������B
-- **�v����**:
-  1. **�񓯊���**: ���ߍ��ݐ������� BM25 �����ő��点�Abefore/after �̃��C�e���V�����|�[�g����B
-  2. **�Z�b�V�������O���ʒ���**: `source=session` �� command ���O�Ɍy���ȃy�i���e�B��^����A�������� rerank �Ώۂ��珜�O���āA���� Runbook/�K�C�h����ɏo��悤��������B
-  3. **LLM���d���v��**:
-      - ����: reranker �͓����I�� 1������ LLM ���Ăяo���B�ŐV run ���O�ł� `pairs_scored=49`, `avg_llm_latency?2.2s`�A�L���b�V���q�b�g�� 0%�B
-      - �ۑ�: ����N�G����������Ƒ҂��s�񂪔������A�������X�|���X�� LLM �҂��Ɉ��������郊�X�N�B�L���b�V�������p�ł��Ă��Ȃ��B
-      - ���P��:
-          1. reranker �p�� `max_parallel_reranks` �ݒ�ƃ��[�J�[�v�[���iThreadPool or asyncio�j�𓱓����ē��� N ���܂ŕ��񉻁B
-          2. �o�b�N���O��臒l�𒴂����ꍇ�� heuristics �X�R�A�݂̂ŕԂ��t�H�[���o�b�N��݌v�B
-          3. ���g���N�X�iqueue length / wait ms / cache hit���j�� `get_reranker_metrics` �ɒǉ����ACI ����Ď��ł���悤�ɂ���B
-          4. �L���b�V�����P: ���� query �𕡐��񗬂��V�i���I����A�ɒǉ����A�L���b�V���q�b�g���Č��B�p�o query �ւ̃E�H�[���A�b�v�� project �P�ʂ̃v���t�F�b�`�헪����������B
-  4. **QAM����90%�J�o�[**: �����[�X/�C���V�f���g/�ăf�v���C/�č�/�K�o�i���X/�_�b�V���{�[�h�ȂǑ�\�^�X�N�̌�b�Z�b�g�𐮗����A��v����֖|��BLang Eval �� Precision >=0.9/ NDCG >=1.3 ���m�F����B
-- **�o������**: ���C�e���V����ƃ����L���O���P�̃��O���c��ALang Eval �Őݒ肵���w�W�𖞂����A�����J�o���b�W�� 90% �ȏ�ɂȂ��Ă��邱�ƁB
+### #2025-11-10-07 検索パイプライン最適化とQAM辞書拡充
+- **背景**: 現状の検索は十分高速だが、埋め込み生成後に BM25 を逐次実行しているため微小ながら余剰がある。また `source=session` のログが Runbook より上位に出ることがあり、CrossEncoder reranker の同時実行数（並列度）も未定義で、ログ上は平均 2.2s/49 call（`mcp_run-20251111-005159.jsonl`）とキュー遅延の兆候がある。QAM辞書は代表語彙を中心に整備中だが、基本開発タスクで 90% 以上をカバーしておきたい。
+- **プラン**:
+  1. **非同期化**: 埋め込み生成中に BM25 を並列で走らせ、before/after のレイテンシをレポートする。
+  2. **セッションログ順位調整**: `source=session` や command ログに軽微なペナルティを与える、もしくは rerank 対象から除外して、正式 Runbook/ガイドが先に出るよう調整する。
+  3. **LLM多重化計画**:
+      - 現状: reranker は同期的に 1件ずつ LLM を呼び出す。最新 run ログでは `pairs_scored=49`, `avg_llm_latency≈2.2s`、キャッシュヒット率 0%。
+      - 課題: 並列クエリが増えると待ち行列が発生し、検索レスポンスが LLM 待ちに引きずられるリスク。キャッシュも活用できていない。
+      - 改善案:
+          1. reranker 用に `max_parallel_reranks` 設定とワーカープール（ThreadPool or asyncio）を導入して同時 N 件まで並列化。
+          2. バックログが閾値を超えた場合は heuristics スコアのみで返すフォールバックを設計。
+          3. メトリクス（queue length / wait ms / cache hit率）を `get_reranker_metrics` に追加し、CI から監視できるようにする。
+          4. キャッシュ改善: 同一 query を複数回流すシナリオを回帰に追加し、キャッシュヒットを再現。頻出 query へのウォームアップや project 単位のプリフェッチ戦略も検討する。
+  4. **QAM辞書90%カバー**: リリース/インシデント/再デプロイ/監査/ガバナンス/ダッシュボードなど代表タスクの語彙セットを整理し、主要言語へ翻訳。Lang Eval で Precision >=0.9/ NDCG >=1.3 を確認する。
+- **出口条件**: レイテンシ測定とランキング改善のログが残り、Lang Eval で設定した指標を満たし、辞書カバレッジが 90% 以上になっていること。
 
-### #2025-11-12-01 �S�������p�t�H�[�}���X�Z�k���i�����ۑ�j
-- **�w�i**: ���[�N�t���[A�i�i�K�I�k�ށj�ɂ��A�v���W�F�N�g�m�莞��LLM�Ăяo������70%�팸�i100����30���j����錩���݁B�������A3������s�ł��S���������K�v�ȃP�[�X�ł͕���40.6�b/�N�G���̃��C�e���V����������B���^�p�ł�5�b�ȉ����]�܂����B
-- **����̃{�g���l�b�N����**:
-  - **LLM�Ăяo��**: 2.35�b/�y�A �~ ����2.0�y�A/�N�G�� = 4.7�b
-  - **���񉻌���**: 3�����1/3�ɒZ�k�\�i���_�l�j
-  - **�L���b�V���q�b�g��**: L1/L2/L3���v��14%�i�ڕW70%�ɖ��B�j
-  - **�S�������P�[�X**: 86����LLM�Ăяo���i3����j= 29�o�b�` �~ 2.35�b = 68.2�b
-- **�Z�k���A�v���[�`���**:
-  1. **�L���b�V���q�b�g������**�i�ŗD��j:
-     - L3�Z�}���e�B�b�N�L���b�V��臒l�̊ɘa�i0.85 �� 0.70-0.75�j
-     - �v���t�F�b�`�N�G���̋�̉��i�v���W�F�N�g�ŗL�̃N�G���p�^�[���w�K�j
-     - �K���I�w�K: �N�G����������p�o�p�^�[���𒊏o���ăL���b�V���E�H�[�~���O
-     - **���Ҍ���**: �q�b�g�� 14% �� 50-70%�ALLM�Ăяo���� 86�� �� 26-43��
-  2. **����x�̊g��**:
-     - `cross_encoder_max_parallel: 3` �� 5-10�i���\�[�X���e�͈͂Łj
-     - **���Ҍ���**: 68.2�b �� 40-20�b�i����x5-10�̏ꍇ�j
-     - **����**: CPU/���������ׁALLM�T�[�o�[���̃��[�g����
-  3. **LLM�œK��**:
-     - ���f���؂�ւ��i��荂���ȃ��f���A���x�g���[�h�I�t�j
-     - �o�b�`���_�i�����y�A��1���N�G�X�g�ŏ����j
-     - **���Ҍ���**: 2.35�b/�y�A �� 0.5-1.0�b/�y�A
-  4. **��␔�팸**:
-     - �n�C�u���b�h�����i�K�ł̍i�荞�݋����i100��� �� 50-70���j
-     - BM25/Vector������臒l����
-     - **���Ҍ���**: LLM�Ăяo���� 86�� �� 43-60��
-  5. **�t�H�[���o�b�N�q���[���X�e�B�N�X**:
-     - LLM�L���[�҂����Ԃ�臒l���ߎ��̓��[���x�[�X�X�R�A�ő����ɕԋp
-     - **���Ҍ���**: �ň��P�[�X�̃��C�e���V�����ݒ�i��: 5�b�j
-- **�����D�揇��**:
-  1. �L���b�V���q�b�g������i���������A�R�X�g��j
-  2. ����x�g��i�����ς݁A�ݒ�ύX�̂݁j
-  3. ��␔�팸�i���x�e�������؂��Ȃ���i�K�I�Ɂj
-  4. LLM�œK���i�����ۑ�A���f���I��E���؂��K�v�j
-  5. �t�H�[���o�b�N�q���[���X�e�B�N�X�i���[�U�[�̌��ی�Ƃ��ĕ⊮�I�Ɂj
-- **�}�C���X�g�[��**:
-  - **�Z���i1-2�T�ԁj**: L3臒l�ɘa + ����x�g��Ńq�b�g��30-40%�A���C�e���V20-30�b
-  - **�����i1-2�����j**: �K���I�w�K�����Ńq�b�g��50-70%�A���C�e���V10-15�b
-  - **�����i3-6�����j**: LLM�œK�� + �o�b�`���_�Ń��C�e���V5�b�ȉ�
-- **�o������**: �S���������̕��σ��C�e���V��5�b�ȉ��A�܂��̓L���b�V���q�b�g��70%�ȏ��B�����邱�ƁB
+### #2025-11-12-01 全数検索パフォーマンス短縮化（長期課題）
+- **背景**: ワークフローA（段階的縮退）により、プロジェクト確定時のLLM呼び出し数は70%削減（100件→30件）される見込み。しかし、3並列実行でも全数検索が必要なケースでは平均40.6秒/クエリのレイテンシが発生する。実運用では5秒以下が望ましい。
+- **現状のボトルネック分析**:
+  - **LLM呼び出し**: 2.35秒/ペア × 平均2.0ペア/クエリ = 4.7秒
+  - **並列化効果**: 3並列で1/3に短縮可能（理論値）
+  - **キャッシュヒット率**: L1/L2/L3合計で14%（目標70%に未達）
+  - **全数検索ケース**: 86件のLLM呼び出し（3並列）= 29バッチ × 2.35秒 = 68.2秒
+- **短縮化アプローチ候補**:
+  1. **キャッシュヒット率向上**（最優先）:
+     - L3セマンティックキャッシュ閾値の緩和（0.85 → 0.70-0.75）
+     - プリフェッチクエリの具体化（プロジェクト固有のクエリパターン学習）
+     - 適応的学習: クエリ履歴から頻出パターンを抽出してキャッシュウォーミング
+     - **期待効果**: ヒット率 14% → 50-70%、LLM呼び出し数 86件 → 26-43件
+  2. **並列度の拡大**:
+     - `cross_encoder_max_parallel: 3` → 5-10（リソース許容範囲で）
+     - **期待効果**: 68.2秒 → 40-20秒（並列度5-10の場合）
+     - **制約**: CPU/メモリ負荷、LLMサーバー側のレート制限
+  3. **LLM最適化**:
+     - モデル切り替え（より高速なモデル、精度トレードオフ）
+     - バッチ推論（複数ペアを1リクエストで処理）
+     - **期待効果**: 2.35秒/ペア → 0.5-1.0秒/ペア
+  4. **候補数削減**:
+     - ハイブリッド検索段階での絞り込み強化（100候補 → 50-70候補）
+     - BM25/Vector検索の閾値調整
+     - **期待効果**: LLM呼び出し数 86件 → 43-60件
+  5. **フォールバックヒューリスティクス**:
+     - LLMキュー待ち時間が閾値超過時はルールベーススコアで即座に返却
+     - **期待効果**: 最悪ケースのレイテンシ上限を設定（例: 5秒）
+- **推奨優先順位**:
+  1. キャッシュヒット率向上（即効性高、コスト低）
+  2. 並列度拡大（実装済み、設定変更のみ）
+  3. 候補数削減（精度影響を検証しながら段階的に）
+  4. LLM最適化（長期課題、モデル選定・検証が必要）
+  5. フォールバックヒューリスティクス（ユーザー体験保護として補完的に）
+- **マイルストーン**:
+  - **短期（1-2週間）**: L3閾値緩和 + 並列度拡大でヒット率30-40%、レイテンシ20-30秒
+  - **中期（1-2ヶ月）**: 適応的学習実装でヒット率50-70%、レイテンシ10-15秒
+  - **長期（3-6ヶ月）**: LLM最適化 + バッチ推論でレイテンシ5秒以下
+- **出口条件**: 全数検索時の平均レイテンシが5秒以下、またはキャッシュヒット率70%以上を達成すること。
 
-### #2025-11-13-08 ���x����v�� Phase 1: �x�[�X���C�� & �K�[�h���[�� (Baseline & Guardrails)
-- **�w�i**: Phase 3g�Ń�����ID�s��v���C�����APrecision/NDCG���啝���P�i136-178%����j�B����̐��x����{���i�K�I�ɐi�߂邽�߁A�܂��x�[�X���C�����m�����A��A���o�̎d�g�݂𐮔�����B
-- **�ڕW**:
-  - ���݂̐��x�����iPhase 3g�j���x�[�X���C���Ƃ��ċL�^
-  - ������A���o�ɂ��A����̕ύX�Ő��x���ቺ���Ȃ����Ƃ�ۏ�
-  - ���ߍ��ݕi���̌p���I�Ď�
-- **���{���e**:
-  1. **Precision Baseline Snapshot�쐬** (`scripts/create_precision_baseline.py`):
-     - Phase 3g���s���ʁi`mcp_run-20251113-170221.jsonl`�j���烁�g���N�X�𒊏o
-     - `reports/precision_baseline.json`�Ɉȉ����L�^:
+### #2025-11-13-08 精度向上計画 Phase 1: ベースライン & ガードレール (Baseline & Guardrails)
+- **背景**: Phase 3gでメモリID不一致を修正し、Precision/NDCGが大幅改善（136-178%向上）。今後の精度向上施策を段階的に進めるため、まずベースラインを確立し、回帰検出の仕組みを整備する。
+- **目標**:
+  - 現在の精度水準（Phase 3g）をベースラインとして記録
+  - 自動回帰検出により、今後の変更で精度が低下しないことを保証
+  - 埋め込み品質の継続的監視
+- **実施内容**:
+  1. **Precision Baseline Snapshot作成** (`scripts/create_precision_baseline.py`):
+     - Phase 3g実行結果（`mcp_run-20251113-170221.jsonl`）からメトリクスを抽出
+     - `reports/precision_baseline.json`に以下を記録:
        - Macro Precision: 0.886
        - Macro NDCG: 1.470
        - Cache hit rate: 21%
        - LLM calls: 67
        - Zero-hit queries: 0
-     - ��A���o臒l��ݒ�:
+     - 回帰検出閾値を設定:
        - Precision >= 0.80
        - NDCG >= 1.20
        - Cache hit rate >= 15%
        - Zero-hit queries <= 2
-     - ���ߍ��ݕi��臒l���`:
+     - 埋め込み品質閾値を定義:
        - exact_match >= 0.95
        - summary >= 0.70
        - full_content >= 0.50
   2. **Embedding Quality CI Test** (`scripts/test_embedding_quality_ci.py`):
-     - `test_embedding_quality.py`��CI�����p�Ɋg��
-     - JSON�`���Ńe�X�g���ʂ��G�N�X�|�[�g�i`reports/embedding_quality.json`�j
-     - 3�̃e�X�g�P�[�X:
+     - `test_embedding_quality.py`をCI統合用に拡張
+     - JSON形式でテスト結果をエクスポート（`reports/embedding_quality.json`）
+     - 3つのテストケース:
        - Exact match: 1.000 (PASS)
        - Full content: 0.881 (PASS)
        - Summary: 0.910 (PASS)
-     - �S�e�X�g�P�[�X��臒l�𖞂������Ƃ��m�F
+     - 全テストケースが閾値を満たすことを確認
   3. **Regression Detection Logic** (`scripts/run_regression_ci.py`):
-     - `check_embedding_quality()`�֐���ǉ�
-     - �x�[�X���C��臒l�ƍŐV�̖��ߍ��ݕi�����|�[�g���r
-     - 臒l���B�̏ꍇ�̓G���[���b�Z�[�W�ƂƂ���CI���s
-     - �R�}���h���C��������ǉ�:
-       - `--precision-baseline`: �x�[�X���C���t�@�C���p�X�i�f�t�H���g: `reports/precision_baseline.json`�j
-       - `--embedding-quality-report`: �i�����|�[�g�p�X�i�f�t�H���g: `reports/embedding_quality.json`�j
-     - �����̃[���q�b�g�N�G�����o�ɉ����A���ߍ��ݕi�����o�𓝍�
-- **���،���**:
-  - ? Precision baseline�쐬����: `reports/precision_baseline.json`
-  - ? Embedding quality CI test���s����: 3/3 tests passed
-  - ? Regression detection logic�ǉ�����: `run_regression_ci.py`�X�V
-  - ? �S�R���|�[�l���g��UTF-8�G���R�[�f�B���O�Ő��퓮��
-- **���ʕ�**:
-  - `scripts/create_precision_baseline.py`: �x�[�X���C�������X�N���v�g
-  - `scripts/test_embedding_quality_ci.py`: CI�������ߍ��ݕi���e�X�g
-  - `reports/precision_baseline.json`: Phase 3g�x�[�X���C���L�^
-  - `reports/embedding_quality.json`: ���ߍ��ݕi���e�X�g����
-  - `scripts/run_regression_ci.py`: ��A���o���W�b�N����
-- **���_**:
-  - Phase 1����: �x�[�X���C���m���Ɖ�A���o�̎d�g�݂��������ꂽ
-  - ����̐��x���P�{��iPhase 2-5�j�����S�Ɏ��{�ł����Ղ�����
-  - ���ߍ��݃��f���inomic-embed-text�j�̕i�����p���I�ɊĎ������
-  - CI/CD�p�C�v���C���ɂ��A���x�򉻂𑁊����o�\
-- **���̐����A�N�V����**:
-  - Phase 2: QAM�����ƃ��^�f�[�^�g�[�i90%�J�o���b�W�ڕW�j
-  - Phase 3: �N���X�G���R�[�_�[�̊w�K�d�ݒ����iPrecision/NDCG�œK���j
-  - Phase 4: �Z�}���e�B�b�N�L���b�V�����P�iL3臒l�����Aenhanced summary�j
-  - Phase 5: �K���I�w�K�ƃv���t�F�b�`�œK���i�N�G�����𕪐́j
+     - `check_embedding_quality()`関数を追加
+     - ベースライン閾値と最新の埋め込み品質レポートを比較
+     - 閾値未達の場合はエラーメッセージとともにCI失敗
+     - コマンドライン引数を追加:
+       - `--precision-baseline`: ベースラインファイルパス（デフォルト: `reports/precision_baseline.json`）
+       - `--embedding-quality-report`: 品質レポートパス（デフォルト: `reports/embedding_quality.json`）
+     - 既存のゼロヒットクエリ検出に加え、埋め込み品質検出を統合
+- **検証結果**:
+  - ✅ Precision baseline作成完了: `reports/precision_baseline.json`
+  - ✅ Embedding quality CI test実行成功: 3/3 tests passed
+  - ✅ Regression detection logic追加完了: `run_regression_ci.py`更新
+  - ✅ 全コンポーネントがUTF-8エンコーディングで正常動作
+- **成果物**:
+  - `scripts/create_precision_baseline.py`: ベースライン生成スクリプト
+  - `scripts/test_embedding_quality_ci.py`: CI統合埋め込み品質テスト
+  - `reports/precision_baseline.json`: Phase 3gベースライン記録
+  - `reports/embedding_quality.json`: 埋め込み品質テスト結果
+  - `scripts/run_regression_ci.py`: 回帰検出ロジック統合
+- **結論**:
+  - Phase 1完了: ベースライン確立と回帰検出の仕組みが整備された
+  - 今後の精度改善施策（Phase 2-5）を安全に実施できる基盤が完成
+  - 埋め込みモデル（nomic-embed-text）の品質が継続的に監視される
+  - CI/CDパイプラインにより、精度劣化を早期検出可能
+- **次の推奨アクション**:
+  - Phase 2: QAM辞書とメタデータ拡充（90%カバレッジ目標）
+  - Phase 3: クロスエンコーダーの学習重み調整（Precision/NDCG最適化）
+  - Phase 4: セマンティックキャッシュ改善（L3閾値調整、enhanced summary）
+  - Phase 5: 適応的学習とプリフェッチ最適化（クエリ履歴分析）
 
-### #2025-11-13-09 ���[���x�[�X�������L���O�{CrossEncoder�������iPhase 4�j
-- **�w�i**: Phase 3g �� Precision/NDCG �͑啝���P�������ALLM �������N�̃R�X�g�͈ˑR�Ƃ��ăN�G�����Ƃ�5���O��̌��𓯊��X�R�A���Ă���A�ҋ@���Ԃ��L���b�V�����ʂ𑊎E����P�[�X���U�������BWorkflow A �Ō��W�����i��Ă��鍡�̍\���ł́ALLM ���ĂԑO�Ɂu�v���W�F�N�g�^�ʑ��ɉ��������[���w�W�ōĐ��񂷂�w�v�ƁuCrossEncoder �ɓn����␔�E�҂����Ԃ̖��m�ȏ���v��݂���ق������C�e���V�E�R�X�g���ʂō����I�B
-- **�Ή����j**:
-  1. **���[���t�^**: `SearchService._rerank()` �Ƀt�F�[�Y���m�̃X�R�A�i��: project �ʑ��A���J�e�S���Asession phase�j��ǉ����ACrossEncoder �ɑ���O�� `metadata.phase_score` �� `project_priority` ��g�ݍ��񂾃q���[���X�e�B�b�N�Ō�⏇�ʂ��ĕ]������B����ɂ�� LLM �ɓn���g�b�vN�������肵�A�L���b�V���q�b�g���Č����₷���Ȃ�B
-  2. **�ő吔�^�ő�ҋ@���Ԃ̖��m��**: `config.search.cross_encoder_top_k`�i= `CrossEncoderReranker.max_candidates`�j���v���W�F�N�g�P�ʂŒ������A`fallback_max_wait_ms` �� 500ms �� 300ms �ȂǂɈ��������āu�w�莞�Ԃ𒴂����烋�[���X�R�A�ŕԂ��v�|���V�[��O�ꂷ��B�K�v�Ȃ� `simple_query_max_words` �� `skip_rerank_for_simple_queries` �� config ����؂�ւ��\�ɂ��APhase 4 �Ŏ����l���L�^����B
-- **���ʕ�**
-  - `src/services/search.py`: `_rerank()` �ւ̈ʑ��x�[�X�w�W�ǉ��ACrossEncoder �֓n����␔���O
-  - `src/services/rerankers.py`: `max_candidates`/`fallback_max_wait_ms` �� config ���f�ł���悤���t�@�N�^�Ametrics �Ɂuskipped_due_to_limit�v�Ȃǂ�ǉ�
-  - `config.yaml`: `search.cross_encoder_top_k`, `cross_encoder_fallback_max_wait_ms`, `phase_rerank_weights` ���̐����ǋL
-- **�o������**: (1) Macro Precision/NDCG �� Phase 3g �x�[�X���C�� (0.886/1.47) ���ێ��A(2) CrossEncoder 1�N�G��������� LLM �Ăяo��������3���ȉ��A(3) 95 �p�[�Z���^�C���̃������N�ҋ@���Ԃ� 1 �b�����A(4) ���[���x�[�X�X�R�A�ő��Ԃ��������E臒l�� `scripts/run_regression_ci.py` �ŉ����B
+### #2025-11-13-09 ルールベースリランキング＋CrossEncoder上限制御（Phase 4）
+- **背景**: Phase 3g で Precision/NDCG は大幅改善したが、LLM リランクのコストは依然としてクエリごとに5件前後の候補を同期スコアしており、待機時間がキャッシュ効果を相殺するケースが散見される。Workflow A で候補集合を絞れている今の構成では、LLM を呼ぶ前に「プロジェクト／位相に応じたルール指標で再整列する層」と「CrossEncoder に渡す候補数・待ち時間の明確な上限」を設けるほうがレイテンシ・コスト両面で合理的。
+- **対応方針**:
+  1. **ルール付与**: `SearchService._rerank()` にフェーズ感知のスコア（例: project 位相、問題カテゴリ、session phase）を追加し、CrossEncoder に送る前に `metadata.phase_score` や `project_priority` を組み込んだヒューリスティックで候補順位を再評価する。これにより LLM に渡すトップNがより安定し、キャッシュヒットも再現しやすくなる。
+  2. **最大数／最大待機時間の明確化**: `config.search.cross_encoder_top_k`（= `CrossEncoderReranker.max_candidates`）をプロジェクト単位で調整し、`fallback_max_wait_ms` を 500ms → 300ms などに引き下げて「指定時間を超えたらルールスコアで返す」ポリシーを徹底する。必要なら `simple_query_max_words` や `skip_rerank_for_simple_queries` も config から切り替え可能にし、Phase 4 で実測値を記録する。
+- **成果物**
+  - `src/services/search.py`: `_rerank()` への位相ベース指標追加、CrossEncoder へ渡す候補数ログ
+  - `src/services/rerankers.py`: `max_candidates`/`fallback_max_wait_ms` を config 反映できるようリファクタ、metrics に「skipped_due_to_limit」などを追加
+  - `config.yaml`: `search.cross_encoder_top_k`, `cross_encoder_fallback_max_wait_ms`, `phase_rerank_weights` 等の説明追記
+- **出口条件**: (1) Macro Precision/NDCG が Phase 3g ベースライン (0.886/1.47) を維持、(2) CrossEncoder 1クエリ当たりの LLM 呼び出しが平均3件以下、(3) 95 パーセンタイルのリランク待機時間が 1 秒未満、(4) ルールベーススコアで即返した件数・閾値を `scripts/run_regression_ci.py` で可視化。
 
-### #2025-11-14-01 ��I�e�X�g�v�����iPhase 7: Quality Assurance�j
-- **�w�i**: Phase 6�i�K���I臒l�헪�j�ő啝�ȃp�t�H�[�}���X���P��B���i���C�e���V71%�팸�ALLM�Ăяo��63%�팸�APrecision 0.826, NDCG 1.367�j�B����ȏ�̍œK���͔�p�Ό��ʂ��Ⴂ���߁A���̃X�e�b�v�͑��l�ȃe�X�g�p�^�[���ň��萫�E�M���������؂��邱�ƁB
-- **�ڕW**:
-  - �l�X�ȃN�G���p�^�[���ł̋����m�F
-  - �G�b�W�P�[�X�̌��o�ƑΏ�
-  - ���׃e�X�g�ɂ�鐫�\���E�̔c��
-  - �����i���̎蓮���r���[�Ɖ��P
-- **�e�X�g�J�e�S��**:
-  1. **���l�ȃN�G���p�^�[��**:
-     - �����N�G���i100+ words�jvs �Z���N�G���i1-3 words�j
-     - ���{�� vs �p�� vs �X�y�C����i�����ꃋ�[�e�B���O���؁j
-     - �Z�p�p�ꂪ�����N�G�� vs ���R����N�G��
-     - �h���C�������N�G���iArchitecture/Code/Ops/Config/Testing�j
-     - �B���ȃN�G�� vs ��̓I�ȃN�G��
-  2. **�G�b�W�P�[�X**:
-     - �[���q�b�g�N�G���i�Y���Ȃ��A�Ӑ}�I�ɐ݌v�j
-     - ��ʃq�b�g�N�G���i100���ȏ�̌��j
-     - ���ꕶ�����܂ރN�G���i`@`, `#`, `$`, etc.�j
-     - �G�������܂ރN�G��
-     - �󔒂݂̂̃N�G���A�ɒ[�ɒ����N�G���i1000+ words�j
-     - �v���W�F�N�gID�����ݒ�̃N�G��
-     - ���݂��Ȃ��v���W�F�N�gID���w�肵���N�G��
-  3. **���׃e�X�g**:
-     - �A��100�N�G�����s�i���������[�N�`�F�b�N�j
-     - �������s�N�G���i5-10�N�G��������s�j
-     - �L���b�V���E�H�[�~���O���ʂ̑���i����N�G���J��Ԃ��j
-     - �v�[���T�C�Y�������̋����i100 �� 500 �� 1000�������j
-  4. **�i���e�X�g**:
-     - �������ʂ̑Ó����i�蓮���r���[�A�e�g�s�b�N5���T���v�����O�j
-     - �֘A���X�R�A�̕��z�i�q�X�g�O�������́j
-     - False positive/negative ���́i���Ҍ��ʂƂ̍����j
-     - Cross-encoder reranking�̌��ʑ���i�L����r�j
-     - L3�Z�}���e�B�b�N�L���b�V���̐M���x�ʌ��ʁihigh/medium/low�j
-- **�����v��**:
-  1. **Phase 7a: �N�G���p�^�[���e�X�g**:
-     - `tests/scenarios/diverse_queries.json` �쐬�i50�N�G���A�e�J�e�S��10���j
-     - `scripts/mcp_replay.py` �Ŏ��s�APrecision/NDCG����
-     - ���C�e���V���z�iP50/P95/P99�j�ƃL���b�V���q�b�g�����L�^
-  2. **Phase 7b: �G�b�W�P�[�X�e�X�g**:
-     - `tests/unit/services/test_search_edge_cases.py` �쐬
-     - �e�G�b�W�P�[�X�ł̗�O�����ƃG���[���b�Z�[�W����
-     - �[���q�b�g���̃t�H�[���o�b�N�����m�F
-  3. **Phase 7c: ���׃e�X�g**:
-     - `scripts/load_test.py` �쐬�i100�A���N�G���A�������v���t�@�C�����O�j
-     - `scripts/concurrent_test.py` �쐬�iasyncio������s�j
-     - ���\�[�X�g�p�ʁiCPU/Memory/Disk I/O�j���j�^�����O
-  4. **Phase 7d: �i�����r���[**:
-     - `scripts/quality_review.py` �쐬�i�蓮���r���[�x���j
-     - �g�s�b�N�ʃT���v�����O�iAppBrain 5���AInsightOps 5���A...�j
-     - �֘A���X�R�A���z�̉����imatplotlib�j
-     - False positive/negative �̒�ʕ���
-- **�����**:
-  - �N�G���p�^�[���e�X�g: Precision ?0.75, NDCG ?1.20�i�S�J�e�S���j
-  - �G�b�W�P�[�X�e�X�g: ��O����100%�J�o�[�A�G���[���b�Z�[�W���m
-  - ���׃e�X�g: ���������[�N�Ȃ��A100�N�G����<5%�p�t�H�[�}���X�ቺ
-  - �i�����r���[: False positive rate <10%, False negative rate <15%
-- **�o������**: �S�e�X�g�J�e�S���Ő�����𖞂����A���o���ꂽ�o�O���C������A��A�e�X�g�ɓ�������邱�ƁB
+### #2025-11-14-01 包括的テストプラン（Phase 7: Quality Assurance）
+- **背景**: Phase 6（適応的閾値戦略）で大幅なパフォーマンス改善を達成（レイテンシ71%削減、LLM呼び出し63%削減、Precision 0.826, NDCG 1.367）。これ以上の最適化は費用対効果が低いため、次のステップは多様なテストパターンで安定性・信頼性を検証すること。
+- **目標**:
+  - 様々なクエリパターンでの挙動確認
+  - エッジケースの検出と対処
+  - 負荷テストによる性能限界の把握
+  - 検索品質の手動レビューと改善
+- **テストカテゴリ**:
+  1. **多様なクエリパターン**:
+     - 長文クエリ（100+ words）vs 短文クエリ（1-3 words）
+     - 日本語 vs 英語 vs スペイン語（多言語ルーティング検証）
+     - 技術用語が多いクエリ vs 自然言語クエリ
+     - ドメイン特化クエリ（Architecture/Code/Ops/Config/Testing）
+     - 曖昧なクエリ vs 具体的なクエリ
+  2. **エッジケース**:
+     - ゼロヒットクエリ（該当なし、意図的に設計）
+     - 大量ヒットクエリ（100件以上の候補）
+     - 特殊文字を含むクエリ（`@`, `#`, `$`, etc.）
+     - 絵文字を含むクエリ
+     - 空白のみのクエリ、極端に長いクエリ（1000+ words）
+     - プロジェクトIDが未設定のクエリ
+     - 存在しないプロジェクトIDを指定したクエリ
+  3. **負荷テスト**:
+     - 連続100クエリ実行（メモリリークチェック）
+     - 同時並行クエリ（5-10クエリ並列実行）
+     - キャッシュウォーミング効果の測定（同一クエリ繰り返し）
+     - プールサイズ増加時の挙動（100 → 500 → 1000メモリ）
+  4. **品質テスト**:
+     - 検索結果の妥当性（手動レビュー、各トピック5件サンプリング）
+     - 関連性スコアの分布（ヒストグラム分析）
+     - False positive/negative 分析（期待結果との差分）
+     - Cross-encoder rerankingの効果測定（有無比較）
+     - L3セマンティックキャッシュの信頼度別効果（high/medium/low）
+- **実装計画**:
+  1. **Phase 7a: クエリパターンテスト**:
+     - `tests/scenarios/diverse_queries.json` 作成（50クエリ、各カテゴリ10件）
+     - `scripts/mcp_replay.py` で実行、Precision/NDCG測定
+     - レイテンシ分布（P50/P95/P99）とキャッシュヒット率を記録
+  2. **Phase 7b: エッジケーステスト**:
+     - `tests/unit/services/test_search_edge_cases.py` 作成
+     - 各エッジケースでの例外処理とエラーメッセージ検証
+     - ゼロヒット時のフォールバック挙動確認
+  3. **Phase 7c: 負荷テスト**:
+     - `scripts/load_test.py` 作成（100連続クエリ、メモリプロファイリング）
+     - `scripts/concurrent_test.py` 作成（asyncio並列実行）
+     - リソース使用量（CPU/Memory/Disk I/O）モニタリング
+  4. **Phase 7d: 品質レビュー**:
+     - `scripts/quality_review.py` 作成（手動レビュー支援）
+     - トピック別サンプリング（AppBrain 5件、InsightOps 5件、...）
+     - 関連性スコア分布の可視化（matplotlib）
+     - False positive/negative の定量分析
+- **成功基準**:
+  - クエリパターンテスト: Precision ≥0.75, NDCG ≥1.20（全カテゴリ）
+  - エッジケーステスト: 例外処理100%カバー、エラーメッセージ明確
+  - 負荷テスト: メモリリークなし、100クエリで<5%パフォーマンス低下
+  - 品質レビュー: False positive rate <10%, False negative rate <15%
+- **出口条件**: 全テストカテゴリで成功基準を満たし、検出されたバグが修正され、回帰テストに統合されること。
 
-### #2025-11-13-01 �������\���̉��P�iEnriched Summary�j
-- **�w�i**: Phase 1��embedding�i���̃x�[�X���C��(summary 0.910)���m���������AL3�Z�}���e�B�b�N�L���b�V���̃q�b�g����21%�ƒႭ�Asummary embedding��query embedding�̗ގ��x��0.39-0.72��臒l0.85�ɓ͂��Ȃ���肪�����i#2025-11-11-03 Phase 3f�j�B���{�����́Asummary�����k���ꂽ�Z���v�񕶂ł���A�N�G���̏ڍׂȃL�[���[�h�╶���������Ă��邽�߁B
-- **�Ώ� (2025-11-13)**:
-  - **Phase 2����**: Memory Representation Refresh
-    1. **IngestionService����** (`src/services/ingestion.py`):
-       - `_build_enriched_summary()`���\�b�h�ǉ��i64�s�j
-       - �v�� + Top 5�L�[���[�h + ��\���o����g�ݍ��킹�� enriched summary ����
-       - �V�K�������o�^���� enriched summary ���g�p����embedding����
-    2. **Backfill�X�N���v�g�쐬** (`scripts/refresh_memory_embeddings.py`):
-       - �����������G���g���� enriched summary �Đ����@�\�i240�s�j
-       - `--dry-run`��`--limit`�I�v�V�����Ή�
-       - �S�R���|�[�l���g�iModelRouter, VectorDB, BM25Index, Indexer�j�𐳂���������
-    3. **ProjectMemoryPool�X�V** (`src/services/project_memory_pool.py`):
-       - �ۑ��ς�embedding���ė��p����`�ɕύX�i`include_embeddings=True`�j
-       - Fallback: �ۑ�����Ă��Ȃ��ꍇ�̂�embedding����
-       - �v�Z���ׂ��팸
-- **���،���**:
-  - ? **Embedding Quality**: summary similarity = **0.910** (?0.80�ڕW�B��)
-    - exact_match: 1.000 ? (?0.95)
-    - full_content: 0.881 ? (?0.50)
-  - ? **Precision/NDCG�ێ�**:
-    - Macro Precision: 0.886 (baseline 0.375����+136%���P�ێ�)
-    - Macro NDCG: 1.470 (baseline 0.528����+178%���P�ێ�)
-  - ? **L3 Cache Hit Rate**: 21% (Phase 3g baseline�ێ�)
-    - �ڕW35%���B�����A�����f�[�^��Chroma DB��memory metadata�`���ŕۑ�����Ă��Ȃ��i0 documents�j
-    - ����o�^�����V������������enriched summary�ŕۑ�����邱�ƂŁA���X�ɉ��P�\��
-  - ? **Backfill�X�N���v�g����m�F**: dry-run�e�X�g�����A�S�R���|�[�l���g���평����
-- **���ʕ�**:
-  - `src/services/ingestion.py`: `_build_enriched_summary()`���\�b�h�ǉ�
-  - `src/utils/keyword_extractor.py`: �L�[���[�h���o���[�e�B���e�B�i�����j
-  - `scripts/refresh_memory_embeddings.py`: Backfill�X�N���v�g�i�V�K�쐬�j
-  - `src/services/project_memory_pool.py`: �ۑ��ς�embedding�ė��p���W�b�N�ǉ�
-- **���_**:
-  - **Phase 2�Z�p�I�Ɋ���**: enriched summary������embedding�i�����P�̎d�g�݂��������ꂽ
-  - Embedding�i���ڕW�isummary?0.80�j�B��
-  - Precision/NDCG�̍������ێ��i+136-178%���P�j
-  - �����f�[�^��backfill�͌��ʌ���I�����A�V�K����������i�K�I�ɉ��P
-  - L3�L���b�V���q�b�g���̍��{���P�ɂ�summary���e�������L���Ɗm�F�itest_embedding_quality.py��0.88-0.91�B���j
-- **���̐����A�N�V����** (Phase 3: Chunk/Vector Retrieval Tuning):
-  - �n�C�u���b�h�����̃`���[�j���O�ivector��␔�EBM25��␔�̍œK���j
-  - Chunk�����L���O����̏��O�i������summary�݂̂������L���O�ΏۂɁj
-  - Tier��recency�X�R�A�����ilong-term memory�̕��㑣�i�j
-  - �v�[���������D���Workflow A�����i��␔�팸�ɂ��LLM�Ăяo���팸�j
+### #2025-11-13-01 メモリ表現の改善（Enriched Summary）
+- **背景**: Phase 1でembedding品質のベースライン(summary 0.910)を確立したが、L3セマンティックキャッシュのヒット率が21%と低く、summary embeddingとquery embeddingの類似度が0.39-0.72で閾値0.85に届かない問題が判明（#2025-11-11-03 Phase 3f）。根本原因は、summaryが圧縮された短い要約文であり、クエリの詳細なキーワードや文脈を失っているため。
+- **対処 (2025-11-13)**:
+  - **Phase 2実装**: Memory Representation Refresh
+    1. **IngestionService強化** (`src/services/ingestion.py`):
+       - `_build_enriched_summary()`メソッド追加（64行）
+       - 要約 + Top 5キーワード + 代表見出しを組み合わせた enriched summary 生成
+       - 新規メモリ登録時に enriched summary を使用してembedding生成
+    2. **Backfillスクリプト作成** (`scripts/refresh_memory_embeddings.py`):
+       - 既存メモリエントリの enriched summary 再生成機能（240行）
+       - `--dry-run`と`--limit`オプション対応
+       - 全コンポーネント（ModelRouter, VectorDB, BM25Index, Indexer）を正しく初期化
+    3. **ProjectMemoryPool更新** (`src/services/project_memory_pool.py`):
+       - 保存済みembeddingを再利用する形に変更（`include_embeddings=True`）
+       - Fallback: 保存されていない場合のみembedding生成
+       - 計算負荷を削減
+- **検証結果**:
+  - ✅ **Embedding Quality**: summary similarity = **0.910** (≥0.80目標達成)
+    - exact_match: 1.000 ✓ (≥0.95)
+    - full_content: 0.881 ✓ (≥0.50)
+  - ✅ **Precision/NDCG維持**:
+    - Macro Precision: 0.886 (baseline 0.375から+136%改善維持)
+    - Macro NDCG: 1.470 (baseline 0.528から+178%改善維持)
+  - ✅ **L3 Cache Hit Rate**: 21% (Phase 3g baseline維持)
+    - 目標35%未達だが、既存データはChroma DBにmemory metadata形式で保存されていない（0 documents）
+    - 今後登録される新しいメモリがenriched summaryで保存されることで、徐々に改善予定
+  - ✅ **Backfillスクリプト動作確認**: dry-runテスト成功、全コンポーネント正常初期化
+- **成果物**:
+  - `src/services/ingestion.py`: `_build_enriched_summary()`メソッド追加
+  - `src/utils/keyword_extractor.py`: キーワード抽出ユーティリティ（既存）
+  - `scripts/refresh_memory_embeddings.py`: Backfillスクリプト（新規作成）
+  - `src/services/project_memory_pool.py`: 保存済みembedding再利用ロジック追加
+- **結論**:
+  - **Phase 2技術的に完了**: enriched summary生成とembedding品質改善の仕組みが整備された
+  - Embedding品質目標（summary≥0.80）達成
+  - Precision/NDCGの高水準維持（+136-178%改善）
+  - 既存データのbackfillは効果限定的だが、新規メモリから段階的に改善
+  - L3キャッシュヒット率の根本改善にはsummary内容強化が有効と確認（test_embedding_quality.pyで0.88-0.91達成）
+- **次の推奨アクション** (Phase 3: Chunk/Vector Retrieval Tuning):
+  - ハイブリッド検索のチューニング（vector候補数・BM25候補数の最適化）
+  - Chunkランキングからの除外（メモリsummaryのみをランキング対象に）
+  - Tier別recencyスコア調整（long-term memoryの浮上促進）
+  - プール内検索優先のWorkflow A実装（候補数削減によるLLM呼び出し削減）
 
 ### #2025-11-15-01 Codex/Claude session logging bridge missing
-- **����**: `scripts/setup_cli_recording.ps1` �� `claude`/`codex` �� `Tee-Object` �o�R�ɂ��Ă��邽�߁AReady-to-code �o�i�[���\�����ꂸ�A�Θb���̏o�͂̓v���Z�X�I����܂� `capturedOutput` �ɗ��܂�B  
-- **�����̐i�� (2025-11-17)**:
-  1. Claude �����������|�[�g�ɑ����ACodex �l�C�e�B�u���O�d�l���܂Ƃ߂� `reports/issue_15-01_codex_spec_report.md` ���쐬�B`~/.codex/history.jsonl`�A`sessions/**/rollout-*.jsonl`�A`log/codex-tui.log` �̍\���Ɗ��p���@�𐮗��B
-  2. Claude/Codex ���ʂ̎������[�h�}�b�v�� `reports/cli_session_capture_plan.md` �Ƃ��Ēǉ��BPhase0?Phase2 �̍�ƁA�L�����^�C�~���O�ł̃��O�ۊǕ��j�𖾕����B
-  3. Open Issue �� Next Action �� Phase0�i�C���^���N�e�B�u����Tee�����{history�������M�j�ɍX�V���APhase1�ȍ~�̃A�N�V���������|�[�g�փ����N�B
-- **�Ή��v�� (����)**:
-  - **Phase0**: `Test-IsInteractiveSession` �𓱓����A�Θb���[�h�ł� `Tee-Object` ���o�C�p�X�B�Z�b�V�����I����� `~/.claude` / `~/.codex` �� `history.jsonl` ������ `add_command` �֑����Ďb�胍�O���m�ہB
-  - **Phase1**: Claude �� `debug/<sessionId>.txt`�ACodex �� `sessions/**/rollout-*.jsonl` ���p�[�X���A���[�U�[�{�A�V�X�^���g�{ToolCall �� Context Orchestrator �Ɋ��S�����B�p�[�T�� Python ���W���[�������� pytest �Ō��؁B
-  - **Phase2**: �L�����W���u�ƘA���������O�A�[�J�C�u�ACLI `session-history` �̃Z�b�V����ID�r���[�AJSON�j�����̃��g���C�Ȃǉ^�p���P�B
-- **Exit Criteria**: �@ Ready-to-code �o�i�[���܂ރ��A���^�C�����o�͂������A�A Claude/Codex ������� `history/debug` or `rollout` �R���̊��S�g�����X�N���v�g�� Context Orchestrator ���ێ��A�B ���O�ۊǂ��L�����^�C�~���O�Ɠ����B
-- **Next Checkpoint**: Phase0 ���� �� `python -m src.cli session-history` �Ŏb�胍�O���f���m�F���A������ Phase1 �̃��O�p�[�T�𒅎�B
+- **現状**: `scripts/setup_cli_recording.ps1` で `claude`/`codex` を `Tee-Object` 経由にしているため、Ready-to-code バナーが表示されず、対話中の出力はプロセス終了後まで `capturedOutput` に溜まる。  
+- **今日の進捗 (2025-11-17)**:
+  1. Claude 向け調査レポートに続き、Codex ネイティブログ仕様をまとめた `reports/issue_15-01_codex_spec_report.md` を作成。`~/.codex/history.jsonl`、`sessions/**/rollout-*.jsonl`、`log/codex-tui.log` の構造と活用方法を整理。
+  2. Claude/Codex 共通の実装ロードマップを `reports/cli_session_capture_plan.md` として追加。Phase0〜Phase2 の作業、記憶化タイミングでのログ保管方針を明文化。
+  3. Open Issue の Next Action を Phase0（インタラクティブ時のTee解除＋history差分送信）に更新し、Phase1以降のアクションをレポートへリンク。
+- **対応計画 (抜粋)**:
+  - **Phase0**: `Test-IsInteractiveSession` を導入し、対話モードでは `Tee-Object` をバイパス。セッション終了後に `~/.claude` / `~/.codex` の `history.jsonl` 差分を `add_command` へ送って暫定ログを確保。
+  - **Phase1**: Claude は `debug/<sessionId>.txt`、Codex は `sessions/**/rollout-*.jsonl` をパースし、ユーザー＋アシスタント＋ToolCall を Context Orchestrator に完全同期。パーサは Python モジュール化して pytest で検証。
+  - **Phase2**: 記憶化ジョブと連動したログアーカイブ、CLI `session-history` のセッションIDビュー、JSON破損時のリトライなど運用改善。
+- **Exit Criteria**: ① Ready-to-code バナーを含むリアルタイム入出力が復旧、② Claude/Codex いずれも `history/debug` or `rollout` 由来の完全トランスクリプトを Context Orchestrator が保持、③ ログ保管が記憶化タイミングと同期。
+- **Next Checkpoint**: Phase0 実装 → `python -m src.cli session-history` で暫定ログ反映を確認し、続いて Phase1 のログパーサを着手。
 
-### #2025-11-25-01 TTY-safe CLI wrapper with session logging
-- **Problem**: PowerShell wrapper always pipes output (Tee-Object | Out-Host), so CLAUDE/CODEX lose TTY and drop into non-interactive/--print behavior; users cannot start interactive sessions.
-- **Scope**: Keep JSON-RPC start_session/add_command/end_session for memory ingestion; fix only TTY loss.
-- **Plan**:
-  1. Detect non-interactive (--print or piped stdin); only there use Tee-Object or Start-Transcript.
-  2. Interactive path runs &  @args / &  @args with no pipe.
-  3. Add -Force overwrite in installer; update scripts/setup.py and release_package script to new wrapper.
-  4. Tests: interactive prompt shows; echo hi | claude --print still logs; session-history works.
-- **Exit Criteria**: Interactive CLAUDE/CODEX start normally; non-interactive logging preserved; new wrapper auto-installs and overwrites old; session logs/ingestion continue.
-- **Resolved**: 2025-11-26 (TTY保持は達成。非インタラクティブは全文ログ取得OK。インタラクティブ本文は未対応のため新Issueへ切り出し)
 
-### #2025-11-26-01 Interactive transcript capture while keeping TTY
-- **Problem**: インタラクティブ実行時、TTYは保持できたが会話本文がログに残らない（Start-Transcriptでは claude/codex の TUI 出力を拾えない）
-- **Scope**: TTY を壊さずに対話本文も記録する仕組みを追加する
-- **Options**:
-  1. ConPTY/擬似TTY 経由で claude/codex をラップし入出力を横取り
-  2. claude/codex の内部ログ (history.jsonl 等) をフックして add_command に流し込むブリッジを実装
-- **Next Action**: 方針選定 → 実装プロトタイプ → session-history で本文確認
+### #2025-11-26-02 Log bridge improvements and remaining risks
+- **Status**: Open (スレッド安全性の緊急修正完了、残りは優先度に応じて対応)
+- **Created**: 2025-11-26
+- **Background**: log_bridge.py実装完了後のリスク評価で発見された改善項目
+- **Thread-Safety Fixes (2025-11-26 Completed)**:
+  - ✅ SessionManager に `threading.RLock()` 追加 (`src/services/session_manager.py`)
+  - ✅ LRUCache に `threading.Lock()` 追加 (`scripts/log_bridge.py`)
+  - ✅ log_bridge再起動・動作確認完了
+- **Remaining Risks** (優先度順):
+  1. **セッションID抽出 RegEx の脆弱性** (確率2/5, 影響4/5)
+     - 問題: `re.search(r'rollout-[^-]+-[^-]+-[^-]+-([^.]+)\.jsonl$', ...)` がファイル名の変更に脆弱
+     - 影響: セッションID抽出失敗 → メッセージが記録されない
+     - 対策: より堅牢なパターンまたはファイル名仕様の明文化
+  2. **重い初期化（全モデル・ストレージ起動）** (確率4/5, 影響3/5)
+     - 問題: log_bridge起動時にContext Orchestrator全サービス初期化（2秒）
+     - 影響: システム起動時間増加
+     - 対策: 遅延初期化またはSessionManager単独初期化モード
+  3. **PowerShell 起動引数の空白パス問題** (確率2/5, 影響3/5)
+     - 問題: `start_log_bridge.ps1` のパスに空白がある環境で起動失敗の可能性
+     - 対策: パス引用処理の追加
+  4. **プロセス死活監視なし** (確率3/5, 影響3/5)
+     - 問題: log_bridgeクラッシュ時の自動再起動なし
+     - 対策: PowerShell Job監視またはWindows Service化
+  5. **ポーリング負荷** (確率2/5, 影響2/5)
+     - 問題: 500msポーリングによるCPU/IO負荷
+     - 対策: watchfiles/inotifyによるイベント駆動監視
+  6. **タイムスタンプ未利用による順序ズレ** (確率3/5, 影響2/5)
+     - 問題: parse関数がタイムスタンプを返すが未使用
+     - 対策: タイムスタンプ順ソートの実装
+- **Next Action**: 優先度1-2のリスクから順次対応
+
+### #2025-11-26-03 Session memorization (indexing) implementation
+- **Status**: Open
+- **Created**: 2025-11-26
+- **Owner**: ryomy
+- **Background**: #2025-11-15-01でlog_bridgeによるセッションログ取得は完了したが、記憶化プロトコルの最終ステップであるベクトルDB/BM25へのインデックス化が未実装であることが判明。
+- **Current State**:
+  - ✅ ログ取得：log_bridgeがCodex/Claudeセッションを監視・取得
+  - ✅ ログ保存：SessionLogCollectorが.logファイルを作成（59+個確認）
+  - ✅ Unicode問題：tail_file()を修正してreadline()ベースに変更（2025-11-26）
+  - ❌ インデックス化：SessionManager.end_session()がingestion_service.ingest_conversation()を呼ぶ設計だが、log_bridgeがend_session()を呼んでいない
+- **Problem**: 会話内容はログファイルに保存されているが、検索可能な記憶としてインデックス化されていない
+- **Solution**: log_bridgeにセッション終了検知とend_session()呼び出しを実装
+  1. ファイル監視でセッション終了を検知（ファイル更新停止、新セッション開始など）
+  2. または定期的なバッチ処理でアクティブでないセッションをクローズ
+  3. end_session()呼び出しでingestion_service.ingest_conversation()を経由してベクトルDB/BM25にインデックス化
+- **Next Action**: セッション終了検知ロジックの設計と実装
+
+### #2025-11-26-04 Repository cleanup and distribution preparation
+- **Status**: Open
+- **Created**: 2025-11-26
+- **Owner**: ryomy
+- **Background**: log_bridge実装完了後、リポジトリの整理と配布準備が必要。現在、未コミットファイル、配布不要ファイル、ユーザー環境への直接的な変更が混在している。
+- **Current State**:
+  - 両ディレクトリ (`/c/Users/ryomy/context-orchestrator/`, `~/OneDrive/ドキュメント/app/llm-brain/`) が同じGitHubリポジトリに接続
+  - 最新コミット: 5f92198 (同期済み)
+  - 未コミット変更あり
+  - 配布不要ファイルあり
+  - ユーザー固有の手動設定あり
+  
+- **Tasks**:
+  
+  **A. コミット必要なファイル**:
+  1. ✅ `scripts/log_bridge.py` (Unicode修正済み、context-orchestrator側はUntracked)
+  2. ✅ `src/services/session_manager.py` (threading.RLock追加済み)
+  3. ✅ `scripts/setup.py` (Unicode修正 + -Force追加済み)
+  4. ⚠️ `.kiro/specs/dev-knowledge-orchestrator/issues.md` (issue記録、配布には不要だが記録として保持)
+  
+  **B. 新規追加すべきファイル**:
+  1. `scripts/start_log_bridge.ps1` をリポジトリに追加
+     - 現在: `C:\Users\ryomy\Documents\PowerShell\start_log_bridge.ps1` (手動作成)
+     - 配置先: `scripts/start_log_bridge.ps1` として追加
+  2. `scripts/setup_cli_recording.ps1` を拡張してlog_bridge自動起動を統合
+     - PowerShellプロファイルにlog_bridge起動スクリプトを追加する機能
+  
+  **C. 削除すべきファイル**:
+  1. `release_package/` ディレクトリ (配布不要)
+  2. `update_issues.ps1` (配布不要)
+  
+  **D. 設定の改善**:
+  1. `config.yaml.template` のパス設定改善
+     - 現状: `data_dir: C:\Users\ryomy\.context-orchestrator` (ユーザー固有)
+     - 改善: 環境変数化 or `~/.context-orchestrator` 自動検出
+  2. `scripts/setup.py` 初期セットアップ改善
+     - log_bridge自動起動設定も含める
+     - PowerShellプロファイルへの統合確認
+  3. `scripts/setup_cli_recording.ps1` 拡張
+     - log_bridgeの自動起動もPowerShellプロファイルに書き込む
+     - 既存のclaude/codex wrapper機能と統合
+  
+  **E. GitHubリポジトリ同期手順**:
+  1. context-orchestrator側で `scripts/log_bridge.py` を git add
+  2. llm-brain側の変更を確認してコミット
+  3. 配布不要ファイルを削除
+  4. start_log_bridge.ps1をscriptsディレクトリに移動
+  5. 初期セットアップスクリプトを改善
+  6. コミット & プッシュ
+  
+- **Notes**:
+  - 両ディレクトリが同じリポジトリに接続されているため、どちらか一方で作業すればOK
+  - PowerShellプロファイルファイル自体が存在しない（未作成）状態なので、setup時に自動作成する必要あり
+  - log_bridgeは常時起動が必要なため、PowerShell起動時の自動起動が望ましい
+  
+- **Next Action**: 上記タスクA-Eを順次実施してGitHubリポジトリと同期、配布可能な状態にする

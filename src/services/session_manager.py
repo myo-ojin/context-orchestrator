@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 import logging
 import uuid
 import json
+import threading
 
 try:
     from typing import TYPE_CHECKING
@@ -85,6 +86,7 @@ class SessionManager:
         self.model_router = model_router
         self.obsidian_vault_path = obsidian_vault_path
         self.sessions: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.RLock()  # Thread-safe access to sessions dict
         self.query_attribute_extractor = query_attribute_extractor or QueryAttributeExtractor(
             model_router=model_router,
             llm_enabled=False
@@ -116,17 +118,18 @@ class SessionManager:
         if session_id is None:
             session_id = f"session-{uuid.uuid4().hex[:12]}"
 
-        self.sessions[session_id] = {
-            'id': session_id,
-            'started_at': datetime.now(),
-            'commands': [],
-            'last_activity': datetime.now(),
-            'project_hint': None,
-            'project_hint_confidence': 0.0,
-            'project_hint_source': None,
-            'project_hint_history': [],
-            'prefetched_projects': [],
-        }
+        with self._lock:
+            self.sessions[session_id] = {
+                'id': session_id,
+                'started_at': datetime.now(),
+                'commands': [],
+                'last_activity': datetime.now(),
+                'project_hint': None,
+                'project_hint_confidence': 0.0,
+                'project_hint_source': None,
+                'project_hint_history': [],
+                'prefetched_projects': [],
+            }
 
         self._start_session_log(session_id)
 
@@ -162,8 +165,13 @@ class SessionManager:
             ...     exit_code=0
             ... )
         """
+        with self._lock:
+            if session_id not in self.sessions:
+                logger.warning(f"Session not found: {session_id} (reopening)")
+                # Temporarily release lock to call start_session
+                pass  # start_session will be called outside lock
+
         if session_id not in self.sessions:
-            logger.warning(f"Session not found: {session_id} (reopening)")
             self.start_session(session_id)
 
         command_entry = {
@@ -174,8 +182,10 @@ class SessionManager:
             'metadata': metadata or {}
         }
 
-        self.sessions[session_id]['commands'].append(command_entry)
-        self.sessions[session_id]['last_activity'] = datetime.now()
+        with self._lock:
+            self.sessions[session_id]['commands'].append(command_entry)
+            self.sessions[session_id]['last_activity'] = datetime.now()
+
         self._maybe_update_project_from_metadata(session_id, command_entry['metadata'])
         self._maybe_update_project_from_text(session_id, f"{command}\n{output}")
         self._log_command_event(session_id, command_entry)
@@ -201,11 +211,17 @@ class SessionManager:
         Example:
             >>> memory_id = manager.end_session(session_id, create_obsidian_note=True)
         """
+        with self._lock:
+            if session_id not in self.sessions:
+                logger.warning(f"Session not found: {session_id} (reopening)")
+                # Will call start_session outside lock
+                pass
+
         if session_id not in self.sessions:
-            logger.warning(f"Session not found: {session_id} (reopening)")
             self.start_session(session_id)
 
-        session = self.sessions[session_id]
+        with self._lock:
+            session = self.sessions[session_id].copy()  # Make a copy to work with outside lock
 
         try:
             # Format session log
@@ -240,7 +256,8 @@ class SessionManager:
                 self._create_obsidian_note(session, summary, memory_id)
 
             # Remove from active sessions
-            del self.sessions[session_id]
+            with self._lock:
+                del self.sessions[session_id]
 
             logger.info(f"Ended session {session_id}, created memory {memory_id}")
             return memory_id
