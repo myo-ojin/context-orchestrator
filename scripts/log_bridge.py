@@ -478,17 +478,46 @@ def watch_rollout_directory(session_manager):
         time.sleep(5)  # Scan for new files every 5 seconds
 
 
+def get_claude_projects_dir():
+    """
+    Get Claude projects directory for current user
+
+    Claude sanitizes the user's home directory path by replacing special characters.
+    For example: C:\\Users\\ryomy -> C--Users-ryomy
+
+    Returns:
+        Path object for Claude projects directory
+    """
+    home = Path.home()
+    # Sanitize home path: replace \ with - and : with -
+    sanitized_home = str(home).replace('\\', '-').replace(':', '-')
+    projects_dir = Path.home() / ".claude" / "projects" / sanitized_home
+
+    # If directory doesn't exist, try to find any existing project directory
+    if not projects_dir.exists():
+        base_dir = Path.home() / ".claude" / "projects"
+        if base_dir.exists():
+            # List all subdirectories
+            subdirs = [d for d in base_dir.iterdir() if d.is_dir()]
+            if subdirs:
+                # Use the first one found
+                projects_dir = subdirs[0]
+                logger.info(f"Using existing Claude projects directory: {projects_dir}")
+
+    return projects_dir
+
+
 def watch_claude_projects(session_manager):
     """
     Watch for new Claude project .jsonl files and start tailing them
 
-    Scans ~/.claude/projects/C--Users-ryomy/ directory for existing project log files,
+    Scans ~/.claude/projects/ directory for existing project log files,
     then periodically checks for new files.
 
     Args:
         session_manager: SessionManager instance
     """
-    projects_dir = Path.home() / ".claude" / "projects" / "C--Users-ryomy"
+    projects_dir = get_claude_projects_dir()
     active_files = set()
 
     if not projects_dir.exists():
@@ -591,7 +620,8 @@ def main():
     # Start watching both Codex and Claude sessions
     logger.info("Starting file watchers...")
     logger.info("  - Codex rollout files: ~/.codex/sessions/**/rollout-*.jsonl")
-    logger.info("  - Claude project files: ~/.claude/projects/C--Users-ryomy/*.jsonl")
+    claude_dir = get_claude_projects_dir()
+    logger.info(f"  - Claude project files: {claude_dir}/*.jsonl")
     logger.info("  - Session timeout: 10 minutes (auto-index idle sessions)")
     logger.info("Press Ctrl+C to stop")
     logger.info("")

@@ -43,7 +43,49 @@ function Resolve-Python {
     param(
         [string]$StartDir = $(Get-Location).Path
     )
-    return "C:\Users\ryomy\AppData\Local\Programs\Python\Python311\python.exe"
+
+    # Try to find context-orchestrator repo root by walking up
+    $current = $StartDir
+    $maxDepth = 10
+    $depth = 0
+
+    while ($depth -lt $maxDepth) {
+        # Check for .venv/Scripts/python.exe
+        $venvPath = Join-Path $current ".venv\Scripts\python.exe"
+        if (Test-Path $venvPath) {
+            return $venvPath
+        }
+
+        # Check for .venv311/Scripts/python.exe (alternative)
+        $venv311Path = Join-Path $current ".venv311\Scripts\python.exe"
+        if (Test-Path $venv311Path) {
+            return $venv311Path
+        }
+
+        # Check if we're at repo root (has src/ directory)
+        $srcPath = Join-Path $current "src"
+        if ((Test-Path $srcPath) -and (Test-Path (Join-Path $srcPath "main.py"))) {
+            # We're at repo root but no .venv found, try PATH
+            break
+        }
+
+        # Go up one level
+        $parent = Split-Path -Parent $current
+        if (-not $parent -or $parent -eq $current) {
+            break
+        }
+        $current = $parent
+        $depth++
+    }
+
+    # Fall back to python on PATH
+    $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+    if ($pythonCmd) {
+        return $pythonCmd.Source
+    }
+
+    # Last resort: return null (will cause error later)
+    return $null
 }# Check if we're in an internal call (prevent recursion)
 function Test-IsInternalCall {
     return $env:CONTEXT_ORCHESTRATOR_INTERNAL -eq "1"
@@ -96,15 +138,37 @@ function Invoke-ContextSessionRpc {
         return $null
     }
 
+    # Resolve repo root from python path or environment variable
     $repoRoot = $null
-    if ($pythonPath -match "[\\/]\\.venv[\\/]Scripts[\\/]python.exe$") {
+
+    # 1. Try environment variable
+    if ($env:CONTEXT_ORCHESTRATOR_ROOT) {
+        $repoRoot = $env:CONTEXT_ORCHESTRATOR_ROOT
+    }
+    # 2. Try to derive from python path
+    elseif ($pythonPath -match "[\\/]\.venv[\\/]Scripts[\\/]python\.exe$") {
         $repoRoot = Split-Path (Split-Path (Split-Path $pythonPath -Parent) -Parent) -Parent
     }
-    if (-not $repoRoot) {
-        $repoRoot = "$HOME\\OneDrive\\ドキュメント\\app\\llm-brain"
+    elseif ($pythonPath -match "[\\/]\.venv311[\\/]Scripts[\\/]python\.exe$") {
+        $repoRoot = Split-Path (Split-Path (Split-Path $pythonPath -Parent) -Parent) -Parent
     }
-    if (-not $repoRoot) {
-        $repoRoot = "$HOME\\OneDrive\\ドキュメント\\app\\llm-brain"
+    # 3. Try to find from current directory
+    else {
+        $current = Get-Location
+        $maxDepth = 10
+        $depth = 0
+        while ($depth -lt $maxDepth) {
+            if ((Test-Path (Join-Path $current "src\main.py")) -and (Test-Path (Join-Path $current "config.yaml.template"))) {
+                $repoRoot = $current.Path
+                break
+            }
+            $parent = Split-Path -Parent $current
+            if (-not $parent -or $parent -eq $current) {
+                break
+            }
+            $current = $parent
+            $depth++
+        }
     }
 
     $scriptBlock = {
