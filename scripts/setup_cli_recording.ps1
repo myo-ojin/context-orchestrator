@@ -395,6 +395,16 @@ function codex {
 }
 
 Write-Host "Context Orchestrator CLI recording enabled" -ForegroundColor Green
+
+# Auto-start log bridge if available
+$logBridgeScript = Join-Path (Split-Path -Parent $PSScriptRoot) "scripts\start_log_bridge.ps1"
+if (Test-Path $logBridgeScript) {
+    try {
+        & $logBridgeScript
+    } catch {
+        Write-Host "[Context Orchestrator] Warning: Failed to start log bridge: $_" -ForegroundColor Yellow
+    }
+}
 '@
 
 function Install-Wrapper {

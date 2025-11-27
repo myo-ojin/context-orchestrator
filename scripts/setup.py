@@ -280,6 +280,9 @@ class SetupWizard:
         print("3. Re-run the CLI wrapper installer anytime you reset your PowerShell profile:")
         print("   powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install -Force")
         print()
+        print("Note: The CLI wrapper now auto-starts the log bridge for session monitoring.")
+        print("      Restart PowerShell to activate all features.")
+        print()
 
     def run(self) -> bool:
         """
