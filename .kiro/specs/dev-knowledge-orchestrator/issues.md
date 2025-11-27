@@ -13,12 +13,12 @@
 | #2025-11-13-09 | ルールベースリランキング＋CrossEncoder上限制御（Phase 4） | Under Review | 2025-11-13 | ryomy | Phase 6完了後の検討課題として継続評価 |
 | #2025-11-14-01 | 包括的テストプラン（Phase 7: Quality Assurance） | Planned | 2025-11-14 | ryomy | 多様なクエリパターン、エッジケース、負荷テスト、品質テストの実施 |
 | #2025-11-26-02 | Log bridge improvements and remaining risks | Open | 2025-11-26 | ryomy | 優先度1-2のリスクから順次対応：RegEx脆弱性、初期化重量化、PowerShell空白パス、プロセス死活監視、ポーリング負荷、タイムスタンプ順序 |
-| #2025-11-26-03 | Session memorization (indexing) implementation | Open | 2025-11-26 | ryomy | セッション終了検知ロジックの設計と実装（end_session呼び出しでingestion_serviceを経由してベクトルDB/BM25にインデックス化） |
-| #2025-11-26-04 | Repository cleanup and distribution preparation | Open | 2025-11-26 | ryomy | タスクA-Eを順次実施：コミット、新規追加、不要ファイル削除、設定改善、GitHub同期 |
 
 ## Resolved Issues
 | ID | Title | Resolved | Owner | Notes |
 |----|-------|----------|-------|-------|
+| #2025-11-26-03 | Session memorization (indexing) implementation | 2025-11-27 | ryomy | SessionTimeoutTracker実装完了、10分アイドルタイムアウトでend_session()自動呼び出し、VectorDB/BM25自動インデックス化。セッションログ→検索可能メモリのパイプライン完成 |
+| #2025-11-26-04 | Repository cleanup and distribution preparation | 2025-11-27 | ryomy | タスクA-E完了：log_bridge.py/start_log_bridge.ps1追加、release_package削除、setup改善、GitHub同期完了。配布準備完了 |
 | #2025-11-15-01 | Codex/Claude session logging bridge missing | 2025-11-27 | ryomy | log_bridge.py実装完了、Unicode問題修正、セッションログ取得機能完成。インデックス化は#2025-11-26-03で継続 |
 | #2025-11-13-01 | メモリ表現の改善（Enriched Summary） | 2025-11-13 | ryomy | Phase 2完了: 埋め込み品質0.910（≥0.80）、Precision/NDCG維持、Phase 3に進む |
 | #2025-11-11-02 | 検索結果の細分化とコンテキストベース選別 | 2025-11-14 | ryomy | Phase 6で大幅改善達成（レイテンシ71%削減、LLM呼び出し63%削減）により不要と判断 |
