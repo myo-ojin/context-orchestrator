@@ -111,8 +111,14 @@ class SessionLogCollector:
             ... )
         """
         if session_id not in self.active_sessions:
-            logger.warning(f"Session not found: {session_id}")
-            return False
+            # Allow appends across short-lived processes: reopen existing log if present
+            candidate = self.log_dir / f"{session_id}.log"
+            if candidate.exists():
+                self.active_sessions[session_id] = candidate
+                logger.debug(f"Reopened session log for append: {session_id}")
+            else:
+                logger.warning(f"Session not found: {session_id}")
+                return False
 
         log_file = self.active_sessions[session_id]
 
@@ -152,8 +158,13 @@ class SessionLogCollector:
             PosixPath('/home/user/.context-orchestrator/logs/session-abc123.log')
         """
         if session_id not in self.active_sessions:
-            logger.warning(f"Session not found: {session_id}")
-            return None
+            candidate = self.log_dir / f"{session_id}.log"
+            if candidate.exists():
+                self.active_sessions[session_id] = candidate
+                logger.debug(f"Reopened session log for close: {session_id}")
+            else:
+                logger.warning(f"Session not found: {session_id}")
+                return None
 
         log_file = self.active_sessions[session_id]
 
