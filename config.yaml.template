@@ -85,7 +85,7 @@ consolidation:
   auto_enabled: true       # Enable automatic nightly consolidation
 
 # ============================================================================
-# Session Logging (Requirement 26)
+# Session Logging (Requirement 26, Issue #2025-11-27-01)
 # NOTE: src.config expects nested keys under `logging`
 # ============================================================================
 logging:
@@ -93,13 +93,19 @@ logging:
   max_log_size_mb: 10                            # Max log file size before rotation
   summary_model: qwen2.5:7b                      # Model for session summarization
   level: INFO
+  # Hierarchical summarization settings (for long session logs >3.5k chars)
+  hierarchical_summary_enabled: true             # Enable hierarchical summarization
+  hierarchical_chunk_size: 3500                  # Characters per chunk
+  hierarchical_chunk_overlap: 200                # Overlap between chunks
+  hierarchical_max_tokens: 600                   # Max tokens for hierarchical summaries (500-800 range)
 
 # ============================================================================
-# Router (Model Routing Thresholds)
+# Router (Model Routing Thresholds, Updated #2025-11-27-01)
 # ============================================================================
 router:
-  short_summary_max_tokens: 100   # <= this uses local LLM
-  long_summary_min_tokens: 500    # >= this uses cloud LLM
+  short_summary_max_tokens: 450   # <= this uses local LLM (increased for richer summaries)
+  mid_summary_max_tokens: 800     # Mid-range summaries (hierarchical, local LLM)
+  long_summary_min_tokens: 800    # >= this uses cloud LLM
 
 # ============================================================================
 # Language Routing

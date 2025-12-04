@@ -123,6 +123,7 @@ class SearchService:
         top_k: Optional[int] = None,
         filters: Optional[Dict[str, Any]] = None,
         prefetch: bool = False,
+        include_session_summaries: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         Search memories using hybrid search
@@ -131,6 +132,8 @@ class SearchService:
             query: Search query string
             top_k: Number of results to return (overrides default)
             filters: Optional metadata filters (e.g., {'schema_type': 'Incident'})
+            prefetch: Whether this is a prefetch operation (affects logging)
+            include_session_summaries: Whether to include session summaries (default: True)
 
         Returns:
             List of search result dicts, sorted by relevance:
@@ -153,7 +156,7 @@ class SearchService:
         try:
             result_limit = top_k if top_k is not None else self.result_count
             query_attributes = self._extract_query_attributes(query)
-            filters = self._prepare_filters(filters, query_attributes)
+            filters = self._prepare_filters(filters, query_attributes, include_session_summaries)
 
             log_fn = logger.debug if prefetch else logger.info
             log_fn(f"Searching for: '{query[:100]}...' (top_k={result_limit}, prefetch={prefetch})")
@@ -356,7 +359,8 @@ class SearchService:
     def _prepare_filters(
         self,
         filters: Optional[Dict[str, Any]],
-        query_attributes: Optional[QueryAttributes]
+        query_attributes: Optional[QueryAttributes],
+        include_session_summaries: bool = True
     ) -> Optional[Dict[str, Any]]:
         if filters:
             combined = dict(filters)
@@ -365,6 +369,12 @@ class SearchService:
 
         if query_attributes and query_attributes.has_hints():
             self._apply_attribute_filters(combined, query_attributes)
+
+        # Filter out session summaries if not requested
+        if not include_session_summaries:
+            # Exclude documents with is_session_summary=True
+            # Note: ChromaDB uses $ne for "not equal" operator
+            combined['is_session_summary'] = {'$ne': True}
 
         return combined if combined else None
 

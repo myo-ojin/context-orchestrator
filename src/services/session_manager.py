@@ -72,6 +72,7 @@ class SessionManager:
         project_prefetch_settings: Optional[ProjectPrefetchSettings] = None,
         project_memory_pool: Optional[ProjectMemoryPool] = None,
         session_log_collector: Optional[SessionLogCollector] = None,
+        session_summary_worker: Optional[Any] = None,
     ):
         """
         Initialize Session Manager
@@ -96,6 +97,7 @@ class SessionManager:
         self.project_prefetch_settings = project_prefetch_settings or ProjectPrefetchSettings()
         self.project_memory_pool = project_memory_pool
         self.session_log_collector = session_log_collector
+        self.session_summary_worker = session_summary_worker
 
         logger.info("Initialized SessionManager")
 
@@ -308,12 +310,38 @@ class SessionManager:
             logger.warning(f"Failed to append session log event for {session_id}: {exc}")
 
     def _close_session_log(self, session_id: str) -> None:
-        """Close SessionLogCollector entry when session ends."""
+        """
+        Close SessionLogCollector entry when session ends.
+
+        If SessionSummaryWorker is configured, queue the log for summarization.
+        """
         if not self.session_log_collector:
             return
 
         try:
-            self.session_log_collector.close_session(session_id)
+            log_path = self.session_log_collector.close_session(session_id)
+
+            # Queue log for summarization if worker is configured
+            if log_path and self.session_summary_worker:
+                with self._lock:
+                    session = self.sessions.get(session_id, {})
+                metadata = {
+                    'session_id': session_id,
+                    'started_at': session.get('started_at', datetime.now()).isoformat() if session else datetime.now().isoformat(),
+                    'command_count': len(session.get('commands', [])) if session else 0,
+                }
+
+                success = self.session_summary_worker.queue_log(
+                    session_id=session_id,
+                    log_path=log_path,
+                    metadata=metadata
+                )
+
+                if success:
+                    logger.info(f"Queued session log for summarization: {session_id}")
+                else:
+                    logger.warning(f"Failed to queue session log for summarization: {session_id}")
+
         except Exception as exc:  # pragma: no cover - logging only
             logger.warning(f"Failed to close session log for {session_id}: {exc}")
 

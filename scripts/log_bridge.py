@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.config import load_config
 from src.main import init_storage, init_models, init_processing, init_services
 from src.utils.logger import setup_logger
+from src.services.session_summary import SessionSummaryWorker
 
 logger = setup_logger('log_bridge', 'INFO')
 
@@ -169,6 +170,9 @@ class SessionTimeoutTracker:
 
 # Global session timeout tracker (initialized in main())
 session_timeout_tracker: Optional[SessionTimeoutTracker] = None
+
+# Global session summary worker (initialized in main())
+session_summary_worker: Optional[SessionSummaryWorker] = None
 
 
 def parse_rollout_event(line: str, file_path: str) -> Optional[Tuple[str, str, str, float]]:
@@ -610,6 +614,19 @@ def main():
         logger.error(f"Failed to initialize Context Orchestrator: {e}", exc_info=True)
         return 1
 
+    # Initialize session summary worker
+    global session_summary_worker
+    session_summary_worker = SessionSummaryWorker(
+        model_router=model_router,
+        vector_db=vector_db,
+        summary_model=config.logging.summary_model,
+        summary_max_tokens=config.router.mid_summary_max_tokens
+    )
+    logger.info("Initialized SessionSummaryWorker")
+
+    # Pass session_summary_worker to session_manager
+    session_manager.session_summary_worker = session_summary_worker
+
     # Initialize session timeout tracker
     global session_timeout_tracker
     session_timeout_tracker = SessionTimeoutTracker(
@@ -654,6 +671,11 @@ def main():
                 time.sleep(60)  # Check every minute
                 try:
                     session_timeout_tracker.check_and_end_idle_sessions()
+                    # Process queued summary jobs
+                    if session_summary_worker:
+                        stats = session_summary_worker.run_once()
+                        if stats['processed'] > 0 or stats['failed'] > 0:
+                            logger.info(f"Summary worker stats: {stats}")
                 except Exception as e:
                     logger.error(f"Error in session timeout checker: {e}", exc_info=True)
 
