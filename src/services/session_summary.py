@@ -19,6 +19,7 @@ import math
 
 from src.models import ModelRouter
 from src.storage.vector_db import ChromaVectorDB
+from src.utils.summarization import hierarchical_summarize, SummaryConfig, validate_yaml_summary
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,8 @@ class SessionSummaryWorker:
         self,
         model_router: ModelRouter,
         vector_db: ChromaVectorDB,
-        summary_model: str = "qwen2.5:7b"
+        summary_model: str = "qwen2.5:7b",
+        summary_max_tokens: int = 600
     ):
         """
         Initialize Session Summary Worker
@@ -58,6 +60,7 @@ class SessionSummaryWorker:
         self.model_router = model_router
         self.vector_db = vector_db
         self.summary_model = summary_model
+        self.summary_max_tokens = summary_max_tokens
         self.job_queue: List[Dict[str, Any]] = []
         self.failed_jobs: List[Dict[str, Any]] = []
 
@@ -195,19 +198,74 @@ class SessionSummaryWorker:
 
     def _summarize_log(self, log_content: str) -> str:
         """
-        Generate summary of log content using local LLM
+        Generate summary of log content using hierarchical LLM summarization
+
+        Uses hierarchical summarization for long logs (>3500 chars):
+        1. Split into chunks with overlap
+        2. Summarize each chunk with Decision/Rationale/Risks/NextSteps
+        3. Merge chunk summaries into final summary
+
+        Args:
+            log_content: Log file content (full text, no truncation)
+
+        Returns:
+            Generated YAML summary with structured schema
+
+        Raises:
+            Exception: If summarization fails
+        """
+        # Configure hierarchical summarization
+        config = SummaryConfig(
+            chunk_size=3500,
+            chunk_overlap=200,
+            max_tokens=self.summary_max_tokens,  # configurable
+            temperature=0.0,
+            language="auto"
+        )
+
+        # LLM function wrapper for hierarchical_summarize
+        def llm_function(prompt: str, max_tokens: int, temperature: float) -> str:
+            return self.model_router.route(
+                task_type='short_summary',
+                prompt=prompt,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
+
+        try:
+            # Use hierarchical summarization
+            logger.info(f"Summarizing log content ({len(log_content)} chars)")
+            summary = hierarchical_summarize(
+                content=log_content,
+                llm_function=llm_function,
+                config=config
+            )
+
+            # Validate summary
+            if not validate_yaml_summary(summary):
+                logger.warning("Generated summary failed validation, using fallback")
+                # Fallback to simple summary
+                return self._fallback_summary(log_content)
+
+            return summary.strip()
+
+        except Exception as e:
+            logger.error(f"Hierarchical summarization failed: {e}")
+            # Fallback to simple summary
+            return self._fallback_summary(log_content)
+
+    def _fallback_summary(self, log_content: str) -> str:
+        """
+        Fallback summary for when hierarchical summarization fails
 
         Args:
             log_content: Log file content
 
         Returns:
-            Generated summary
-
-        Raises:
-            Exception: If summarization fails
+            Simple summary
         """
-        # Truncate if too long (keep first and last parts)
-        max_chars = 4000
+        # Truncate to first/last parts
+        max_chars = 2000
         if len(log_content) > max_chars:
             half = max_chars // 2
             log_content = (
@@ -216,30 +274,24 @@ class SessionSummaryWorker:
                 log_content[-half:]
             )
 
-        prompt = f"""Summarize this terminal session log in 2-3 sentences.
-Focus on:
-- What commands were executed
-- What tasks were accomplished
-- Any errors or important outcomes
+        prompt = f"""Summarize this session log briefly.
 
 Session log:
 {log_content}
 
-Summary:"""
+Summary (YAML):"""
 
         try:
-            # Use local LLM for summarization
             summary = self.model_router.route(
                 task_type='short_summary',
                 prompt=prompt,
-                max_tokens=150
+                max_tokens=200
             )
-
             return summary.strip()
-
         except Exception as e:
-            logger.error(f"Summarization failed: {e}")
-            raise
+            logger.error(f"Fallback summarization failed: {e}")
+            # Ultimate fallback
+            return f"topic: Session log\nnotes:\n- Log length: {len(log_content)} chars"
 
     def _store_summary(
         self,

@@ -220,7 +220,9 @@ def init_services(
         indexer=indexer,
         model_router=model_router,
         supported_languages=config.languages.supported_local,
-        language_fallback_strategy=config.languages.fallback_strategy
+        language_fallback_strategy=config.languages.fallback_strategy,
+        summary_max_tokens=config.router.mid_summary_max_tokens,
+        hierarchical_max_tokens=config.router.mid_summary_max_tokens,
     )
 
     logger.info("Initialized IngestionService")

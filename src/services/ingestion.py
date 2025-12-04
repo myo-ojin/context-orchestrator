@@ -44,6 +44,7 @@ from src.processing.classifier import SchemaClassifier
 from src.processing.chunker import Chunker
 from src.processing.indexer import Indexer
 from src.storage.vector_db import ChromaVectorDB
+from src.utils.summarization import hierarchical_summarize, SummaryConfig
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,9 @@ class IngestionService:
         indexer: Indexer,
         model_router: ModelRouter,
         supported_languages: Optional[List[str]] = None,
-        language_fallback_strategy: str = "cloud"
+        language_fallback_strategy: str = "cloud",
+        summary_max_tokens: int = 450,
+        hierarchical_max_tokens: int = 500,
     ):
         """
         Initialize Ingestion Service
@@ -134,6 +137,8 @@ class IngestionService:
             if language_fallback_strategy
             else "cloud"
         )
+        self.summary_max_tokens = summary_max_tokens
+        self.hierarchical_max_tokens = hierarchical_max_tokens
         self._routing_metrics = LanguageRoutingMetrics()
 
         logger.info("Initialized IngestionService")
@@ -262,13 +267,17 @@ class IngestionService:
         """
         Generate summary of conversation
 
-        Uses local LLM for short summaries (< 100 tokens).
+        Updated for #2025-11-27-01:
+        - No 1500 char truncation
+        - Uses hierarchical summarization for long content (>3500 chars)
+        - Increased max_tokens to 400-500 for richer summaries
+        - YAML schema with Decision/Rationale/Risks/NextSteps
 
         Args:
             conversation: Conversation dict
 
         Returns:
-            Summary string (max 100 tokens)
+            YAML summary string
         """
         user_message = conversation.get('user', '')
         assistant_message = conversation.get('assistant', '')
@@ -292,9 +301,24 @@ class IngestionService:
             language_code = override_language
 
         routing_target = self._determine_summary_routing(language_code)
-
         content = f"User: {user_message}\n\nAssistant: {assistant_message}"
+
+        # Determine if we need hierarchical summarization
+        use_hierarchical = len(content) > 3500
+
+        if use_hierarchical:
+            logger.info(f"Using hierarchical summarization for long content ({len(content)} chars)")
+            return self._generate_hierarchical_summary(
+                content=content,
+                hints=hints,
+                language_code=language_code,
+                routing_target=routing_target
+            )
+
+        # Standard summarization for shorter content
         attempts = 2
+        max_tokens = self.summary_max_tokens  # configurable (default 450)
+
         for attempt in range(1, attempts + 1):
             prompt = self._build_structured_prompt(
                 content=content,
@@ -307,7 +331,7 @@ class IngestionService:
                 summary = self.model_router.route(
                     task_type='short_summary',
                     prompt=prompt,
-                    max_tokens=200,
+                    max_tokens=max_tokens,
                     temperature=0.0,
                     force_routing=routing_target
                 )
@@ -345,6 +369,73 @@ class IngestionService:
             assistant_message=assistant_message
         )
 
+    def _generate_hierarchical_summary(
+        self,
+        content: str,
+        hints: Dict[str, str],
+        language_code: str,
+        routing_target: str
+    ) -> str:
+        """
+        Generate hierarchical summary for long content
+
+        Args:
+            content: Full conversation content
+            hints: Metadata hints
+            language_code: Language code
+            routing_target: Routing target (local/cloud)
+
+        Returns:
+            YAML summary
+        """
+        config = SummaryConfig(
+            chunk_size=3500,
+            chunk_overlap=200,
+            max_tokens=self.hierarchical_max_tokens,
+            temperature=0.0,
+            language=language_code
+        )
+
+        # LLM function wrapper
+        def llm_function(prompt: str, max_tokens: int, temperature: float) -> str:
+            return self.model_router.route(
+                task_type='short_summary',
+                prompt=prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                force_routing=routing_target
+            )
+
+        try:
+            summary = hierarchical_summarize(
+                content=content,
+                llm_function=llm_function,
+                config=config,
+                language_code=language_code
+            )
+            return summary.strip()
+        except Exception as e:
+            logger.error(f"Hierarchical summarization failed: {e}")
+            # Fallback to truncated standard summary
+            truncated_content = content[:3000]
+            prompt = self._build_structured_prompt(
+                content=truncated_content,
+                hints=hints,
+                language_code=language_code,
+                enforce_notice=True
+            )
+            try:
+                return self.model_router.route(
+                    task_type='short_summary',
+                    prompt=prompt,
+                    max_tokens=450,
+                    temperature=0.0,
+                    force_routing=routing_target
+                ).strip()
+            except Exception as fallback_error:
+                logger.error(f"Fallback summarization also failed: {fallback_error}")
+                return self._build_fallback_summary(hints, language_code, "", "")
+
     @classmethod
     def _detect_language(cls, *texts: str) -> str:
         corpus = " ".join(filter(None, texts)).strip()
@@ -378,62 +469,64 @@ class IngestionService:
         language_code: str,
         enforce_notice: bool = False
     ) -> str:
+        """
+        Build structured prompt with YAML schema (Decision/Rationale/Risks/NextSteps)
+
+        Updated for #2025-11-27-01: No longer truncates content to 1500 chars.
+        Hierarchical summarization handles long content.
+        """
         language = cls._LANGUAGE_MAP.get(language_code, "English")
         metadata_hint = (
             f"- Topic: {hints['topic']}\n"
             f"- DocType: {hints['doc_type']}\n"
             f"- Project: {hints['project']}"
         )
-        notice = "Output EXACTLY the headers and bullet list." if enforce_notice else "Follow the format strictly."
-        return (
-            f"You are a summarization assistant. Respond in {language}.\n"
-            f"Known metadata:\n{metadata_hint}\n\n"
-            f"Summarize the conversation in the same language.\n"
-            f"{notice}\n\n"
-            "Required format:\n"
-            "Topic: <value>\n"
-            "DocType: <value>\n"
-            "Project: <value>\n"
-            "KeyActions:\n"
-            "- <assistant guidance 1>\n"
-            "- <assistant guidance 2>\n"
-            "(bullet list can be 1-3 items.)\n\n"
-            "Do not add extra commentary before or after the headers.\n\n"
-            f"Conversation:\n---\n{content[:1500]}\n---\n\nSummary:"
-        )
+
+        # New YAML schema prompt (~60 tokens)
+        return f"""Summarize the conversation. Output YAML with keys: topic, doc_type, project,
+decisions[], risks[], next_steps[], notes[]. Each value ≤30 tokens.
+decisions items: text, rationale, owner, due. risks: text, mitigation.
+next_steps: text, owner, due. Omit empty keys. Use source language ({language}).
+
+Known metadata:
+{metadata_hint}
+
+Conversation:
+---
+{content}
+---
+
+Summary (YAML):"""
 
     @classmethod
     def _is_structured_summary(cls, summary: str) -> bool:
+        """
+        Validate structured YAML summary
+
+        Updated for #2025-11-27-01: Validates new YAML schema with
+        topic/doc_type/project/decisions/risks/next_steps/notes
+        """
         if not summary:
             return False
-        lines = [line.rstrip() for line in summary.splitlines()]
-        stripped = [line.strip() for line in lines if line.strip()]
-        if len(stripped) < 5:
+
+        # Check for at least one required key (topic, doc_type, or project)
+        has_topic = re.search(r'^topic:\s*.+$', summary, re.MULTILINE | re.IGNORECASE)
+        has_doc_type = re.search(r'^doc_type:\s*.+$', summary, re.MULTILINE | re.IGNORECASE)
+        has_project = re.search(r'^project:\s*.+$', summary, re.MULTILINE | re.IGNORECASE)
+
+        if not (has_topic or has_doc_type or has_project):
+            logger.debug("Summary validation failed: missing required keys (topic/doc_type/project)")
             return False
 
-        expected = cls._STRUCTURED_HEADERS
-        for header, line in zip(expected, stripped[:4]):
-            if not line.startswith(header):
-                return False
+        # Optional: Check for at least one of the list keys (decisions/risks/next_steps/notes)
+        has_list = (
+            re.search(r'^decisions:', summary, re.MULTILINE | re.IGNORECASE) or
+            re.search(r'^risks:', summary, re.MULTILINE | re.IGNORECASE) or
+            re.search(r'^next_steps:', summary, re.MULTILINE | re.IGNORECASE) or
+            re.search(r'^notes:', summary, re.MULTILINE | re.IGNORECASE)
+        )
 
-        # Ensure KeyActions line is exactly header (no inline text)
-        key_actions_idx = None
-        for idx, line in enumerate(lines):
-            if line.strip().startswith("KeyActions:"):
-                key_actions_idx = idx
-                break
-        if key_actions_idx is None:
-            return False
-
-        bullets = [
-            lines[i].lstrip()
-            for i in range(key_actions_idx + 1, len(lines))
-            if lines[i].strip()
-        ]
-        if not bullets:
-            return False
-        if not all(bullet.startswith("- ") for bullet in bullets):
-            return False
+        # Valid if has required keys (optional list items are nice to have but not required)
         return True
 
     @classmethod

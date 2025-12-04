@@ -105,6 +105,7 @@ class RouterConfig:
     """Routing thresholds/configuration"""
     short_summary_max_tokens: int = 100
     long_summary_min_tokens: int = 500
+    mid_summary_max_tokens: int = 600
 
 
 @dataclass
@@ -361,10 +362,11 @@ def _parse_config(data: Dict[str, Any]) -> Config:
             level=logging_data.get('level', LoggingConfig.level)
         ),
 
-        router=RouterConfig(
-            short_summary_max_tokens=router_data.get('short_summary_max_tokens', RouterConfig.short_summary_max_tokens),
-            long_summary_min_tokens=router_data.get('long_summary_min_tokens', RouterConfig.long_summary_min_tokens),
-        ),
+    router=RouterConfig(
+        short_summary_max_tokens=router_data.get('short_summary_max_tokens', RouterConfig.short_summary_max_tokens),
+        long_summary_min_tokens=router_data.get('long_summary_min_tokens', RouterConfig.long_summary_min_tokens),
+        mid_summary_max_tokens=router_data.get('mid_summary_max_tokens', RouterConfig.mid_summary_max_tokens),
+    ),
 
         languages=LanguageConfig(
             supported_local=language_data.get('supported_local', default_language.supported_local),
@@ -471,6 +473,7 @@ def save_config(config: Config, config_path: Optional[str] = None) -> None:
         'router': {
             'short_summary_max_tokens': config.router.short_summary_max_tokens,
             'long_summary_min_tokens': config.router.long_summary_min_tokens,
+            'mid_summary_max_tokens': config.router.mid_summary_max_tokens,
         },
 
         'languages': {
