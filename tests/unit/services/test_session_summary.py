@@ -113,31 +113,35 @@ nothing to commit
         assert content is None
 
     def test_summarize_log(self, worker, mock_dependencies):
-        """Test log summarization"""
+        """Test log summarization with YAML output"""
         log_content = "python test.py\nAll tests passed\ngit status\nOn branch main"
 
-        mock_dependencies['model_router'].route.return_value = "Ran Python tests and checked git status"
+        # Return valid YAML summary
+        mock_dependencies['model_router'].route.return_value = """topic: Testing and git status
+doc_type: session_log
+notes:
+- Ran Python tests
+- Checked git status"""
 
         summary = worker._summarize_log(log_content)
 
-        assert summary == "Ran Python tests and checked git status"
+        assert "topic:" in summary.lower()
         mock_dependencies['model_router'].route.assert_called_once()
 
     def test_summarize_log_truncation(self, worker, mock_dependencies):
-        """Test log truncation for very long logs"""
-        # Create very long log content
+        """Test hierarchical summarization for very long logs"""
+        # Create very long log content (>3500 chars triggers hierarchical)
         log_content = "x" * 10000
 
-        mock_dependencies['model_router'].route.return_value = "Summary"
+        # Return valid YAML summary
+        mock_dependencies['model_router'].route.return_value = """topic: Long log summary
+doc_type: session_log"""
 
         summary = worker._summarize_log(log_content)
 
-        # Verify truncation occurred (content passed to LLM should be shorter)
-        call_args = mock_dependencies['model_router'].route.call_args
-        prompt = call_args[1]['prompt']
-
-        assert len(prompt) < len(log_content)
-        assert "truncated" in prompt
+        # Verify LLM was called (hierarchical may call multiple times)
+        assert mock_dependencies['model_router'].route.called
+        assert "topic:" in summary.lower()
 
     def test_store_summary(self, worker, mock_dependencies):
         """Test storing summary"""
@@ -162,7 +166,7 @@ nothing to commit
         assert call_args[1]['metadata']['session_id'] == 'session-123'
 
     def test_process_job_success(self, worker, mock_dependencies, sample_log_file):
-        """Test successful job processing"""
+        """Test successful job processing with YAML summary"""
         job = {
             'session_id': 'session-123',
             'log_path': str(sample_log_file),
@@ -170,7 +174,10 @@ nothing to commit
             'retry_count': 0
         }
 
-        mock_dependencies['model_router'].route.return_value = "Test summary"
+        # Return valid YAML summary
+        mock_dependencies['model_router'].route.return_value = """topic: Test session
+doc_type: session_log
+project: TestProject"""
         mock_dependencies['model_router'].generate_embedding.return_value = [0.1] * 768
 
         result = worker._process_job(job)
