@@ -71,8 +71,8 @@ Need the full walkthrough (clone → setup wizard → smoke tests)? Follow the d
 
 ```bash
 # Clone & enter repository
-git clone https://github.com/myo-ojin/llm-brain.git
-cd llm-brain
+git clone https://github.com/myo-ojin/contextorchestrator.git
+cd contextorchestrator
 
 # Create virtual environment
 python -m venv .venv
