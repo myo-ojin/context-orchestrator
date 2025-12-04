@@ -1,420 +1,70 @@
-# Context Orchestrator
+﻿# Context Orchestrator
 
-> Privacy-first MCP server that acts as your external brain across Claude CLI, Cursor, VS Code, and any other Model Context Protocol client.
+Privacy-first MCP server that captures and searches your CLI/LLM work across clients (Claude, Codex, Cursor, VS Code).
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11-3.12](https://img.shields.io/badge/python-3.11--3.12-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-48%2F48%20passing-success)](tests/)
-[![Release](https://img.shields.io/badge/version-v0.1.0-6f42c1.svg)](CHANGELOG.md)
+[日本語 README](README_JA.md) | [Quick Start](QUICKSTART.md) | [Setup Guide](SETUP_GUIDE.md)
 
-[日本語ドキュメント](README_JA.md) | [OSS README](README_OSS.md) | [Quick Start](QUICKSTART.md) | [Setup Guide](SETUP_GUIDE.md) | [Setup Verification](SETUP_VERIFICATION.md)
+---
 
-An external brain system that acts as an MCP (Model Context Protocol) server, enabling developers to capture, organize, and retrieve their work experiences across any LLM client.
-
-## Documentation Map
-
-- [Quick Start](QUICKSTART.md): five-minute setup, smoke tests, and first MCP run.
-- [Setup Guide](SETUP_GUIDE.md): detailed environment preparation notes (PowerShell + Bash).
-- [Setup Verification](SETUP_VERIFICATION.md): checklist we run before tagging releases.
-- [README_JA](README_JA.md): full Japanese translation of the OSS README.
-- [README_OSS](README_OSS.md): public-facing README that ships with release archives.
-- [OSS Release Summary](OSS_RELEASE_SUMMARY.md) / [OSS File Checklist](OSS_FILE_CHECKLIST.md): packaging and distribution steps.
-
-## Features
-
-### Core Capabilities
-
-- 🧠 **Automatic Memory Capture**: Transparently records CLI conversations (Claude, Codex)
-- 📊 **Schema Classification**: Organizes memories into Incident, Snippet, Decision, Process
-- 🔍 **Hybrid Search**: Vector (semantic) + BM25 (keyword) search with intelligent reranking
-- 🏠 **Local-First Privacy**: Embeddings and classification run locally (Ollama)
-- ⚡ **Smart Model Routing**: Light tasks → local LLM, heavy tasks → cloud LLM
-- 💾 **Memory Hierarchy**: Working → Short-term → Long-term memory like human brain
-- 🌙 **Auto Consolidation**: Nightly memory consolidation and forgetting
-
-### Integrations
-
-- 📓 **Obsidian Integration**: Auto-detect and ingest conversation notes from Obsidian vault
-  - Monitors `.md` files for conversation patterns
-  - Extracts Wikilinks for relationship tracking
-  - Parses YAML frontmatter (tags, metadata)
-- 📝 **Session Logging**: Preserves full terminal transcripts with auto-summarization
-- 🔌 **MCP Protocol**: Works with any MCP-compatible client (Claude CLI, Cursor, VS Code)
-
-### Management Tools
-
-- 📊 **System Status**: Comprehensive health monitoring with `status` command
-- 🩺 **Diagnostics**: Automated troubleshooting with `doctor` command
-- 💾 **Backup/Restore**: Export and import memories with `export`/`import` commands
-- 📋 **Session History**: View and manage session logs and summaries
-
-### Testing & Quality Assurance
-
-- 🧪 **Edge Case Testing**: 48 comprehensive tests covering special characters, emoji, extreme inputs
-- 📈 **Load Testing**: Memory leak detection, concurrent query validation, thread safety checks
-- 📊 **Quality Metrics**: Precision/Recall/F1 analysis, false positive/negative detection
-- 🎯 **Query Pattern Coverage**: 50 diverse queries across 5 categories for comprehensive validation
-
-## Quick Start
-
-Need the full walkthrough (clone → setup wizard → smoke tests)? Follow the dedicated [Quick Start guide](QUICKSTART.md). The condensed steps are below.
-
-### Prerequisites
-
-- Python **3.11.x or 3.12.x** (v3.11.9 is what we ship/verify in CI)
-- [Ollama](https://ollama.ai/) 0.3+ (for local embeddings + inference)
-- PowerShell 7+ (Windows) or Bash/zsh (macOS/Linux)
-- Git 2.40+ and curl (for cloning and health checks)
-- Optional: GPU with ≥8GB VRAM for faster Qwen2.5 inference
-
-### Installation
-
-```bash
-# Clone & enter repository
-git clone https://github.com/myo-ojin/contextorchestrator.git
-cd contextorchestrator
-
-# Create virtual environment
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run setup wizard
-python scripts/setup.py
-```
-
-### Download Required Models
-
-```bash
+## Quick Path (TL;DR)
+1) One-time
+`
+python scripts/setup.py                 # generate config, check Ollama
 ollama pull nomic-embed-text
 ollama pull qwen2.5:7b
-```
+powershell -File scripts/setup_cli_recording.ps1   # optional but recommended: auto session logging + log_bridge autostart
+`
+2) Daily
+`
+python -m src.main          # start MCP server
+# if you didn't install the wrapper:
+python scripts/log_bridge.py # manual log bridge
+`
 
-### Smoke Test (recommended)
+## What’s Included
+- Automatic CLI session capture (Codex/Claude logs) with idle auto-close
+- Hierarchical session summaries (Decision/Risks/NextSteps, default 800 tokens via outer.mid_summary_max_tokens)
+- Hybrid search (vector + BM25) with session summaries included by default
+- Optional Obsidian watcher to ingest .md notes
 
-```bash
-# Verify services
-python -m src.cli status
-python -m src.cli doctor
+## Prerequisites
+- Python 3.11/3.12, Git 2.40+, PowerShell 7+ or Bash/zsh
+- [Ollama](https://ollama.ai/) running; models: 
+omic-embed-text, qwen2.5:7b
+- Optional: GPU ≥8GB VRAM for faster inference
 
-# Ingestion dry-run (no data sent)
-python -m scripts.claude_session_ingestor --dry-run --cwd .
-python -m scripts.codex_session_ingestor  --dry-run --cwd .
+## One-Time Setup
+`
+git clone https://github.com/myo-ojin/context-orchestrator.git
+cd context-orchestrator
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1   # or source .venv/bin/activate
+pip install -r requirements.txt
+python scripts/setup.py
+ollama pull nomic-embed-text
+ollama pull qwen2.5:7b
+powershell -File scripts/setup_cli_recording.ps1  # enables auto session logging & log_bridge autostart
+`
 
-# Check that session logs are readable
-python -m src.cli session-history --limit 5
-```
+## Run
+`
+python -m src.main          # MCP server
+# log_bridge: auto if wrapper installed, otherwise run:
+python scripts/log_bridge.py
+`
 
-## Usage
-
-### Start MCP Server
-```bash
-# Start Context Orchestrator as MCP server
-python -m src.main
-
-# Or use console entry point (if installed)
-context-orchestrator
-```
-
-### CLI Commands
-
-> 💡 **Tip:** Run `powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install` once. The wrapper now calls `start_session → add_command → end_session` for every `claude`/`codex` invocation, so `~/.context-orchestrator/logs` stays warm and `python -m src.cli session-history --limit 5` will always have fresh memories to show.
-
-```bash
-# System status and health
-python -m src.cli status      # Show comprehensive system status
-python -m src.cli doctor      # Run diagnostics
-
-# Memory management
-python -m src.cli consolidate         # Manual memory consolidation
-python -m src.cli list-recent --limit 20  # List recent memories
-python -m src.cli export --output backup.json  # Export memories
-python -m src.cli import --input backup.json   # Import memories
-
-# Session history
-python -m src.cli session-history  # List all sessions
-python -m src.cli session-history --session-id <id>  # Show specific session
-
-```
-
-See [CLAUDE.md](CLAUDE.md) for detailed CLI documentation.
-
-### Enable Automatic Session Logging
-
-1. Install the wrapper once per machine:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts/setup_cli_recording.ps1 -Install
-   ```
-2. Run a `claude ...` or `codex ...` command as usual. The wrapper generates a stable `session-<timestamp>` ID, fires `start_session → add_command → end_session` via MCP, and streams every command/output pair into `~/.context-orchestrator/logs`.
-3. Inspect the transcripts or summaries immediately:
-   ```bash
-   python -m src.cli session-history --limit 5 --format table
-  python -m src.cli session-history --session-id session-20251116-104455-a1b2  # open a specific log
-  ```
-
-The setup wizard now runs the wrapper installer automatically; rerun the command above whenever you reset your PowerShell profile or update to a new shell.
-
-If you ever stop seeing new entries, re-run the install command above or delete/recreate your PowerShell profile so the wrapper is re-imported.
-
-### Testing & Quality Assurance
-
-軽量配布向けに、最低限の動作確認コマンドだけ残しています。
-
-```bash
-# ヘルスチェック
-python -m src.cli status
-python -m src.cli doctor
-
-# セッション取り込みのドライラン（送信なし）
-python -m scripts.claude_session_ingestor --dry-run --cwd .
-python -m scripts.codex_session_ingestor  --dry-run --cwd .
-
-# 直近ログの確認
-python -m src.cli session-history --limit 5
-```
-
-### Structured Summaries & Scenario Loader
-
-Every ingested conversation must produce a structured summary with the following exact layout:
-
-```
-Topic: <short topic name>
-DocType: <incident|decision|checklist|guide|...>
-Project: <project name or Unknown>
-KeyActions:
-- <Imperative Action 1>
-- <Action 2>
-```
-
-- `KeyActions` は必ず `- ` で始まる箇条書きにする。段落や番号付きリストは検証に失敗する。
-- 取り込み時の構造チェックはセッションインジェスター側で行われるため、上記フォーマットを守ってメモを生成してください。
-
-## Configuration
-
-Create `~/.context-orchestrator/config.yaml`:
-
-```yaml
-# Data storage
-data_dir: ~/.context-orchestrator
-
-# Obsidian integration (optional)
-obsidian_vault_path: C:\Users\username\Documents\ObsidianVault
-
-# Ollama settings
-ollama:
-  url: http://localhost:11434
-  embedding_model: nomic-embed-text
-  inference_model: qwen2.5:7b
-
-# CLI LLM for complex tasks
-cli:
-  command: claude  # or "codex"
-
-# Search parameters
-search:
-  candidate_count: 50
-  result_count: 10
-  timeout_seconds: 2
-  cross_encoder_enabled: true
-  cross_encoder_top_k: 3
-  cross_encoder_cache_size: 128
-  cross_encoder_cache_ttl_seconds: 900
-  vector_candidate_count: 100
-  bm25_candidate_count: 30
-  query_attribute_min_confidence: 0.4
-  query_attribute_llm_enabled: true
-
-# Memory management
-clustering:
-  similarity_threshold: 0.9
-  min_cluster_size: 2
-
-forgetting:
-  age_threshold_days: 30
-  importance_threshold: 0.3
-  compression_enabled: true
-
-working_memory:
-  retention_hours: 8
-  auto_consolidate: true
-
-# Consolidation schedule (cron format)
-consolidation:
-  schedule: "0 3 * * *"  # 3:00 AM daily
-  auto_enabled: true
-
-# Session logging
-logging:
-  session_log_dir: ~/.context-orchestrator/logs
-  max_log_size_mb: 10
-  summary_model: qwen2.5:7b
-  level: INFO
-
-# Language routing (local LLM handles these language codes; others fall back to cloud)
-languages:
-  supported_local:
-    - en
-    - ja
-    - es
-  fallback_strategy: cloud
-```
-
-`languages.supported_local` に含まれない言語が検知されると、`fallback_strategy` に従ってクラウド LLM へルーティングされます。短期的に特定言語を強制したい場合は MCP サーバーを起動するシェルで環境変数 `CONTEXT_ORCHESTRATOR_LANG_OVERRIDE` を設定してください。
-
-```powershell
-$env:CONTEXT_ORCHESTRATOR_LANG_OVERRIDE = "fr"
-python -m src.main  # 以降の要約はフランス語扱いで routing
-```
-
-### Cross-Encoder Reranker Cache
-
-LRU キャッシュのパラメータは `search.cross_encoder_cache_*` で調整できます。リリースパッケージにはベンチマーク／学習スクリプトは含めていません。詳細なチューニングが必要な場合は開発ブランチ（`dev/tool-scripts` など）に含まれるツール群を参照してください。
-
+## Key Settings
+- outer.mid_summary_max_tokens (default 800): summary token budget for hierarchical summaries
+- search.include_session_summaries (default true): include is_session_summary results
 
 ## Troubleshooting
+- Ollama not responding → ollama serve
+- No session logs → rerun scripts/setup_cli_recording.ps1 or start scripts/log_bridge.py
+- Summaries too short/long → adjust outer.mid_summary_max_tokens in config.yaml
 
-### Ollama Connection Issues
+## Optional: Obsidian
+If configured, .md notes in your vault are ingested and searchable; otherwise ignore.
 
-```bash
-# Check if Ollama is running
-curl http://localhost:11434/api/tags
+---
 
-# Start Ollama
-ollama serve
-
-# Verify models are installed
-ollama list
-```
-
-### PowerShell Wrapper Not Working
-
-```powershell
-# Check if wrapper is loaded
-Get-Command claude
-
-# Reload profile
-. $PROFILE
-
-# Re-run setup
-python scripts/setup.py --repair
-```
-
-### Search Returns No Results
-
-```bash
-# Check if memories are indexed
-python -m src.cli list-recent
-
-# Verify database exists
-ls ~/.context-orchestrator/chroma_db/
-
-# Check logs
-python -m src.cli status
-
-# Run diagnostics
-python -m src.cli doctor
-```
-
-### High Memory Usage
-
-```bash
-# Check consolidation status
-python -m src.cli status
-
-# Run manual consolidation
-python -m src.cli consolidate
-
-# Export and prune old memories
-python -m src.cli export --output backup_$(date +%Y%m%d).json
-```
-
-## How It Works
-
-1. **Capture**: PowerShell wrapper intercepts CLI commands and sends conversations to the orchestrator
-2. **Classify**: Local LLM classifies memories into schemas (Incident/Snippet/Decision/Process)
-3. **Chunk**: Content is split into 512-token chunks for efficient processing
-4. **Index**: Chunks are indexed in both Vector DB (semantic) and BM25 (keyword)
-5. **Search**: Hybrid search retrieves relevant memories and reranks by importance
-6. **Consolidate**: Nightly job migrates working memory, clusters similar memories, and forgets old data
-
-## Architecture
-
-See [CLAUDE.md](CLAUDE.md) for detailed architecture and development guide.
-
-## Performance Targets
-
-- **Search Latency**: 80-200ms (typical: ~80ms)
-- **Ingestion Time**: <5 seconds per conversation
-- **Memory Footprint**: 1GB resident, 3GB peak (during inference)
-- **Disk Usage**: ~10MB/year (~100MB/10 years)
-- **Consolidation**: Complete in <5 minutes for 10K memories
-
-### Performance Profiling
-
-Run performance benchmarks to validate system performance:
-
-## Documentation
-
-- **Requirements**: `.kiro/specs/dev-knowledge-orchestrator/requirements.md` - Full project requirements
-- **Design**: `designtt.txt` - Detailed architecture and interfaces
-- **Tasks**: `.kiro/specs/dev-knowledge-orchestrator/tasks.md` - Implementation roadmap
-- **Developer Guide**: `CLAUDE.md` - Development and contribution guidelines
-- **Integration Tests**: `INTEGRATION_TEST_RESULTS.md` - Test results and validation
-
-## Project Status
-
-- ✅ **Phase 1-10**: Core system (MCP server, storage, processing, services) - **COMPLETE**
-- ✅ **Phase 11**: Obsidian Integration - **COMPLETE**
-- ✅ **Phase 12**: CLI Interface - **COMPLETE**
-- ✅ **Phase 13**: Testing and Documentation - **COMPLETE**
-- ✅ **Phase 14**: Integration & Optimization - **COMPLETE**
-  - End-to-end validation tests
-  - Performance profiling tool
-  - Enhanced error handling and structured logging
-
-**Current Status**: Production Ready
-
-## License
-
-TBD
-
-## Contributing
-
-We welcome contributions! Please see:
-- [CLAUDE.md](CLAUDE.md) for coding guidelines and development setup
-- [CONTRIBUTING.md](CONTRIBUTING.md) for contribution process (coming soon)
-
-### Development Setup
-
-```bash
-# Clone repository
-git clone https://github.com/myo-ojin/llm-brain.git
-cd llm-brain
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # or .\.venv\Scripts\Activate.ps1 on Windows
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Install dev dependencies
-pip install pytest pytest-cov black ruff mypy
-
-# Run tests
-pytest
-
-# Format code
-black .
-
-# Lint
-ruff .
-```
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/myo-ojin/llm-brain/issues)
-- **Documentation**: [CLAUDE.md](CLAUDE.md)
-- **Test Results**: [INTEGRATION_TEST_RESULTS.md](INTEGRATION_TEST_RESULTS.md)
+For detailed flows and smoke tests, see [Quick Start](QUICKSTART.md) and [Setup Guide](SETUP_GUIDE.md).
