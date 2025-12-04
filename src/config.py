@@ -105,7 +105,7 @@ class RouterConfig:
     """Routing thresholds/configuration"""
     short_summary_max_tokens: int = 100
     long_summary_min_tokens: int = 500
-    mid_summary_max_tokens: int = 600
+    mid_summary_max_tokens: int = 800
 
 
 @dataclass
