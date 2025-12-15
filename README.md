@@ -1,10 +1,20 @@
 # Context Orchestrator
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Python](https://img.shields.io/badge/python-3.11--3.12-blue.svg)](https://www.python.org) [![Tests](https://img.shields.io/badge/tests-48%2F48%20passing-success)](tests/)
 
 **Your personal AI memory layer** that captures everything you do with LLMs and terminal sessions, making it instantly searchable whenever you need it.
 
 Context Orchestrator is a privacy-first MCP server that automatically records your CLI commands and LLM conversations (Claude, Codex, Cursor, VS Code), intelligently summarizes them with structured decision tracking, and makes your entire work history searchable through a powerful hybrid search engine—all running locally on your machine.
 
-[日本語 README](README_JA.md) | [Quick Start](QUICKSTART.md) | [Setup Guide](SETUP_GUIDE.md)
+[TL;DR Quick Start (~60s)]
+```bash
+git clone https://github.com/myo-ojin/context-orchestrator.git
+cd context-orchestrator
+python -m venv .venv && .\.venv\Scripts\Activate.ps1  # macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt && python scripts/setup.py
+python -m src.main  # start the MCP server; PowerShell users can run scripts/setup_cli_recording.ps1 to auto-log sessions
+```
+
+[日本誁EREADME](README_JA.md) | [Quick Start](QUICKSTART.md) | [Setup Guide](SETUP_GUIDE.md)
 
 ---
 
@@ -74,10 +84,23 @@ python scripts/log_bridge.py
 - `router.mid_summary_max_tokens` (default 800): token budget for hierarchical summaries.
 - `search.include_session_summaries` (default true): include is_session_summary results.
 
+## FAQ
+Q. Ollama is not responding  
+A. Start the service with `ollama serve`, then check models with `ollama list`. Pull missing models: `ollama pull nomic-embed-text` and `ollama pull qwen2.5:7b`.
+
+Q. No session logs are showing up  
+A. On PowerShell run `powershell -File scripts/setup_cli_recording.ps1` once. If you skip it, start `python scripts/log_bridge.py` manually before you begin working.
+
+Q. Search feels slow  
+A. Set `search.cross_encoder_enabled=false` to disable reranking, or lower `candidate_count` / `vector_candidate_count` in `config.yaml`.
+
+Q. I want GPU acceleration  
+A. Ollama uses GPU when available. 8GB+ VRAM is recommended; verify with `nvidia-smi`.
+
 ## Troubleshooting
-- Ollama not responding → `ollama serve`
-- No session logs → rerun `scripts/setup_cli_recording.ps1` or start `scripts/log_bridge.py`
-- Summaries too short/long → adjust `router.mid_summary_max_tokens`
+- Ollama not responding ↁE`ollama serve`
+- No session logs ↁErerun `scripts/setup_cli_recording.ps1` or start `scripts/log_bridge.py`
+- Summaries too short/long ↁEadjust `router.mid_summary_max_tokens`
 
 ## Optional: Obsidian
 If configured, .md notes in your vault are ingested and searchable; otherwise ignore.
@@ -85,3 +108,4 @@ If configured, .md notes in your vault are ingested and searchable; otherwise ig
 ---
 
 For detailed flows and smoke tests, see [Quick Start](QUICKSTART.md) and [Setup Guide](SETUP_GUIDE.md).
+
