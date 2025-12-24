@@ -73,6 +73,7 @@ If you skip step 4, start log_bridge manually when needed (see Daily Use).
 ```bash
 python -m src.main
 ```
+  - **First run**: You'll be prompted to index existing session logs. This is a one-time operation to make your past sessions searchable. You can skip it—new sessions will be indexed automatically.
 - log_bridge
   - If wrapper installed: auto-starts when you open PowerShell.
   - Otherwise:
@@ -83,6 +84,9 @@ python scripts/log_bridge.py
 ## Key Settings (config.yaml)
 - `router.mid_summary_max_tokens` (default 800): token budget for hierarchical summaries.
 - `search.include_session_summaries` (default true): include is_session_summary results.
+- `logging.first_run_index_enabled` (default true): enable first-run indexing prompt on startup.
+- `logging.first_run_index_max_file_mb` (default 100): maximum log file size to index (MB).
+- `logging.first_run_index_allowed_extensions` (default ['.jsonl', '.log', '.txt']): file extensions to index.
 
 ## FAQ
 Q. Ollama is not responding  
@@ -94,8 +98,11 @@ A. On PowerShell run `powershell -File scripts/setup_cli_recording.ps1` once. If
 Q. Search feels slow  
 A. Set `search.cross_encoder_enabled=false` to disable reranking, or lower `candidate_count` / `vector_candidate_count` in `config.yaml`.
 
-Q. I want GPU acceleration  
+Q. I want GPU acceleration
 A. Ollama uses GPU when available. 8GB+ VRAM is recommended; verify with `nvidia-smi`.
+
+Q. How do I skip or re-run first-run indexing?
+A. To skip: answer 'N' at the prompt or disable via `logging.first_run_index_enabled=false` in config.yaml. To re-run: delete `~/.context-orchestrator/first_run_index_done` and restart. For non-interactive environments (CI/Docker), set `CO_FIRST_RUN_AUTO=1` to auto-approve.
 
 ## Troubleshooting
 - Ollama not responding ↁE`ollama serve`

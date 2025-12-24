@@ -92,6 +92,12 @@ logging:
   session_log_dir: ~/.context-orchestrator/logs  # Directory for session logs
   max_log_size_mb: 10                            # Max log file size before rotation
   summary_model: qwen2.5:7b                      # Model for session summarization
+  first_run_index_enabled: true                  # Enable one-time indexing of existing logs on first start
+  first_run_index_max_file_mb: 100               # Skip log files larger than this
+  first_run_index_allowed_extensions:            # Extensions eligible for first-run indexing
+    - .jsonl
+    - .log
+    - .txt
   level: INFO
   # Hierarchical summarization settings (for long session logs >3.5k chars)
   hierarchical_summary_enabled: true             # Enable hierarchical summarization
