@@ -98,6 +98,12 @@ class LoggingConfig:
     max_log_size_mb: int = 10
     summary_model: str = "qwen2.5:7b"
     level: str = "INFO"
+    # First-run indexing settings
+    first_run_index_enabled: bool = True
+    first_run_index_max_file_mb: int = 100
+    first_run_index_allowed_extensions: List[str] = field(
+        default_factory=lambda: ['.jsonl', '.log', '.txt']
+    )
 
 
 @dataclass
@@ -359,7 +365,19 @@ def _parse_config(data: Dict[str, Any]) -> Config:
             session_log_dir=logging_data.get('session_log_dir', LoggingConfig.session_log_dir),
             max_log_size_mb=logging_data.get('max_log_size_mb', LoggingConfig.max_log_size_mb),
             summary_model=logging_data.get('summary_model', LoggingConfig.summary_model),
-            level=logging_data.get('level', LoggingConfig.level)
+            level=logging_data.get('level', LoggingConfig.level),
+            first_run_index_enabled=logging_data.get(
+                'first_run_index_enabled',
+                LoggingConfig.first_run_index_enabled
+            ),
+            first_run_index_max_file_mb=logging_data.get(
+                'first_run_index_max_file_mb',
+                LoggingConfig.first_run_index_max_file_mb
+            ),
+            first_run_index_allowed_extensions=logging_data.get(
+                'first_run_index_allowed_extensions',
+                ['.jsonl', '.log', '.txt']
+            ),
         ),
 
     router=RouterConfig(
@@ -467,7 +485,10 @@ def save_config(config: Config, config_path: Optional[str] = None) -> None:
             'session_log_dir': config.logging.session_log_dir,
             'max_log_size_mb': config.logging.max_log_size_mb,
             'summary_model': config.logging.summary_model,
-            'level': config.logging.level
+            'level': config.logging.level,
+            'first_run_index_enabled': config.logging.first_run_index_enabled,
+            'first_run_index_max_file_mb': config.logging.first_run_index_max_file_mb,
+            'first_run_index_allowed_extensions': config.logging.first_run_index_allowed_extensions,
         },
 
         'router': {

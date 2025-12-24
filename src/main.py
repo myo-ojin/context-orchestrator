@@ -57,6 +57,7 @@ from src.services.bookmark_manager import BookmarkManager  # Phase 15
 from src.services.query_attributes import QueryAttributeExtractor
 from src.services.rerankers import CrossEncoderReranker
 from src.services.project_memory_pool import ProjectMemoryPool  # Issue #2025-11-11-03
+from src.services.first_run_indexer import should_run_first_run_indexing, run_first_run_indexing
 
 # Import MCP handler
 from src.mcp.protocol_handler import MCPProtocolHandler
@@ -456,6 +457,27 @@ def main(config_path: Optional[str] = None) -> None:
             chunker,
             indexer
         )
+
+        # Check and run first-run indexing (if needed)
+        if should_run_first_run_indexing(
+            data_dir=config.data_dir,
+            enabled=config.logging.first_run_index_enabled
+        ):
+            logger.info("First-run indexing check triggered")
+            try:
+                # Determine if auto-approve based on environment
+                auto_approve = os.environ.get('CO_FIRST_RUN_AUTO', '0') == '1'
+                run_first_run_indexing(
+                    data_dir=config.data_dir,
+                    session_log_dir=config.logging.session_log_dir,
+                    ingestion_service=ingestion_service,
+                    auto_approve=auto_approve,
+                    max_file_size_mb=config.logging.first_run_index_max_file_mb,
+                    allowed_extensions=config.logging.first_run_index_allowed_extensions
+                )
+            except Exception as e:
+                logger.error(f"First-run indexing failed: {e}", exc_info=True)
+                # Continue startup even if first-run indexing fails
 
         # Check and run missed consolidation
         check_and_run_consolidation(consolidation_service, config.data_dir)
