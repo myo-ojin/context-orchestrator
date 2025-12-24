@@ -81,6 +81,11 @@ python -m src.main
 python scripts/log_bridge.py
 ```
 
+## Connect an MCP client
+- **Claude Desktop/Web**: Settings → Model Context Protocol → Add server. Command: `python -m src.main` (or `C:\Users\ryomy\context-orchestrator\.venv\Scripts\python.exe -m src.main` if using venv). Working directory: project root (`context-orchestrator`).
+- **mcp-shell (CLI)**: Run `mcp-shell "python -m src.main"` from the project root, then issue `search <query>` inside the shell.
+- **VS Code / Cursor MCP extensions**: Add server with the same command and set the working directory to the repo root. After enabling, trigger search from the extension UI/command palette.
+
 ## Key Settings (config.yaml)
 - `router.mid_summary_max_tokens` (default 800): token budget for hierarchical summaries.
 - `search.include_session_summaries` (default true): include is_session_summary results.
@@ -115,4 +120,3 @@ If configured, .md notes in your vault are ingested and searchable; otherwise ig
 ---
 
 For detailed flows and smoke tests, see [Quick Start](QUICKSTART.md) and [Setup Guide](SETUP_GUIDE.md).
-
