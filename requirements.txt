@@ -2,7 +2,7 @@
 # Python 3.11+ required
 
 # Core dependencies
-chromadb>=0.4.22              # Vector database (SQLite-based)
+chromadb>=1.3.5,<2.0.0        # Vector database (SQLite-based) - pin to 1.x for DB compatibility
 tiktoken>=0.5.2               # OpenAI tokenizer for chunking
 rank-bm25>=0.2.2              # BM25 keyword search
 pyyaml>=6.0.1                 # Configuration file parsing
