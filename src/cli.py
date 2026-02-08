@@ -44,11 +44,11 @@ def cmd_status(args):
         # Data directory
         print(f"📁 Data Directory: {config.data_dir}")
         data_dir_exists = Path(config.data_dir).exists()
-        print(f"   Status: {'✁EExists' if data_dir_exists else '✁ENot found'}")
+        print(f"   Status: {'✓ Exists' if data_dir_exists else '✗ Not found'}")
         print()
 
         # Check Ollama connection
-        print("🤁EOllama:")
+        print("🤖 Ollama:")
         try:
             local_llm = LocalLLMClient(
                 ollama_url=config.ollama.url,
@@ -56,14 +56,14 @@ def cmd_status(args):
                 inference_model=config.ollama.inference_model
             )
             print(f"   URL: {config.ollama.url}")
-            print(f"   Status: ✁EConnected")
+            print(f"   Status: ✓ Connected")
 
             # Check models
             print(f"   Embedding Model: {config.ollama.embedding_model}")
             print(f"   Inference Model: {config.ollama.inference_model}")
         except Exception as e:
             print(f"   URL: {config.ollama.url}")
-            print(f"   Status: ✁EFailed ({str(e)[:50]}...)")
+            print(f"   Status: ✗ Failed ({str(e)[:50]}...)")
         print()
 
         # Check Chroma DB
@@ -74,14 +74,14 @@ def cmd_status(args):
                 vector_db = ChromaVectorDB(persist_directory=str(chroma_path), collection_name='context_orchestrator')
                 count = vector_db.collection.count()
                 print(f"   Path: {chroma_path}")
-                print(f"   Status: ✁EInitialized")
+                print(f"   Status: ✓ Initialized")
                 print(f"   Memories: {count} items")
             except Exception as e:
                 print(f"   Path: {chroma_path}")
-                print(f"   Status: ✁EError ({e})")
+                print(f"   Status: ✗ Error ({e})")
         else:
             print(f"   Path: {chroma_path}")
-            print(f"   Status: ✁ENot initialized")
+            print(f"   Status: ✗ Not initialized")
         print()
 
         # Check BM25 Index
@@ -90,10 +90,10 @@ def cmd_status(args):
         if bm25_path.exists():
             size_kb = bm25_path.stat().st_size / 1024
             print(f"   Path: {bm25_path}")
-            print(f"   Status: ✁EExists ({size_kb:.1f} KB)")
+            print(f"   Status: ✓ Exists ({size_kb:.1f} KB)")
         else:
             print(f"   Path: {bm25_path}")
-            print(f"   Status: ✁ENot initialized")
+            print(f"   Status: ✗ Not initialized")
         print()
 
         # Check session logs
@@ -103,11 +103,11 @@ def cmd_status(args):
             log_files = list(log_dir.glob('*.log'))
             total_size = sum(f.stat().st_size for f in log_files) / 1024 / 1024  # MB
             print(f"   Directory: {log_dir}")
-            print(f"   Status: ✁EInitialized")
+            print(f"   Status: ✓ Initialized")
             print(f"   Files: {len(log_files)} sessions ({total_size:.2f} MB)")
         else:
             print(f"   Directory: {log_dir}")
-            print(f"   Status: ✁ENot initialized")
+            print(f"   Status: ✗ Not initialized")
         print()
 
         # Check Obsidian integration
@@ -117,11 +117,11 @@ def cmd_status(args):
             if vault_path.exists():
                 md_files = list(vault_path.rglob('*.md'))
                 print(f"   Vault: {vault_path}")
-                print(f"   Status: ✁EConnected")
+                print(f"   Status: ✓ Connected")
                 print(f"   Notes: {len(md_files)} markdown files")
             else:
                 print(f"   Vault: {vault_path}")
-                print(f"   Status: ✁ENot found")
+                print(f"   Status: ✗ Not found")
         else:
             print(f"   Status: Not configured")
         print()
@@ -139,9 +139,9 @@ def cmd_status(args):
 
                 print(f"   Last run: {last_time.strftime('%Y-%m-%d %H:%M:%S')} ({hours_since:.1f}h ago)")
                 print(f"   Schedule: {config.consolidation.schedule}")
-                print(f"   Status: {'✁EUp to date' if hours_since < 24 else '⚠ Overdue'}")
+                print(f"   Status: {'✓ Up to date' if hours_since < 24 else '⚠ Overdue'}")
             except Exception as e:
-                print(f"   Status: ✁EError reading timestamp")
+                print(f"   Status: ✗ Error reading timestamp ({e})")
         else:
             print(f"   Status: Never run")
             print(f"   Schedule: {config.consolidation.schedule}")
@@ -257,7 +257,7 @@ def cmd_consolidate(args):
         from datetime import datetime
         last_consolidation_file.write_text(datetime.now().isoformat(), encoding='utf-8')
 
-        print("✁EConsolidation completed successfully")
+        print("✓ Consolidation completed successfully")
         print()
 
     except Exception as e:
@@ -463,9 +463,9 @@ def cmd_export(args):
 
         size_mb = output_path.stat().st_size / 1024 / 1024
 
-        print(f"✁EExported {len(all_results['ids'])} memories")
-        print(f"✁EOutput file: {output_path}")
-        print(f"✁EFile size: {size_mb:.2f} MB")
+        print(f"✓ Exported {len(all_results['ids'])} memories")
+        print(f"✓ Output file: {output_path}")
+        print(f"✓ File size: {size_mb:.2f} MB")
         print()
 
     except Exception as e:
@@ -527,7 +527,7 @@ def cmd_ingest(args):
         # Parse Obsidian notes
         print(f"📁 Parsing Obsidian vault: {vault_path}")
         md_files = list(vault_path.rglob('*.md'))
-        print(f"✁EFound {len(md_files)} markdown files")
+        print(f"✓ Found {len(md_files)} markdown files")
         print()
         
         # Chunk and embed
@@ -592,12 +592,12 @@ def cmd_ingest(args):
         
         elapsed = time.time() - start_time
         
-        print(f"\n✁EIndexed {total_chunks} chunks from {len(md_files)} files")
-        print(f"✁ETime: {elapsed:.1f}s ({elapsed/len(md_files):.2f}s per file)")
+        print(f"\n✓ Indexed {total_chunks} chunks from {len(md_files)} files")
+        print(f"✓ Time: {elapsed:.1f}s ({elapsed/len(md_files):.2f}s per file)")
         
         # Save indices
         bm25_index._save()
-        print(f"✁ESaved BM25 index to {bm25_path}")
+        print(f"✓ Saved BM25 index to {bm25_path}")
         print()
         
     except Exception as e:
@@ -799,8 +799,8 @@ def cmd_import(args):
         print("Import Results")
         print("=" * 60)
         print()
-        print(f"✁EImported: {imported_count} memories")
-        print(f"⊁ESkipped: {skipped_count} memories")
+        print(f"✓ Imported: {imported_count} memories")
+        print(f"✗ Skipped: {skipped_count} memories")
         print()
 
     except Exception as e:
@@ -893,22 +893,23 @@ def main():
 
     _MAP = {
         '✓': 'OK', '✗': 'NG', '📁': '[DIR]', '🤖': '[Ollama]', '💾': '[DB]',
-        '🔍': '[Search]', '📝': '[Logs]', '📓': '[Obsidian]', '🌙': '[Cron]'
+        '🔍': '[Search]', '📝': '[Logs]', '📓': '[Obsidian]', '🌙': '[Cron]',
+        '⚠': '[!]',
     }
 
     orig_print = builtins.print
 
     def safe_print(*pargs, **pkwargs):
-        def _safe(s):
-            if isinstance(s, str) and not EMOJI_ON:
+        def _safe(s, force_strip=False):
+            if isinstance(s, str) and (not EMOJI_ON or force_strip):
                 for k, v in _MAP.items():
                     s = s.replace(k, v)
             return s
         try:
             return orig_print(*tuple(_safe(a) for a in pargs), **pkwargs)
         except UnicodeEncodeError:
-            # Fallback without emoji
-            return orig_print(*tuple(_safe(a) for a in pargs), **pkwargs)
+            # Fallback: force-strip all emoji
+            return orig_print(*tuple(_safe(a, force_strip=True) for a in pargs), **pkwargs)
 
     builtins.print = safe_print
 
