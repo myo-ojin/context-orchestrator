@@ -62,8 +62,6 @@ reports/*.csv
 # Development artifacts (exclude from OSS)
 .kiro/
 .claude/
-docs/
-progress/
 tmp_*.py
 tmp_*.txt
 tmp_*.json

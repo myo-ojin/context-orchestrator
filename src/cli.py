@@ -20,8 +20,10 @@ import builtins
 from src.config import load_config
 from src.utils.logger import setup_logger, get_logger
 from src.storage.vector_db import ChromaVectorDB
+from src.storage.bm25_index import BM25Index
 from src.services.session_log_collector import SessionLogCollector
 from src.services.session_summary import SessionSummaryWorker
+from src.services.search import SearchService
 from src.models.router import ModelRouter
 from src.models.local_llm import LocalLLMClient
 from src.models.cli_llm import CLILLMClient
@@ -42,11 +44,11 @@ def cmd_status(args):
         # Data directory
         print(f"📁 Data Directory: {config.data_dir}")
         data_dir_exists = Path(config.data_dir).exists()
-        print(f"   Status: {'✓ Exists' if data_dir_exists else '✗ Not found'}")
+        print(f"   Status: {'✁EExists' if data_dir_exists else '✁ENot found'}")
         print()
 
         # Check Ollama connection
-        print("🤖 Ollama:")
+        print("🤁EOllama:")
         try:
             local_llm = LocalLLMClient(
                 ollama_url=config.ollama.url,
@@ -54,14 +56,14 @@ def cmd_status(args):
                 inference_model=config.ollama.inference_model
             )
             print(f"   URL: {config.ollama.url}")
-            print(f"   Status: ✓ Connected")
+            print(f"   Status: ✁EConnected")
 
             # Check models
             print(f"   Embedding Model: {config.ollama.embedding_model}")
             print(f"   Inference Model: {config.ollama.inference_model}")
         except Exception as e:
             print(f"   URL: {config.ollama.url}")
-            print(f"   Status: ✗ Failed ({str(e)[:50]}...)")
+            print(f"   Status: ✁EFailed ({str(e)[:50]}...)")
         print()
 
         # Check Chroma DB
@@ -69,20 +71,17 @@ def cmd_status(args):
         chroma_path = Path(config.data_dir) / 'chroma_db'
         if chroma_path.exists():
             try:
-                vector_db = ChromaVectorDB(
-                    collection_name='context_orchestrator',
-                    persist_directory=str(chroma_path)
-                )
+                vector_db = ChromaVectorDB(persist_directory=str(chroma_path), collection_name='context_orchestrator')
                 count = vector_db.collection.count()
                 print(f"   Path: {chroma_path}")
-                print(f"   Status: ✓ Initialized")
+                print(f"   Status: ✁EInitialized")
                 print(f"   Memories: {count} items")
             except Exception as e:
                 print(f"   Path: {chroma_path}")
-                print(f"   Status: ✗ Error ({e})")
+                print(f"   Status: ✁EError ({e})")
         else:
             print(f"   Path: {chroma_path}")
-            print(f"   Status: ✗ Not initialized")
+            print(f"   Status: ✁ENot initialized")
         print()
 
         # Check BM25 Index
@@ -91,10 +90,10 @@ def cmd_status(args):
         if bm25_path.exists():
             size_kb = bm25_path.stat().st_size / 1024
             print(f"   Path: {bm25_path}")
-            print(f"   Status: ✓ Exists ({size_kb:.1f} KB)")
+            print(f"   Status: ✁EExists ({size_kb:.1f} KB)")
         else:
             print(f"   Path: {bm25_path}")
-            print(f"   Status: ✗ Not initialized")
+            print(f"   Status: ✁ENot initialized")
         print()
 
         # Check session logs
@@ -104,11 +103,11 @@ def cmd_status(args):
             log_files = list(log_dir.glob('*.log'))
             total_size = sum(f.stat().st_size for f in log_files) / 1024 / 1024  # MB
             print(f"   Directory: {log_dir}")
-            print(f"   Status: ✓ Initialized")
+            print(f"   Status: ✁EInitialized")
             print(f"   Files: {len(log_files)} sessions ({total_size:.2f} MB)")
         else:
             print(f"   Directory: {log_dir}")
-            print(f"   Status: ✗ Not initialized")
+            print(f"   Status: ✁ENot initialized")
         print()
 
         # Check Obsidian integration
@@ -118,11 +117,11 @@ def cmd_status(args):
             if vault_path.exists():
                 md_files = list(vault_path.rglob('*.md'))
                 print(f"   Vault: {vault_path}")
-                print(f"   Status: ✓ Connected")
+                print(f"   Status: ✁EConnected")
                 print(f"   Notes: {len(md_files)} markdown files")
             else:
                 print(f"   Vault: {vault_path}")
-                print(f"   Status: ✗ Not found")
+                print(f"   Status: ✁ENot found")
         else:
             print(f"   Status: Not configured")
         print()
@@ -140,9 +139,9 @@ def cmd_status(args):
 
                 print(f"   Last run: {last_time.strftime('%Y-%m-%d %H:%M:%S')} ({hours_since:.1f}h ago)")
                 print(f"   Schedule: {config.consolidation.schedule}")
-                print(f"   Status: {'✓ Up to date' if hours_since < 24 else '⚠ Overdue'}")
+                print(f"   Status: {'✁EUp to date' if hours_since < 24 else '⚠ Overdue'}")
             except Exception as e:
-                print(f"   Status: ✗ Error reading timestamp")
+                print(f"   Status: ✁EError reading timestamp")
         else:
             print(f"   Status: Never run")
             print(f"   Schedule: {config.consolidation.schedule}")
@@ -197,10 +196,7 @@ def cmd_consolidate(args):
             sys.exit(1)
 
         print("Initializing storage...")
-        vector_db = ChromaVectorDB(
-            collection_name='context_orchestrator',
-            persist_directory=str(chroma_path)
-        )
+        vector_db = ChromaVectorDB(persist_directory=str(chroma_path), collection_name='context_orchestrator')
 
         bm25_index = BM25Index(persist_path=str(bm25_path))
 
@@ -261,7 +257,7 @@ def cmd_consolidate(args):
         from datetime import datetime
         last_consolidation_file.write_text(datetime.now().isoformat(), encoding='utf-8')
 
-        print("✓ Consolidation completed successfully")
+        print("✁EConsolidation completed successfully")
         print()
 
     except Exception as e:
@@ -282,10 +278,7 @@ def cmd_list_recent(args):
             print("No memories found (database not initialized)")
             return
 
-        vector_db = ChromaVectorDB(
-            collection_name='context_orchestrator',
-            persist_directory=str(chroma_path)
-        )
+        vector_db = ChromaVectorDB(persist_directory=str(chroma_path), collection_name='context_orchestrator')
 
         # Get recent memories
         results = vector_db.list_by_metadata(
@@ -354,10 +347,7 @@ def cmd_session_history(args):
                 chroma_path = Path(config.data_dir) / 'chroma_db'
 
                 if chroma_path.exists():
-                    vector_db = ChromaVectorDB(
-                        collection_name='context_orchestrator',
-                        persist_directory=str(chroma_path)
-                    )
+                    vector_db = ChromaVectorDB(persist_directory=str(chroma_path), collection_name='context_orchestrator')
 
                     result = vector_db.get(f"{session_id}-summary")
 
@@ -436,10 +426,7 @@ def cmd_export(args):
             sys.exit(1)
 
         print("Loading memories from database...")
-        vector_db = ChromaVectorDB(
-            collection_name='context_orchestrator',
-            persist_directory=str(chroma_path)
-        )
+        vector_db = ChromaVectorDB(persist_directory=str(chroma_path), collection_name='context_orchestrator')
 
         # Get all memories
         all_results = vector_db.collection.get(
@@ -476,9 +463,9 @@ def cmd_export(args):
 
         size_mb = output_path.stat().st_size / 1024 / 1024
 
-        print(f"✓ Exported {len(all_results['ids'])} memories")
-        print(f"✓ Output file: {output_path}")
-        print(f"✓ File size: {size_mb:.2f} MB")
+        print(f"✁EExported {len(all_results['ids'])} memories")
+        print(f"✁EOutput file: {output_path}")
+        print(f"✁EFile size: {size_mb:.2f} MB")
         print()
 
     except Exception as e:
@@ -488,14 +475,220 @@ def cmd_export(args):
         sys.exit(1)
 
 
+def cmd_ingest(args):
+    """Ingest Obsidian notes into Vector DB and BM25 Index"""
+    try:
+        import time
+        config = load_config(args.config)
+        
+        print("=" * 60)
+        print("Ingest Obsidian Notes")
+        print("=" * 60)
+        print()
+        
+        # Determine vault path
+        vault_path = args.vault if args.vault else config.obsidian_vault_path
+        
+        if not vault_path:
+            print("Error: No vault path specified")
+            print("Use --vault or configure obsidian_vault_path in config")
+            sys.exit(1)
+        
+        vault_path = Path(vault_path)
+        if not vault_path.exists():
+            print(f"Error: Vault not found: {vault_path}")
+            sys.exit(1)
+        
+        # Initialize components
+        print("Initializing storage...")
+        chroma_path = Path(config.data_dir) / 'chroma_db'
+        vector_db = ChromaVectorDB(persist_directory=str(chroma_path), collection_name='context_orchestrator')
+        
+        bm25_path = Path(config.data_dir) / 'bm25_index.pkl'
+        bm25_index = BM25Index(persist_path=str(bm25_path))
+        
+        # Initialize model router
+        print("Initializing models...")
+        local_llm = LocalLLMClient(
+            ollama_url=config.ollama.url,
+            embedding_model=config.ollama.embedding_model,
+            inference_model=config.ollama.inference_model
+        )
+        
+        cli_llm = CLILLMClient(cli_command=config.cli.command)
+        
+        model_router = ModelRouter(
+            local_llm_client=local_llm,
+            cli_llm_client=cli_llm,
+            embedding_model=config.ollama.embedding_model,
+            inference_model=config.ollama.inference_model
+        )
+        
+        # Parse Obsidian notes
+        print(f"📁 Parsing Obsidian vault: {vault_path}")
+        md_files = list(vault_path.rglob('*.md'))
+        print(f"✁EFound {len(md_files)} markdown files")
+        print()
+        
+        # Chunk and embed
+        from src.processing.chunker import Chunker
+        chunker = Chunker()
+        
+        total_chunks = 0
+        start_time = time.time()
+        
+        for i, md_file in enumerate(md_files, 1):
+            try:
+                print(f"Processing [{i}/{len(md_files)}]: {md_file.name}".ljust(80), end='\r')
+                
+                # Read file content
+                content = md_file.read_text(encoding='utf-8')
+                
+                # Chunk the content
+                memory_id = f"obsidian-{md_file.stem}"
+                chunks = chunker.chunk(
+                    text=content,
+                    memory_id=memory_id,
+                    metadata={
+                        'source': 'obsidian',
+                        'file_path': str(md_file),
+                        'title': md_file.stem
+                    }
+                )
+                
+                # Generate embeddings and store
+                for chunk_idx, chunk in enumerate(chunks):
+                    chunk_id = chunk.id
+                    chunk_text = chunk.content
+                    
+                    if not chunk_text.strip():
+                        continue
+                    
+                    # Generate embedding
+                    embedding = model_router.generate_embedding(chunk_text)
+                    
+                    # Store in Vector DB
+                    vector_db.add(
+                        id=chunk_id,
+                        embedding=embedding,
+                        document=chunk_text,
+                        metadata={
+                            'source': 'obsidian',
+                            'file_path': str(md_file),
+                            'title': md_file.stem,
+                            'chunk_index': chunk_idx,
+                            'ingested_at': time.time()
+                        }
+                    )
+                    
+                    # Store in BM25 Index
+                    bm25_index.add_document(doc_id=chunk_id, text=chunk_text)
+                    
+                    total_chunks += 1
+                    
+            except Exception as e:
+                print(f"\nWarning: Failed to process {md_file.name}: {e}")
+                continue
+        
+        elapsed = time.time() - start_time
+        
+        print(f"\n✁EIndexed {total_chunks} chunks from {len(md_files)} files")
+        print(f"✁ETime: {elapsed:.1f}s ({elapsed/len(md_files):.2f}s per file)")
+        
+        # Save indices
+        bm25_index._save()
+        print(f"✁ESaved BM25 index to {bm25_path}")
+        print()
+        
+    except Exception as e:
+        logger.error(f"Ingest failed: {e}", exc_info=True)
+        print(f"\nError: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_search(args):
+    """Hybrid search (Vector + BM25) with cross-encoder reranking"""
+    try:
+        import time
+        config = load_config(args.config)
+        
+        start_time = time.time()
+        
+        # Initialize vector DB
+        chroma_path = Path(config.data_dir) / 'chroma_db'
+        if not chroma_path.exists():
+            print(json.dumps({'error': 'Vector database not initialized. Run ingest first.'}), file=sys.stderr)
+            sys.exit(1)
+        
+        vector_db = ChromaVectorDB(persist_directory=str(chroma_path), collection_name='context_orchestrator')
+        
+        # Initialize BM25 index
+        bm25_path = Path(config.data_dir) / 'bm25_index.pkl'
+        bm25_index = BM25Index(persist_path=str(bm25_path))
+        
+        # Initialize model router
+        local_llm = LocalLLMClient(
+            ollama_url=config.ollama.url,
+            embedding_model=config.ollama.embedding_model,
+            inference_model=config.ollama.inference_model
+        )
+        
+        cli_llm = CLILLMClient(cli_command=config.cli.command)
+        
+        model_router = ModelRouter(
+            local_llm_client=local_llm,
+            cli_llm_client=cli_llm,
+            embedding_model=config.ollama.embedding_model,
+            inference_model=config.ollama.inference_model
+        )
+        
+        # Create search service
+        search_service = SearchService(
+            vector_db=vector_db,
+            bm25_index=bm25_index,
+            model_router=model_router,
+            result_count=args.limit
+        )
+        
+        # Execute search
+        results = search_service.search(
+            query=args.query,
+            top_k=args.limit
+        )
+        
+        elapsed_ms = (time.time() - start_time) * 1000
+        
+        # Format output
+        output = {
+            'results': [
+                {
+                    'id': r['id'],
+                    'content': r['content'],
+                    'score': r.get('score', r.get('combined_score', 0)),
+                    'metadata': r.get('metadata', {})
+                }
+                for r in results
+            ],
+            'query': args.query,
+            'total': len(results),
+            'elapsed_ms': round(elapsed_ms, 2)
+        }
+        
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+        
+    except Exception as e:
+        logger.error(f"Search failed: {e}", exc_info=True)
+        error_output = {
+            'error': str(e),
+            'query': args.query
+        }
+        print(json.dumps(error_output), file=sys.stderr)
+        sys.exit(1)
+
+
 def cmd_import(args):
     """Import memories from JSON file"""
     try:
-        from src.storage.bm25_index import BM25Index
-        from src.models.router import ModelRouter
-        from src.models.local_llm import LocalLLMClient
-        from src.models.cli_llm import CLILLMClient
-
         config = load_config(args.config)
 
         print("=" * 60)
@@ -531,10 +724,7 @@ def cmd_import(args):
         chroma_path.parent.mkdir(parents=True, exist_ok=True)
 
         print("Initializing storage...")
-        vector_db = ChromaVectorDB(
-            collection_name='context_orchestrator',
-            persist_directory=str(chroma_path)
-        )
+        vector_db = ChromaVectorDB(persist_directory=str(chroma_path), collection_name='context_orchestrator')
 
         bm25_index = BM25Index(persist_path=str(bm25_path))
 
@@ -609,8 +799,8 @@ def cmd_import(args):
         print("Import Results")
         print("=" * 60)
         print()
-        print(f"✓ Imported: {imported_count} memories")
-        print(f"⊘ Skipped: {skipped_count} memories")
+        print(f"✁EImported: {imported_count} memories")
+        print(f"⊁ESkipped: {skipped_count} memories")
         print()
 
     except Exception as e:
@@ -674,6 +864,19 @@ def main():
     parser_import.add_argument('--force', action='store_true', help='Overwrite existing memories')
     parser_import.set_defaults(func=cmd_import)
 
+    # ingest command
+    parser_ingest = subparsers.add_parser('ingest', help='Ingest documents into Vector DB and BM25 Index')
+    parser_ingest.add_argument('--source', default='obsidian', help='Source type (obsidian, files, etc.)')
+    parser_ingest.add_argument('--vault', help='Path to Obsidian vault (default: from config)')
+    parser_ingest.add_argument('--force', action='store_true', help='Force re-index (clear existing data)')
+    parser_ingest.set_defaults(func=cmd_ingest)
+
+    # search command
+    parser_search = subparsers.add_parser('search', help='Search memories using hybrid retrieval (vector + BM25)')
+    parser_search.add_argument('--query', required=True, help='Search query string')
+    parser_search.add_argument('--limit', type=int, default=10, help='Maximum number of results to return (default: 10)')
+    parser_search.set_defaults(func=cmd_search)
+
     # Parse args
     args = parser.parse_args()
 
@@ -719,3 +922,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
