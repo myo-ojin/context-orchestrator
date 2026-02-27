@@ -475,6 +475,7 @@ class PlaybookAPI:
                     "confidence": self._calculate_decay_value(meta),
                     "domain": meta.get("domain", ""),
                 })
+        matches.sort(key=lambda m: m["confidence"], reverse=True)
         return matches[:limit]
 
     def get(self, rel_path: str, caller: str = "cli") -> dict:
@@ -862,7 +863,7 @@ class PlaybookAPI:
             results.append({
                 "key": meta.get("key", md.stem),
                 "expires": expires,
-                "preview": body[:100],
+                "preview": body.replace("\n", " ")[:100].strip(),
             })
         return results
 
@@ -1003,7 +1004,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             print("No matching playbooks found.")
             return 0
         for r in results:
-            print(f"  [{r['score']:.1f}] {r['playbook_id']}")
+            print(f"  [{r['score']:.1f}] (conf:{r['confidence']:.2f}) {r['playbook_id']}")
             print(f"        {r['title']}")
         return 0
 

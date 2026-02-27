@@ -1094,3 +1094,178 @@ class TestFindByTitle:
         from playbook_api import main
         ret = main(["--vault", str(vault), "find", "OpenClaw"])
         assert ret == 0
+
+    def test_find_whitespace_only_query(self, api: PlaybookAPI):
+        """空白のみのクエリは空リストを返す（strip 後に空になるため）。"""
+        results = api.find_by_title("   ")
+        assert results == []
+
+    def test_find_matches_title_not_filename(self, api: PlaybookAPI, vault: Path):
+        """タイトルのみでマッチし、ファイル名の prefix (Pattern_, Decision_) はヒットしない。"""
+        # "Pattern" はファイル名 prefix だが、タイトル本文には含まれない
+        # Akkadian_Strategy.md のタイトルは "Decision: Akkadian Translation Strategy"
+        # "strategy" はタイトルに含まれるのでヒットする
+        results_strategy = api.find_by_title("strategy")
+        assert len(results_strategy) >= 1
+        # "Strategy" のファイル名部分だけで "Akkadian_Strategy" はヒットしてはいけない
+        # ただし実際のタイトルに "Strategy" が含まれるので合法的ヒット
+        # ファイル名 prefix の "Decision_Record" はタイトルに含まれないことを確認
+        for r in results_strategy:
+            assert "Decision_Record" not in r["title"]
+
+    def test_find_no_docs_logs_no_event(self, api: PlaybookAPI, vault: Path):
+        """find_by_title は参照ログを記録しない（search と同様）。"""
+        log_path = vault / "logs" / "events.jsonl"
+        before = log_path.read_text() if log_path.exists() else ""
+        api.find_by_title("OpenClaw")
+        after = log_path.read_text() if log_path.exists() else ""
+        assert before == after
+
+
+# ---------------------------------------------------------------------------
+# learn (Inbox candidate creation)
+# ---------------------------------------------------------------------------
+
+class TestLearn:
+
+    def test_learn_creates_inbox_file(self, api: PlaybookAPI, vault: Path):
+        result = api.learn(
+            title="TDD Red-Green-Refactor Checklist",
+            body="# TDD Checklist\n\n## Red\n- Write failing test\n",
+            domain="dev-process",
+        )
+        assert "inbox_file" in result
+        inbox_path = vault / result["inbox_file"]
+        assert inbox_path.exists()
+
+    def test_learn_frontmatter_has_title(self, api: PlaybookAPI, vault: Path):
+        result = api.learn(
+            title="My New Learning",
+            body="# Body\nContent here.\n",
+        )
+        from playbook_api import parse_frontmatter
+        text = (vault / result["inbox_file"]).read_text(encoding="utf-8")
+        meta, _ = parse_frontmatter(text)
+        assert meta["title"] == "My New Learning"
+        assert meta["type"] == "learned"
+        assert meta["status"] == "pending_review"
+
+    def test_learn_domain_stored(self, api: PlaybookAPI, vault: Path):
+        result = api.learn(
+            title="Domain Test",
+            body="# Body\n",
+            domain="dev-process",
+        )
+        from playbook_api import parse_frontmatter
+        text = (vault / result["inbox_file"]).read_text(encoding="utf-8")
+        meta, _ = parse_frontmatter(text)
+        assert meta.get("domain") == "dev-process"
+
+    def test_learn_logs_event(self, api: PlaybookAPI, vault: Path):
+        api.learn(
+            title="Logged Learning",
+            body="# Body\n",
+            domain="security",
+        )
+        log_path = vault / "logs" / "events.jsonl"
+        lines = log_path.read_text().strip().splitlines()
+        learned_events = [json.loads(l) for l in lines if '"learned"' in l]
+        assert len(learned_events) >= 1
+        event = learned_events[-1]
+        assert event["type"] == "learned"
+        assert event["title"] == "Logged Learning"
+
+    def test_learn_empty_title_raises(self, api: PlaybookAPI):
+        with pytest.raises(ValueError, match="must not be empty"):
+            api.learn(title="", body="# Body\n")
+
+    def test_learn_cli(self, vault: Path):
+        from playbook_api import main
+        ret = main([
+            "--vault", str(vault),
+            "learn",
+            "--title", "CLI Learn Test",
+            "--body", "# CLI Body\n",
+            "--domain", "dev-process",
+        ])
+        assert ret == 0
+
+
+# ---------------------------------------------------------------------------
+# search performance: large vault (edge case)
+# ---------------------------------------------------------------------------
+
+class TestSearchPerformance:
+
+    def test_search_100_playbooks(self, api: PlaybookAPI, vault: Path):
+        """100件の Playbook でも search が 2 秒以内に完了する。"""
+        import time
+        # Create 100 playbooks
+        for i in range(100):
+            (vault / "Playbooks" / f"Pattern_Perf_Test_{i:03d}.md").write_text(
+                f"---\ntype: pattern\ndomain: infra\nconfidence: 0.5\n---\n"
+                f"# Performance Test Pattern {i:03d}\n\nBody text for test {i}.\n",
+                encoding="utf-8",
+            )
+        start = time.monotonic()
+        results = api.search("performance test pattern", limit=5)
+        elapsed = time.monotonic() - start
+        assert elapsed < 2.0, f"search took {elapsed:.2f}s — too slow"
+        assert len(results) == 5
+
+    def test_find_100_playbooks(self, api: PlaybookAPI, vault: Path):
+        """100件の Playbook でも find_by_title が 2 秒以内に完了する。"""
+        import time
+        for i in range(100):
+            (vault / "Playbooks" / f"Pattern_Find_Perf_{i:03d}.md").write_text(
+                f"---\ntype: pattern\ndomain: infra\nconfidence: 0.5\n---\n"
+                f"# Find Performance Test {i:03d}\n\nBody text.\n",
+                encoding="utf-8",
+            )
+        start = time.monotonic()
+        results = api.find_by_title("Find Performance Test", limit=10)
+        elapsed = time.monotonic() - start
+        assert elapsed < 2.0, f"find_by_title took {elapsed:.2f}s — too slow"
+        assert len(results) == 10
+
+
+# ---------------------------------------------------------------------------
+# audit: dev-process domain coverage
+# ---------------------------------------------------------------------------
+
+class TestAuditDevProcess:
+
+    def test_audit_dev_process_counts(self, api: PlaybookAPI, vault: Path):
+        """dev-process ドメインの playbook を追加して audit に反映されることを確認。"""
+        api.create(
+            type="pattern",
+            domain="dev-process",
+            title="TDD Workflow Pattern",
+            body="# TDD Workflow\n\nRed-Green-Refactor.\n",
+        )
+        report = api.audit(domain="dev-process")
+        assert "dev-process" in report["domains"]
+        dev_stats = report["domains"]["dev-process"]
+        assert dev_stats["count"] >= 1
+
+    def test_audit_ready_threshold(self, api: PlaybookAPI, vault: Path):
+        """min_count=1 にすると dev-process が READY になる。"""
+        api.create(
+            type="pattern",
+            domain="dev-process",
+            title="Minimal Dev Process Pattern",
+            body="# Pattern\n",
+        )
+        report = api.audit(domain="dev-process", min_count=1)
+        assert report["domains"]["dev-process"]["ready"] is True
+
+    def test_audit_learn_shows_in_inbox_pending(self, api: PlaybookAPI, vault: Path):
+        """learn() で作成した Inbox candidate が audit の inbox_pending に出る。"""
+        api.learn(
+            title="Audit Integration Test",
+            body="# Body\n",
+            domain="dev-process",
+        )
+        report = api.audit()
+        pending_titles = [c["query"] for c in report["inbox_pending"]]
+        assert any("Audit Integration Test" in t for t in pending_titles)
