@@ -85,12 +85,21 @@ def _serialize_frontmatter(meta: dict) -> str:
 
 
 def _update_frontmatter(abs_path: Path, key: str, value) -> None:
-    """Update a single frontmatter key, preserving the rest."""
-    text = abs_path.read_text(encoding="utf-8")
-    meta, body = parse_frontmatter(text)
-    new_meta = {**meta, key: value}
-    new_text = _serialize_frontmatter(new_meta) + body
-    abs_path.write_text(new_text, encoding="utf-8")
+    """Update a single frontmatter key, preserving the rest (with flock)."""
+    fd = os.open(str(abs_path), os.O_RDWR)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        raw = os.read(fd, os.path.getsize(str(abs_path)))
+        text = raw.decode("utf-8")
+        meta, body = parse_frontmatter(text)
+        new_meta = {**meta, key: value}
+        new_text = _serialize_frontmatter(new_meta) + body
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.ftruncate(fd, 0)
+        os.write(fd, new_text.encode("utf-8"))
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 # ---------------------------------------------------------------------------
@@ -353,6 +362,8 @@ class PlaybookAPI:
             raise ValueError("Title must not be empty")
         if len(title) > self.MAX_TITLE_LENGTH:
             raise ValueError(f"Title too long ({len(title)} chars). Max: {self.MAX_TITLE_LENGTH}")
+        if not (0.0 <= confidence <= 1.0):
+            raise ValueError(f"confidence must be between 0.0 and 1.0, got: {confidence}")
 
         # Generate filename from type and title — strip path separators
         slug = re.sub(r"[^a-zA-Z0-9]+", "_", title).strip("_")

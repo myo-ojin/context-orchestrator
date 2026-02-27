@@ -150,6 +150,8 @@ class TestSearch:
         assert results == []
 
     def test_search_does_not_log(self, api: PlaybookAPI, vault: Path):
+        # Ensure last_referenced is recent so apply_time_decay won't fire
+        api.get("Playbooks/OpenClaw_Tailscale.md")
         log_path = vault / "logs" / "events.jsonl"
         before = log_path.read_text() if log_path.exists() else ""
         api.search("tailscale")
@@ -428,6 +430,12 @@ class TestCreate:
     def test_create_long_title_raises(self, api: PlaybookAPI):
         with pytest.raises(ValueError, match="Title too long"):
             api.create(type="pattern", domain="infra", title="A" * 201, body="test")
+
+    def test_create_confidence_out_of_range_raises(self, api: PlaybookAPI):
+        with pytest.raises(ValueError, match="confidence must be between"):
+            api.create(type="pattern", domain="infra", title="High Conf", confidence=1.5)
+        with pytest.raises(ValueError, match="confidence must be between"):
+            api.create(type="pattern", domain="infra", title="Neg Conf", confidence=-0.1)
 
     def test_create_path_separators_sanitized(self, api: PlaybookAPI, vault: Path):
         result = api.create(
