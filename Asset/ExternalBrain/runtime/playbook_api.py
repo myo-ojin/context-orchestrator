@@ -189,12 +189,16 @@ class PlaybookAPI:
 
     @staticmethod
     def _score(query_tokens: list[str], target_text: str) -> float:
-        """Simple term-frequency scoring."""
+        """Length-normalized term-frequency scoring (TF/doclen)."""
         target_lower = target_text.lower()
-        score = 0.0
+        raw = 0.0
         for token in query_tokens:
-            score += target_lower.count(token)
-        return score
+            raw += target_lower.count(token)
+        if raw == 0:
+            return 0.0
+        # Normalize by token count to avoid long documents dominating
+        token_count = len(re.findall(r"[a-z0-9\u3040-\u9fff]+", target_lower))
+        return raw / max(token_count, 1)
 
     # ---- confidence update (H1) ----
 
@@ -438,9 +442,11 @@ class PlaybookAPI:
             title_line = body.split("\n", 1)[0] if body else ""
             tags = meta.get("tags", [])
             tags_text = " ".join(tags) if isinstance(tags, list) else ""
+            domain_text = meta.get("domain", "")
 
             s = (self._score(query_tokens, title_line) * 3.0
                  + self._score(query_tokens, tags_text) * 2.0
+                 + self._score(query_tokens, domain_text) * 1.5
                  + self._score(query_tokens, body) * 1.0
                  + self._score(query_tokens, rel_path) * 0.5)
             if s > 0:
