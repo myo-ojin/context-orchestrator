@@ -40,7 +40,7 @@ External Brain は、LLM エージェントが過去の判断・トラブルシ�
 
 ### データフロー
 
-1. **Search** — エージェントがキーワードで検索 → TF-IDF スコアリング → 結果に時間減衰を適用して上位 N 件を返す
+1. **Search** — エージェントがキーワードで検索 → フィールド重み付き TF-IDF スコアリング（タイトル×3, タグ×2, 本文×1, パス×0.5）→ 上位 N 件を返す（副作用なし・純粋な読み取り操作）
 2. **Get** — Playbook 本文を取得 → `last_referenced` を更新 → `referenced` イベントをログ
 3. **Record** — 使用結果 (`used` / `rejected`) を記録 → EWA で confidence を更新
 4. **Create** — 新しい Playbook を作成（型・ドメイン・タグ付き）
@@ -77,6 +77,9 @@ python3 "$BRAIN" create \
 python3 "$BRAIN" promote "Inbox/candidate.md" \
   --type pattern --domain dev --title "New Pattern"
 
+# タイトルで検索 (部分一致, 大文字小文字無視)
+python3 "$BRAIN" find "ECS" --limit 10
+
 # 監査レポート
 python3 "$BRAIN" audit
 
@@ -91,7 +94,8 @@ python3 "$BRAIN" forget "current-task"
 
 | コマンド | 説明 | ログ記録 | confidence 更新 |
 |----------|------|----------|-----------------|
-| `search` | TF-IDF でキーワード検索 | なし | 時間減衰を適用 |
+| `search` | フィールド重み付き TF-IDF 検索（副作用なし） | なし | なし（表示時に減衰計算） |
+| `find` | タイトル部分一致検索 | なし | なし |
 | `get` | Playbook 本文取得 | `referenced` | `last_referenced` 更新 |
 | `record` | 使用/棄却の記録 | `used` / `rejected` | EWA で更新 |
 | `create` | 新規 Playbook 作成 | `created` | 初期値 0.5 |
@@ -110,14 +114,14 @@ python3 "$BRAIN" forget "current-task"
 ExternalBrain/
 ├── README.md            # この文書
 ├── Playbooks/           # 正式な知識カード (Markdown + YAML frontmatter)
-├── Inbox/               # 未昇格の候補 (search miss / learn で自動生成)
+├── Inbox/               # 未昇格の候補 (search miss / learn で自動生成) ※検索対象外
 ├── WorkingMemory/       # 作業記憶 (TTL 付き一時 KV ストア)
 ├── logs/                # events.jsonl (全イベントの追記ログ)
 └── runtime/             # Python 実装
-    ├── playbook_api.py            # メイン API (~1050 行, stdlib のみ)
+    ├── playbook_api.py            # メイン API (~1150 行, stdlib のみ)
     ├── auto_learn.py              # 自動学習 (セッション transcript 解析)
     └── tests/
-        ├── test_playbook_api.py   # ユニットテスト (91 件)
+        ├── test_playbook_api.py   # ユニットテスト (109 件)
         ├── test_auto_learn.py     # auto_learn テスト (7 件)
         └── simulation/            # 探索テスト
             ├── seed_vault.py      # テスト用 vault 生成
@@ -255,7 +259,7 @@ brain forget "current-task"
 
 ## テスト
 
-### ユニットテスト (98 件)
+### ユニットテスト (109 件)
 
 ```bash
 cd runtime/
@@ -290,11 +294,11 @@ python sim_analysis.py  # 結果分析
 3. **低スコアヒット問題** — 関連性の低い結果も返ることがある（閾値チューニングが必要）
 4. **stdlib のみ** — 外部依存なしの設計上、高度な NLP 手法（ベクトル検索等）は未実装
 5. **単一ファイルロック** — fcntl ベースのファイルロックで並行書き込みを制御（高頻度アクセスには未対応）
-6. **search() の副作用** — 検索時に apply_time_decay が書き込みを行う（将来的に読み取り専用パスに分離予定）
+6. **Inbox は検索対象外** — `search()` / `find()` は `Playbooks/` のみを対象とする。Inbox の候補は `promote` で昇格後に検索可能
 
 ## 今後の方向性
 
-1. **ファイル分割** — playbook_api.py が ~1050 行に成長。storage/search/working_memory/cli への分割を検討
+1. **ファイル分割** — playbook_api.py が ~1150 行に成長。storage/search/working_memory/cli への分割を検討
 2. **セマンティック検索** — TF-IDF の代わりにベクトル検索を導入（SearchBackend インターフェース抽象化）
 3. **Playbook 間リンク** — 関連 Playbook の自動推薦
 4. **自動昇格** — Inbox 候補の自動評価・昇格パイプライン

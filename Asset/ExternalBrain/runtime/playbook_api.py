@@ -435,12 +435,14 @@ class PlaybookAPI:
             if domain and meta.get("domain", "") != domain:
                 continue
 
-            full_text = f"{rel_path} {body}"
+            title_line = body.split("\n", 1)[0] if body else ""
             tags = meta.get("tags", [])
-            if isinstance(tags, list):
-                full_text += " " + " ".join(tags)
+            tags_text = " ".join(tags) if isinstance(tags, list) else ""
 
-            s = self._score(query_tokens, full_text)
+            s = (self._score(query_tokens, title_line) * 3.0
+                 + self._score(query_tokens, tags_text) * 2.0
+                 + self._score(query_tokens, body) * 1.0
+                 + self._score(query_tokens, rel_path) * 0.5)
             if s > 0:
                 results.append({
                     "playbook_id": rel_path,
@@ -457,6 +459,23 @@ class PlaybookAPI:
             self._suggest_inbox(query, domain)
 
         return top
+
+    def find_by_title(self, title_query: str, limit: int = 5) -> list[dict]:
+        """Find playbooks by title substring match (case-insensitive)."""
+        if not title_query or not title_query.strip():
+            return []
+        query_lower = title_query.lower()
+        matches = []
+        for rel_path, meta, body in self._all_playbooks():
+            title_line = body.split("\n", 1)[0].lstrip("# ").strip() if body else ""
+            if query_lower in title_line.lower():
+                matches.append({
+                    "playbook_id": rel_path,
+                    "title": title_line,
+                    "confidence": self._calculate_decay_value(meta),
+                    "domain": meta.get("domain", ""),
+                })
+        return matches[:limit]
 
     def get(self, rel_path: str, caller: str = "cli") -> dict:
         """Read a playbook and auto-log 'referenced' event."""
@@ -878,6 +897,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p_search.add_argument("--domain", default=None)
     p_search.add_argument("--limit", type=int, default=5)
 
+    # find
+    p_find = sub.add_parser("find", help="Find playbooks by title")
+    p_find.add_argument("title", help="Title substring to search for")
+    p_find.add_argument("--limit", type=int, default=5)
+
     # get
     p_get = sub.add_parser("get", help="Read a playbook (auto-logs referenced)")
     p_get.add_argument("path", help="Relative path to playbook")
@@ -981,6 +1005,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         for r in results:
             print(f"  [{r['score']:.1f}] {r['playbook_id']}")
             print(f"        {r['title']}")
+        return 0
+
+    if args.command == "find":
+        results = api.find_by_title(args.title, limit=args.limit)
+        if not results:
+            print("No matching playbooks found.")
+            return 0
+        for r in results:
+            print(f"  {r['playbook_id']}")
+            print(f"    {r['title']} (confidence: {r['confidence']:.4f})")
         return 0
 
     if args.command == "get":

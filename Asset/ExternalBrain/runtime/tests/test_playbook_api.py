@@ -993,3 +993,104 @@ class TestLearn:
         text = Path(result["abs_path"]).read_text(encoding="utf-8")
         meta, _ = parse_frontmatter(text)
         assert meta["source"] == "auto"
+
+
+# ---------------------------------------------------------------------------
+# Field-weighted scoring (P1-2)
+# ---------------------------------------------------------------------------
+
+class TestFieldWeightedScoring:
+
+    def test_title_match_scores_higher_than_body(self, api: PlaybookAPI, vault: Path):
+        """A query matching the title should score higher than one matching only body text."""
+        # OpenClaw_Tailscale has "OpenClaw Remote Access" in title
+        # Create a playbook with "tailscale" only in the body, not title
+        api.create(
+            type="pattern", domain="infra",
+            title="Network Config Pattern",
+            tags=["network"],
+            body="# Network Config Pattern\n\nUse tailscale for VPN tunnels.\n",
+        )
+        results = api.search("tailscale")
+        # OpenClaw_Tailscale has "tailscale" in title AND tags AND body
+        # Network_Config has "tailscale" only in body
+        assert len(results) >= 2
+        tailscale_scores = {r["playbook_id"]: r["score"] for r in results}
+        oc_score = tailscale_scores.get("Playbooks/OpenClaw_Tailscale.md", 0)
+        net_score = tailscale_scores.get("Playbooks/Pattern_Network_Config_Pattern.md", 0)
+        assert oc_score > net_score
+
+    def test_tag_match_boosts_score(self, api: PlaybookAPI, vault: Path):
+        """A playbook with matching tags should score higher than one without."""
+        api.create(
+            type="pattern", domain="infra",
+            title="Deploy A",
+            tags=["redis", "cache"],
+            body="# Deploy A\n\nSome deployment steps.\n",
+        )
+        api.create(
+            type="pattern", domain="infra",
+            title="Deploy B",
+            tags=["postgres"],
+            body="# Deploy B\n\nRedis is mentioned in body only.\n",
+        )
+        results = api.search("redis")
+        scores = {r["playbook_id"]: r["score"] for r in results}
+        a_score = scores.get("Playbooks/Pattern_Deploy_A.md", 0)
+        b_score = scores.get("Playbooks/Pattern_Deploy_B.md", 0)
+        assert a_score > b_score
+
+    def test_path_contributes_to_score(self, api: PlaybookAPI, vault: Path):
+        """The path component should also contribute to scoring."""
+        # "Akkadian" appears in the path Playbooks/Akkadian_Strategy.md
+        results = api.search("akkadian")
+        assert len(results) >= 1
+        assert any("Akkadian" in r["playbook_id"] for r in results)
+
+
+# ---------------------------------------------------------------------------
+# find_by_title (P2-1)
+# ---------------------------------------------------------------------------
+
+class TestFindByTitle:
+
+    def test_find_basic_match(self, api: PlaybookAPI):
+        results = api.find_by_title("OpenClaw")
+        assert len(results) == 1
+        assert "OpenClaw_Tailscale" in results[0]["playbook_id"]
+        assert "OpenClaw Remote Access" in results[0]["title"]
+
+    def test_find_case_insensitive(self, api: PlaybookAPI):
+        results = api.find_by_title("openclaw")
+        assert len(results) == 1
+        assert "OpenClaw_Tailscale" in results[0]["playbook_id"]
+
+    def test_find_no_match(self, api: PlaybookAPI):
+        results = api.find_by_title("xyznonexistent")
+        assert results == []
+
+    def test_find_empty_query(self, api: PlaybookAPI):
+        results = api.find_by_title("")
+        assert results == []
+
+    def test_find_returns_confidence_and_domain(self, api: PlaybookAPI):
+        results = api.find_by_title("Akkadian")
+        assert len(results) == 1
+        assert "confidence" in results[0]
+        assert results[0]["domain"] == "kaggle"
+
+    def test_find_limit(self, api: PlaybookAPI, vault: Path):
+        # Create 3 playbooks with "Test" in title
+        for i in range(3):
+            api.create(
+                type="pattern", domain="infra",
+                title=f"Test Pattern {i}",
+                body=f"# Test Pattern {i}\n",
+            )
+        results = api.find_by_title("Test Pattern", limit=2)
+        assert len(results) == 2
+
+    def test_find_cli(self, vault: Path):
+        from playbook_api import main
+        ret = main(["--vault", str(vault), "find", "OpenClaw"])
+        assert ret == 0
