@@ -188,17 +188,20 @@ class PlaybookAPI:
         return re.findall(r"[a-z0-9\u3040-\u9fff]+", text.lower())
 
     @staticmethod
-    def _score(query_tokens: list[str], target_text: str) -> float:
-        """Length-normalized term-frequency scoring (TF/doclen)."""
+    def _score(query_tokens: list[str], target_text: str, target_token_count: int = 0) -> float:
+        """Length-normalized term-frequency scoring (TF/doclen).
+
+        Divides raw hit count by document token count to prevent
+        long documents from dominating search results.
+        If target_token_count is 0, it is computed via _tokenize.
+        """
         target_lower = target_text.lower()
-        raw = 0.0
-        for token in query_tokens:
-            raw += target_lower.count(token)
+        raw = sum(target_lower.count(token) for token in query_tokens)
         if raw == 0:
             return 0.0
-        # Normalize by token count to avoid long documents dominating
-        token_count = len(re.findall(r"[a-z0-9\u3040-\u9fff]+", target_lower))
-        return raw / max(token_count, 1)
+        if target_token_count <= 0:
+            target_token_count = len(PlaybookAPI._tokenize(target_text))
+        return raw / max(target_token_count, 1)
 
     # ---- confidence update (H1) ----
 
@@ -444,11 +447,18 @@ class PlaybookAPI:
             tags_text = " ".join(tags) if isinstance(tags, list) else ""
             domain_text = meta.get("domain", "")
 
-            s = (self._score(query_tokens, title_line) * 3.0
-                 + self._score(query_tokens, tags_text) * 2.0
-                 + self._score(query_tokens, domain_text) * 1.5
-                 + self._score(query_tokens, body) * 1.0
-                 + self._score(query_tokens, rel_path) * 0.5)
+            # Pre-compute token counts to avoid repeated re.findall in _score
+            title_tc = len(self._tokenize(title_line))
+            tags_tc = len(self._tokenize(tags_text))
+            domain_tc = len(self._tokenize(domain_text))
+            body_tc = len(self._tokenize(body))
+            path_tc = len(self._tokenize(rel_path))
+
+            s = (self._score(query_tokens, title_line, title_tc) * 3.0
+                 + self._score(query_tokens, tags_text, tags_tc) * 2.0
+                 + self._score(query_tokens, domain_text, domain_tc) * 1.5
+                 + self._score(query_tokens, body, body_tc) * 1.0
+                 + self._score(query_tokens, rel_path, path_tc) * 0.5)
             if s > 0:
                 results.append({
                     "playbook_id": rel_path,
