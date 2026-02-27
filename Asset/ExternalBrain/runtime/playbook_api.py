@@ -252,34 +252,22 @@ class PlaybookAPI:
     # ---- confidence time decay ----
 
     def apply_time_decay(self, rel_path: str) -> float:
-        """Apply time-based confidence decay. Returns (possibly updated) confidence."""
+        """Calculate and persist confidence decay. Returns (possibly updated) confidence."""
         meta, _, abs_path = self._load_playbook(rel_path)
         conf = meta.get("confidence", 0.5)
-        if not isinstance(conf, (int, float)):
-            return 0.5
+        decayed = self._calculate_decay_value(meta)
 
-        last_ref = meta.get("last_referenced", meta.get("created", ""))
-        if not last_ref:
-            return float(conf)
-
-        try:
-            last_dt = datetime.fromisoformat(str(last_ref))
-        except (ValueError, TypeError):
-            return float(conf)
-
-        now = datetime.now(JST)
-        if last_dt.tzinfo is None:
-            last_dt = last_dt.replace(tzinfo=JST)
-        days_since = (now - last_dt).days
-        if days_since <= self.DECAY_THRESHOLD_DAYS:
-            return float(conf)
-
-        months_over = (days_since - self.DECAY_THRESHOLD_DAYS) / 30
-        decayed = max(self.MIN_CONFIDENCE_FLOOR, conf - self.DECAY_RATE_PER_MONTH * months_over)
-        decayed = round(decayed, 4)
-
-        if decayed != conf:
+        if isinstance(conf, (int, float)) and decayed != float(conf):
             _update_frontmatter(abs_path, "confidence", decayed)
+            last_ref = meta.get("last_referenced", meta.get("created", ""))
+            try:
+                last_dt = datetime.fromisoformat(str(last_ref))
+                now = datetime.now(JST)
+                if last_dt.tzinfo is None:
+                    last_dt = last_dt.replace(tzinfo=JST)
+                days_since = (now - last_dt).days
+            except (ValueError, TypeError):
+                days_since = 0
             _log_event(self.vault, {
                 "ts": _now_iso(),
                 "type": "confidence_decayed",
