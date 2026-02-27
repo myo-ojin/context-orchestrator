@@ -291,6 +291,32 @@ class PlaybookAPI:
 
         return decayed
 
+    def _calculate_decay_value(self, meta: dict) -> float:
+        """Calculate decayed confidence WITHOUT writing to disk (pure function)."""
+        conf = meta.get("confidence", 0.5)
+        if not isinstance(conf, (int, float)):
+            return 0.5
+
+        last_ref = meta.get("last_referenced", meta.get("created", ""))
+        if not last_ref:
+            return float(conf)
+
+        try:
+            last_dt = datetime.fromisoformat(str(last_ref))
+        except (ValueError, TypeError):
+            return float(conf)
+
+        now = datetime.now(JST)
+        if last_dt.tzinfo is None:
+            last_dt = last_dt.replace(tzinfo=JST)
+        days_since = (now - last_dt).days
+        if days_since <= self.DECAY_THRESHOLD_DAYS:
+            return float(conf)
+
+        months_over = (days_since - self.DECAY_THRESHOLD_DAYS) / 30
+        decayed = max(self.MIN_CONFIDENCE_FLOOR, conf - self.DECAY_RATE_PER_MONTH * months_over)
+        return round(decayed, 4)
+
     # ---- inbox suggestion (H7) ----
 
     def _suggest_inbox(self, query: str, domain: Optional[str] = None) -> Path:
@@ -432,16 +458,12 @@ class PlaybookAPI:
                     "playbook_id": rel_path,
                     "score": s,
                     "domain": meta.get("domain", ""),
-                    "confidence": meta.get("confidence", ""),
+                    "confidence": self._calculate_decay_value(meta),
                     "title": body.split("\n", 1)[0].lstrip("# ").strip() if body else rel_path,
                 })
 
         results.sort(key=lambda r: r["score"], reverse=True)
         top = results[:limit]
-
-        # Apply time decay to search results
-        for r in top:
-            r["confidence"] = self.apply_time_decay(r["playbook_id"])
 
         if not top and query_tokens:
             self._suggest_inbox(query, domain)
